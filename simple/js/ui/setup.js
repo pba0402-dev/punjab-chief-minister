@@ -71,7 +71,7 @@ CMP.ui.setup = (function () {
 
           el('div', { class: 'block' }, [
             el('h2', { class: 'block-title', text: 'Select Your Party' }),
-            el('div', { class: 'party-grid' }, CMP.PARTIES.map(partyCard)),
+            el('div', { class: 'party-grid' }, CMP.PLAYABLE_PARTIES.map(partyCard)),
             errors.partyId
               ? el('span', { class: 'field-error', text: errors.partyId })
               : null,

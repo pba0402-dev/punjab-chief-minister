@@ -17,6 +17,8 @@ CMP.app = (function () {
   var screen = 'home';
   var lobbyView = null; // live CMP.ui.lobby instance while in the lobby
   var electionView = null; // live CMP.ui.election instance while campaigning
+  var resultView = null; // live CMP.ui.result instance once the polls close
+  var serverView = null; // the latest lobby/game view from the server
 
   function mount(node) {
     root = node;
@@ -69,10 +71,41 @@ CMP.app = (function () {
 
     lobbyView.setNotice(null);
     lobbyView.update(res.game);
+    serverView = res.game;
 
     if (res.game.phase === 'election') {
       startMultiplayerElection(res.game);
+      return;
     }
+
+    // Someone rejoining after the polls closed must land on the result, not
+    // sit in a lobby for a game that has already been decided.
+    if (res.game.phase === 'hung' || res.game.phase === 'government') {
+      resumeFinishedGame(res.game);
+    }
+  }
+
+  /** Rebuild just enough local state to show the result of a finished game. */
+  function resumeFinishedGame(view) {
+    var mine = mineFrom(view);
+    if (!mine) return;
+
+    stopLobby();
+    var mp = CMP.state.create();
+    mp.mode = 'multiplayer';
+    mp.gameCode = view.code;
+    mp.partyId = mine.partyId;
+    mp.candidateName = mine.candidateName;
+    mp.slogan = mine.slogan;
+    game = mp;
+    if (view.incumbency) game.incumbency = view.incumbency;
+    applyServerPlayer(mine);
+
+    serverView = view;
+    resultView = null;
+    screen = 'result';
+    paint();
+    CMP.net.startPolling(onElectionUpdate);
   }
 
   function stopLobby() {
@@ -80,13 +113,49 @@ CMP.app = (function () {
     lobbyView = null;
   }
 
-  /** While campaigning in multiplayer, refresh our own figures from the server. */
+  /**
+   * While a multiplayer game is running, keep our own figures in step with the
+   * server and follow it into the result screen when the polls close.
+   */
   function onElectionUpdate(res) {
-    if (!res.ok || screen !== 'election' || !game || game.mode !== 'multiplayer') return;
+    if (!res.ok || !game || game.mode !== 'multiplayer') return;
+    serverView = res.game;
+
+    // The incumbency map is the same board for everybody.
+    if (res.game.incumbency) game.incumbency = res.game.incumbency;
+
     var mine = mineFrom(res.game);
-    if (!mine) return;
-    applyServerPlayer(mine);
-    if (electionView) electionView.render(game);
+    if (mine) applyServerPlayer(mine);
+
+    // The host closing the polls moves everyone to the result together.
+    if (res.game.phase === 'hung' || res.game.phase === 'government') {
+      if (screen !== 'result') {
+        electionView = null;
+        screen = 'result';
+        paint();
+        return;
+      }
+      if (resultView) resultView.update(res.game);
+      return;
+    }
+
+    if (screen === 'election' && electionView) electionView.render(game);
+  }
+
+  /** Host only: close the polls. The poll then carries everyone to the result. */
+  function declareResult() {
+    CMP.net.declare().then(function (res) {
+      if (!res.ok) {
+        if (electionView) electionView.setReport(null);
+        window.alert(res.error || 'The polls could not be closed.');
+        return;
+      }
+      serverView = res.game;
+      electionView = null;
+      screen = 'result';
+      paint();
+      CMP.net.refresh();
+    });
   }
 
   /**
@@ -110,6 +179,7 @@ CMP.app = (function () {
     mp.slogan = mine.slogan;
     mp.screen = 'election';
     game = mp; // the server is the source of truth; nothing is saved locally
+    if (view.incumbency) game.incumbency = view.incumbency;
     applyServerPlayer(mine);
     electionView = null;
     screen = 'election';
@@ -132,10 +202,24 @@ CMP.app = (function () {
             goTo('home');
           },
           play: playAction,
+          getServerView: function () {
+            return serverView;
+          },
+          onDeclare: declareResult,
         });
       }
       electionView.render(game);
       view = electionView.root;
+    } else if (screen === 'result') {
+      if (!resultView) {
+        resultView = CMP.ui.result.create({
+          onMenu: function () {
+            goTo('home');
+          },
+        });
+      }
+      if (serverView) resultView.update(serverView);
+      view = resultView.root;
     } else if (screen === 'setup') {
       view = CMP.ui.setup.render({
         onBack: function () {
@@ -192,9 +276,11 @@ CMP.app = (function () {
 
   function goTo(name) {
     if (name !== 'lobby') stopLobby();
-    if (name !== 'election') {
-      electionView = null;
+    if (name !== 'election') electionView = null;
+    if (name !== 'result') resultView = null;
+    if (name !== 'election' && name !== 'result') {
       CMP.net.stopPolling(onElectionUpdate);
+      serverView = null;
     }
     screen = name;
     paint();

@@ -29,15 +29,55 @@ require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
 require __DIR__ . '/lib/Campaign.php';
+require __DIR__ . '/lib/Investigation.php';
+require __DIR__ . '/lib/Election.php';
+require __DIR__ . '/lib/Coalition.php';
 
 /* ---------------------------------------------------------------- config */
 
 const GAME_TTL_SECONDS = 86400;   // a game idle for a day is dropped
 const MAX_ACTIVE_GAMES = 500;     // a cheap ceiling on abuse
 
+/* Whatever happens, answer JSON. A fatal that renders as HTML shows up in the
+   browser as an unreadable parse error instead of a message. */
+ini_set('display_errors', '0');
+ini_set('html_errors', '0');
+
+set_exception_handler(function (Throwable $e) {
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    error_log('cmp api: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    echo json_encode([
+        'ok' => false,
+        'error' => 'The game server hit an unexpected problem.',
+        'code' => 'server_error',
+    ]);
+});
+
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err === null || !in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        return;
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode([
+        'ok' => false,
+        'error' => 'The game server hit an unexpected problem.',
+        'code' => 'server_error',
+    ]);
+});
+
 $dataDir = getenv('CMP_DATA_DIR') ?: __DIR__ . '/data';
 $store = new FileStore($dataDir);
 $campaign = new Campaign(__DIR__ . '/campaign-config.json');
+$investigation = new Investigation($campaign);
+$election = new Election($campaign);
+$coalitionRules = new Coalition($campaign);
 
 /* The seat list the board is dealt from. Read once from the generated data
    file so the server and browser always agree on which seats exist. */
@@ -53,6 +93,26 @@ $constituencyNumbers = (function (): array {
         }
     }
     return range(1, 117);
+})();
+
+/* Sitting MLAs, read from the generated data file so the server and browser
+   always agree on who holds which seat. */
+$incumbentParties = (function (): array {
+    $js = @file_get_contents(__DIR__ . '/../js/data/incumbents.js');
+    if ($js === false) {
+        return [];
+    }
+    if (preg_match('/CMP\.INCUMBENTS = (\[.*?\]);/s', $js, $m)) {
+        $list = json_decode($m[1], true);
+        if (is_array($list)) {
+            $map = [];
+            foreach ($list as $row) {
+                $map[(string) $row['number']] = $row['party'];
+            }
+            return $map;
+        }
+    }
+    return [];
 })();
 
 /* ---------------------------------------------------------------- errors */
@@ -363,8 +423,14 @@ switch (route()) {
             // game so all four see the same political landscape.
             $engine = $GLOBALS['campaign'];
             $numbers = $GLOBALS['constituencyNumbers'];
-            $parties = Lobby::PARTIES;
-            $board = $engine->seedSupport($numbers, $parties, $g['id']);
+            $parties = Lobby::GAME_PARTIES;
+            [$board, $incumbency] = $engine->seedSupport(
+                $numbers,
+                $parties,
+                $g['id'],
+                $GLOBALS['incumbentParties']
+            );
+            $g['incumbency'] = $incumbency;
             foreach ($g['players'] as $pid => $p) {
                 $g['players'][$pid]['support'] = $board;
                 $g['players'][$pid]['seatsLed'] = $engine->seatsLed($g['players'][$pid]);
@@ -391,6 +457,19 @@ switch (route()) {
             $engine = $GLOBALS['campaign'];
             $player = $g['players'][$playerId];
 
+            if (!empty($player['record']['disqualified'])) {
+                throw new LobbyError('You have been disqualified from this election.', 'disqualified');
+            }
+
+            $action = $engine->action($actionId);
+            if (($action['group'] ?? '') === 'risky'
+                && Investigation::isRestricted($player, (int) ($g['turn'] ?? 1))) {
+                throw new LobbyError(
+                    'You are under a campaign restriction and cannot use risky strategies yet.',
+                    'restricted'
+                );
+            }
+
             $blocked = $engine->blockedReason($player, $actionId, $target);
             if ($blocked !== null) {
                 throw new LobbyError($blocked, 'blocked');
@@ -405,6 +484,83 @@ switch (route()) {
 
             $g['players'][$playerId] = $player;
             $g['lastReport'] = $report;
+            return $g;
+        });
+    }
+
+    /* ------------------------------------------------------------ report */
+    case 'report': {
+        [$game, $playerId] = authenticate($store);
+        $accusedId = (string) input('accusedId', '');
+        $reason = preg_replace('/[^a-z]/i', '', (string) input('reason', ''));
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $accusedId, $reason) {
+            if (($g['phase'] ?? '') !== 'election') {
+                throw new LobbyError('Reports can only be made during the campaign.', 'not_campaign');
+            }
+            if (!empty($g['players'][$playerId]['record']['disqualified'])) {
+                throw new LobbyError('You are out of this election.', 'disqualified');
+            }
+            [$g, $res] = $GLOBALS['investigation']->report($g, $playerId, $accusedId, $reason);
+            if (!$res['ok']) {
+                throw new LobbyError($res['error'], 'report_refused');
+            }
+            $g['lastReport'] = [
+                'accusedId' => $accusedId,
+                'reports' => $res['reports'],
+                'opened' => $res['opened'],
+                'at' => time(),
+            ];
+            return $g;
+        });
+    }
+
+    /* ---------------------------------------------------------- election */
+    case 'declare': {
+        [$game, $playerId] = authenticate($store);
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId) {
+            if ($g['hostId'] !== $playerId) {
+                throw new LobbyError('Only the host can close the polls.', 'not_host', 403);
+            }
+            if (($g['phase'] ?? '') !== 'election') {
+                throw new LobbyError('The campaign is not running.', 'not_campaign');
+            }
+            $result = $GLOBALS['election']->run($g);
+            $g['result'] = $result;
+            $g['phase'] = $result['outcome'] === 'majority' ? 'government' : 'hung';
+            $g['possibleCoalitions'] = $GLOBALS['election']->possibleCoalitions($result);
+            return $g;
+        });
+    }
+
+    /* --------------------------------------------------------- coalition */
+    case 'coalition': {
+        [$game, $playerId] = authenticate($store);
+        $move = preg_replace('/[^a-z]/i', '', (string) input('move', ''));
+        $terms = [
+            'partnerId' => (string) input('partnerId', ''),
+            'chiefMinisterId' => (string) input('chiefMinisterId', ''),
+            'cabinet' => preg_replace('/[^a-zA-Z]/', '', (string) input('cabinet', '')),
+            'policy' => preg_replace('/[^a-zA-Z]/', '', (string) input('policy', '')),
+            'resources' => preg_replace('/[^a-zA-Z]/', '', (string) input('resources', '')),
+        ];
+        $note = clean((string) input('note', ''), 120);
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $move, $terms, $note) {
+            $rules = $GLOBALS['coalitionRules'];
+            if ($move === 'propose') {
+                [$g, $res] = $rules->propose($g, $playerId, $terms);
+            } elseif ($move === 'accept') {
+                [$g, $res] = $rules->accept($g, $playerId);
+            } elseif ($move === 'reject') {
+                [$g, $res] = $rules->reject($g, $playerId, $note);
+            } else {
+                throw new LobbyError('Unknown coalition move.', 'bad_move', 400);
+            }
+            if (!$res['ok']) {
+                throw new LobbyError($res['error'], 'coalition_refused');
+            }
             return $g;
         });
     }

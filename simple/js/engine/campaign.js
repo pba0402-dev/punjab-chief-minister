@@ -41,6 +41,17 @@ CMP.campaign = (function () {
     return items[items.length - 1];
   }
 
+  /**
+   * Real incumbents include parties nobody plays (BSP) and independents.
+   * Those all sit under "Others" for game purposes; their real affiliation is
+   * still shown on the constituency screen.
+   */
+  function gamePartyFor(realPartyCode) {
+    var id = String(realPartyCode || '').toLowerCase();
+    var party = CMP.getParty(id);
+    return party && party.playable ? id : 'oth';
+  }
+
   function heatLevel(heat) {
     var levels = config().heat.levels;
     for (var i = 0; i < levels.length; i++) {
@@ -298,6 +309,7 @@ CMP.campaign = (function () {
     seatsLed: seatsLed,
     standings: standings,
     weightedPick: weightedPick,
+    gamePartyFor: gamePartyFor,
     normalise: normalise,
   };
 })();

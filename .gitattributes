@@ -1,0 +1,3 @@
+# Keep the working tree in LF so patch tooling and diffs stay predictable.
+* text=auto eol=lf
+*.png binary

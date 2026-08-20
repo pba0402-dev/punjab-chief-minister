@@ -13,29 +13,61 @@
     "consequence - they describe no real-world method and never explain how",
     "anything would be done."
   ],
-
   "startingBudget": 50000000,
-
   "heat": {
     "max": 100,
     "levels": [
-      { "id": "low", "label": "Low", "upTo": 25, "colour": "#7fd6a0" },
-      { "id": "moderate", "label": "Moderate", "upTo": 50, "colour": "#e8b93c" },
-      { "id": "high", "label": "High", "upTo": 75, "colour": "#e8863c" },
-      { "id": "critical", "label": "Critical", "upTo": 100, "colour": "#e2634f" }
+      {
+        "id": "low",
+        "label": "Low",
+        "upTo": 25,
+        "colour": "#7fd6a0"
+      },
+      {
+        "id": "moderate",
+        "label": "Moderate",
+        "upTo": 50,
+        "colour": "#e8b93c"
+      },
+      {
+        "id": "high",
+        "label": "High",
+        "upTo": 75,
+        "colour": "#e8863c"
+      },
+      {
+        "id": "critical",
+        "label": "Critical",
+        "upTo": 100,
+        "colour": "#e2634f"
+      }
     ],
     "_consequenceComment": "Chance of a consequence firing after an action = heat/100 * chanceFactor, floored below minHeat.",
     "minHeat": 26,
     "chanceFactor": 0.55
   },
-
   "ratings": [
-    { "id": "safe", "label": "SAFE", "minMargin": 15 },
-    { "id": "likely", "label": "LIKELY", "minMargin": 8 },
-    { "id": "lean", "label": "LEAN", "minMargin": 3 },
-    { "id": "tossup", "label": "TOSS-UP", "minMargin": 0 }
+    {
+      "id": "safe",
+      "label": "SAFE",
+      "minMargin": 15
+    },
+    {
+      "id": "likely",
+      "label": "LIKELY",
+      "minMargin": 8
+    },
+    {
+      "id": "lean",
+      "label": "LEAN",
+      "minMargin": 3
+    },
+    {
+      "id": "tossup",
+      "label": "TOSS-UP",
+      "minMargin": 0
+    }
   ],
-
   "actions": [
     {
       "id": "rally",
@@ -49,12 +81,30 @@
       "impactLabel": "Moderate gain",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "strong", "weight": 25, "label": "A big turnout", "support": 4.5, "heat": 0,
-          "text": "The ground was packed and the speech carried. Support is up sharply." },
-        { "id": "normal", "weight": 60, "label": "A solid rally", "support": 3.0, "heat": 0,
-          "text": "A good crowd and a clean message. Steady gain." },
-        { "id": "weak", "weight": 15, "label": "A thin crowd", "support": 1.2, "heat": 0,
-          "text": "Turnout was modest. Some gain, not much." }
+        {
+          "id": "strong",
+          "weight": 25,
+          "label": "A big turnout",
+          "support": 4.5,
+          "heat": 0,
+          "text": "The ground was packed and the speech carried. Support is up sharply."
+        },
+        {
+          "id": "normal",
+          "weight": 60,
+          "label": "A solid rally",
+          "support": 3,
+          "heat": 0,
+          "text": "A good crowd and a clean message. Steady gain."
+        },
+        {
+          "id": "weak",
+          "weight": 15,
+          "label": "A thin crowd",
+          "support": 1.2,
+          "heat": 0,
+          "text": "Turnout was modest. Some gain, not much."
+        }
       ]
     },
     {
@@ -69,12 +119,30 @@
       "impactLabel": "Good gain",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "strong", "weight": 30, "label": "The message cuts through", "support": 6.0, "heat": 1,
-          "text": "Your line is being repeated back to you on the street." },
-        { "id": "normal", "weight": 55, "label": "Steady coverage", "support": 4.0, "heat": 1,
-          "text": "Solid visibility for the money." },
-        { "id": "weak", "weight": 15, "label": "Lost in the noise", "support": 1.5, "heat": 2,
-          "text": "Everyone else was advertising too. Limited effect." }
+        {
+          "id": "strong",
+          "weight": 30,
+          "label": "The message cuts through",
+          "support": 6,
+          "heat": 1,
+          "text": "Your line is being repeated back to you on the street."
+        },
+        {
+          "id": "normal",
+          "weight": 55,
+          "label": "Steady coverage",
+          "support": 4,
+          "heat": 1,
+          "text": "Solid visibility for the money."
+        },
+        {
+          "id": "weak",
+          "weight": 15,
+          "label": "Lost in the noise",
+          "support": 1.5,
+          "heat": 2,
+          "text": "Everyone else was advertising too. Limited effect."
+        }
       ]
     },
     {
@@ -89,12 +157,30 @@
       "impactLabel": "Moderate, durable gain",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "strong", "weight": 30, "label": "Genuinely appreciated", "support": 5.0, "heat": 0,
-          "text": "The work is visible and people credit you for it." },
-        { "id": "normal", "weight": 65, "label": "Well received", "support": 3.5, "heat": 0,
-          "text": "Quiet, solid goodwill." },
-        { "id": "weak", "weight": 5, "label": "Slow to land", "support": 1.5, "heat": 0,
-          "text": "It will be noticed eventually, but not before polling day." }
+        {
+          "id": "strong",
+          "weight": 30,
+          "label": "Genuinely appreciated",
+          "support": 5,
+          "heat": 0,
+          "text": "The work is visible and people credit you for it."
+        },
+        {
+          "id": "normal",
+          "weight": 65,
+          "label": "Well received",
+          "support": 3.5,
+          "heat": 0,
+          "text": "Quiet, solid goodwill."
+        },
+        {
+          "id": "weak",
+          "weight": 5,
+          "label": "Slow to land",
+          "support": 1.5,
+          "heat": 0,
+          "text": "It will be noticed eventually, but not before polling day."
+        }
       ]
     },
     {
@@ -109,15 +195,32 @@
       "impactLabel": "Small, cheap gain",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "strong", "weight": 25, "label": "Warm reception", "support": 3.2, "heat": 0,
-          "text": "Doors opened and workers were listened to." },
-        { "id": "normal", "weight": 60, "label": "Ground covered", "support": 2.2, "heat": 0,
-          "text": "Slow, steady, dependable." },
-        { "id": "weak", "weight": 15, "label": "Hard going", "support": 0.9, "heat": 1,
-          "text": "A cold reception in places. Modest gain." }
+        {
+          "id": "strong",
+          "weight": 25,
+          "label": "Warm reception",
+          "support": 3.2,
+          "heat": 0,
+          "text": "Doors opened and workers were listened to."
+        },
+        {
+          "id": "normal",
+          "weight": 60,
+          "label": "Ground covered",
+          "support": 2.2,
+          "heat": 0,
+          "text": "Slow, steady, dependable."
+        },
+        {
+          "id": "weak",
+          "weight": 15,
+          "label": "Hard going",
+          "support": 0.9,
+          "heat": 1,
+          "text": "A cold reception in places. Modest gain."
+        }
       ]
     },
-
     {
       "id": "deal",
       "group": "risky",
@@ -130,14 +233,38 @@
       "impactLabel": "Big swing, or trouble",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "large", "weight": 35, "label": "The deal holds", "support": 12.0, "heat": 18,
-          "text": "Whole blocks of votes move your way. Nobody says how." },
-        { "id": "small", "weight": 30, "label": "Partly delivered", "support": 5.0, "heat": 18,
-          "text": "Less than promised, but something moved." },
-        { "id": "none", "weight": 20, "label": "Nothing came of it", "support": 0, "heat": 18,
-          "text": "The money went out and nothing came back." },
-        { "id": "backfire", "weight": 15, "label": "It got out", "support": -8.0, "heat": 30,
-          "text": "Word spread about the arrangement. This will follow you." }
+        {
+          "id": "large",
+          "weight": 35,
+          "label": "The deal holds",
+          "support": 12,
+          "heat": 18,
+          "text": "Whole blocks of votes move your way. Nobody says how."
+        },
+        {
+          "id": "small",
+          "weight": 30,
+          "label": "Partly delivered",
+          "support": 5,
+          "heat": 18,
+          "text": "Less than promised, but something moved."
+        },
+        {
+          "id": "none",
+          "weight": 20,
+          "label": "Nothing came of it",
+          "support": 0,
+          "heat": 18,
+          "text": "The money went out and nothing came back."
+        },
+        {
+          "id": "backfire",
+          "weight": 15,
+          "label": "It got out",
+          "support": -8,
+          "heat": 30,
+          "text": "Word spread about the arrangement. This will follow you."
+        }
       ]
     },
     {
@@ -152,12 +279,30 @@
       "impactLabel": "Gain, or heat",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "gain", "weight": 40, "label": "Levers moved", "support": 7.0, "heat": 12,
-          "text": "The right people became helpful." },
-        { "id": "none", "weight": 35, "label": "No traction", "support": 0, "heat": 12,
-          "text": "Nothing shifted. The money is gone." },
-        { "id": "heat", "weight": 25, "label": "Questions are being asked", "support": 0, "heat": 26,
-          "text": "Someone noticed the pressure and started asking who applied it." }
+        {
+          "id": "gain",
+          "weight": 40,
+          "label": "Levers moved",
+          "support": 7,
+          "heat": 12,
+          "text": "The right people became helpful."
+        },
+        {
+          "id": "none",
+          "weight": 35,
+          "label": "No traction",
+          "support": 0,
+          "heat": 12,
+          "text": "Nothing shifted. The money is gone."
+        },
+        {
+          "id": "heat",
+          "weight": 25,
+          "label": "Questions are being asked",
+          "support": 0,
+          "heat": 26,
+          "text": "Someone noticed the pressure and started asking who applied it."
+        }
       ]
     },
     {
@@ -172,12 +317,31 @@
       "impactLabel": "Hurts your rival — usually",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "works", "weight": 45, "label": "It lands", "support": 0, "opponentSupport": -8.0, "heat": 10,
-          "text": "Your rival spends the week defending themselves instead of campaigning." },
-        { "id": "none", "weight": 30, "label": "Shrugged off", "support": 0, "heat": 10,
-          "text": "Voters have heard it all before." },
-        { "id": "backlash", "weight": 25, "label": "It rebounds", "support": -6.0, "heat": 20,
-          "text": "People thought it was beneath you, and said so." }
+        {
+          "id": "works",
+          "weight": 45,
+          "label": "It lands",
+          "support": 0,
+          "opponentSupport": -8,
+          "heat": 10,
+          "text": "Your rival spends the week defending themselves instead of campaigning."
+        },
+        {
+          "id": "none",
+          "weight": 30,
+          "label": "Shrugged off",
+          "support": 0,
+          "heat": 10,
+          "text": "Voters have heard it all before."
+        },
+        {
+          "id": "backlash",
+          "weight": 25,
+          "label": "It rebounds",
+          "support": -6,
+          "heat": 20,
+          "text": "People thought it was beneath you, and said so."
+        }
       ]
     },
     {
@@ -192,16 +356,33 @@
       "impactLabel": "Can flip a marginal",
       "needsConstituency": true,
       "outcomes": [
-        { "id": "large", "weight": 30, "label": "The seat swings", "support": 15.0, "heat": 15,
-          "text": "A late surge. This could be the seat that decides it." },
-        { "id": "moderate", "weight": 40, "label": "Some movement", "support": 6.0, "heat": 15,
-          "text": "It moved, but not as far as you needed." },
-        { "id": "backlash", "weight": 30, "label": "Too much, too late", "support": -10.0, "heat": 25,
-          "text": "The blitz looked desperate, and voters read it that way." }
+        {
+          "id": "large",
+          "weight": 30,
+          "label": "The seat swings",
+          "support": 15,
+          "heat": 15,
+          "text": "A late surge. This could be the seat that decides it."
+        },
+        {
+          "id": "moderate",
+          "weight": 40,
+          "label": "Some movement",
+          "support": 6,
+          "heat": 15,
+          "text": "It moved, but not as far as you needed."
+        },
+        {
+          "id": "backlash",
+          "weight": 30,
+          "label": "Too much, too late",
+          "support": -10,
+          "heat": 25,
+          "text": "The blitz looked desperate, and voters read it that way."
+        }
       ]
     }
   ],
-
   "consequences": [
     {
       "id": "rumours",
@@ -209,7 +390,7 @@
       "weight": 30,
       "label": "Rumours spreading",
       "text": "Talk about your campaign's methods is doing the rounds.",
-      "support": -2.0,
+      "support": -2,
       "seats": 2,
       "heat": 0
     },
@@ -229,7 +410,7 @@
       "weight": 25,
       "label": "Campaign controversy",
       "text": "A story about your campaign has led the evening bulletins.",
-      "support": -4.0,
+      "support": -4,
       "seats": 3,
       "heat": 3
     },
@@ -249,7 +430,7 @@
       "weight": 20,
       "label": "Public backlash",
       "text": "Voters across the region have turned on your campaign.",
-      "support": -5.0,
+      "support": -5,
       "seats": 6,
       "heat": 4
     },
@@ -259,9 +440,268 @@
       "weight": 20,
       "label": "Investigation opened",
       "text": "An inquiry into your campaign's conduct has been announced.",
-      "support": -7.0,
+      "support": -7,
       "seats": 8,
       "heat": 6
     }
-  ]
+  ],
+  "incumbency": {
+    "_comment": [
+      "The sitting MLA's party starts ahead in their own seat. How far ahead is",
+      "rolled per seat from the game seed, so the map is not uniform and players",
+      "cannot assume every incumbent is equally hard to shift.",
+      "",
+      "These numbers are a balance between two requirements that pull against each",
+      "other. Incumbency has to be a real advantage, or the verified MLA data is",
+      "decoration; but the real result must not simply replay, or the game is over",
+      "before anyone campaigns. partySwingSpread is what buys the second: each game",
+      "rolls one swing per party across every seat, so some open with a dominant",
+      "incumbent bloc and others with a genuine four-way fight.",
+      "",
+      "As tuned (measure with: npm run measure:board, 60 games):",
+      "  incumbents hold their own seat in 74 of 117 on average, range 22-110",
+      "  the largest bloc opens on 76 on average, range 44-113",
+      "  the incumbent party leads the board in roughly two games in three",
+      "After four players campaign, about a quarter of elections end hung.",
+      "",
+      "othersHandicap keeps the unplayable Others bucket where it belongs: it holds",
+      "a couple of real seats and can win a handful, but it never gets a statewide",
+      "swing and never sweeps.",
+      "",
+      "Advantage, swing and spread are all in percentage points of support."
+    ],
+    "levels": [
+      {
+        "id": "weak",
+        "label": "Weak",
+        "advantage": 5,
+        "weight": 30
+      },
+      {
+        "id": "medium",
+        "label": "Medium",
+        "advantage": 10,
+        "weight": 45
+      },
+      {
+        "id": "strong",
+        "label": "Strong",
+        "advantage": 17,
+        "weight": 25
+      }
+    ],
+    "baseSupport": 24,
+    "spread": 14,
+    "partySwingSpread": 22,
+    "othersHandicap": -7
+  },
+  "election": {
+    "_comment": [
+      "Election day. Each seat is decided on its support plus a little noise, so",
+      "a narrow lead is not a guarantee and a close race can go either way.",
+      "seatNoise is in percentage points."
+    ],
+    "seatNoise": 3.2,
+    "majority": 59,
+    "totalSeats": 117
+  },
+  "coalition": {
+    "_comment": [
+      "Post-election government formation. Version 1 allows two human players in",
+      "a coalition; the structure allows more later.",
+      "A proposal must be accepted by the other player, and either side can walk",
+      "away, in which case the talks fail and another pairing can be tried."
+    ],
+    "maxPartners": 2,
+    "requiredSeats": 59,
+    "cabinetSplits": [
+      {
+        "id": "even",
+        "label": "50 / 50",
+        "proposer": 50,
+        "partner": 50
+      },
+      {
+        "id": "leader",
+        "label": "60 / 40 to the larger party",
+        "proposer": 60,
+        "partner": 40
+      },
+      {
+        "id": "generous",
+        "label": "40 / 60 to the partner",
+        "proposer": 40,
+        "partner": 60
+      }
+    ],
+    "policies": [
+      {
+        "id": "farm",
+        "label": "Farm support and procurement"
+      },
+      {
+        "id": "jobs",
+        "label": "Jobs and industry"
+      },
+      {
+        "id": "health",
+        "label": "Health and education"
+      },
+      {
+        "id": "law",
+        "label": "Law and order"
+      },
+      {
+        "id": "power",
+        "label": "Power and infrastructure"
+      }
+    ],
+    "resourceTerms": [
+      {
+        "id": "equal",
+        "label": "Split campaign resources equally next time"
+      },
+      {
+        "id": "proposerFirst",
+        "label": "Proposer gets first call on resources"
+      },
+      {
+        "id": "partnerFirst",
+        "label": "Partner gets first call on resources"
+      }
+    ]
+  },
+  "investigation": {
+    "_comment": [
+      "A fictional oversight mechanic layered on Political Heat.",
+      "",
+      "Players may report a rival once each. Reports do not equal guilt: the",
+      "outcome is rolled against a hidden evidence score, so an innocent player",
+      "can be cleared even with three reports, and ganging up does not reliably",
+      "remove anyone.",
+      "",
+      "Evidence is never shown to players. Weights are shifted by evidenceBias:",
+      "positive means more likely when evidence is high, negative means less."
+    ],
+    "reportsToOpen": 2,
+    "reportsForHighPriority": 3,
+    "reasons": [
+      {
+        "id": "activity",
+        "label": "Suspicious Campaign Activity"
+      },
+      {
+        "id": "spending",
+        "label": "Unusual Spending"
+      },
+      {
+        "id": "rules",
+        "label": "Campaign Rule Violation"
+      },
+      {
+        "id": "influence",
+        "label": "Undisclosed Influence"
+      },
+      {
+        "id": "other",
+        "label": "Other"
+      }
+    ],
+    "evidence": {
+      "_comment": "All contributions are capped so no single factor decides it.",
+      "perRiskyAction": 6,
+      "riskyActionCap": 36,
+      "heatWeight": 0.45,
+      "perPriorPenalty": 12,
+      "priorPenaltyCap": 24,
+      "perReportOverThreshold": 5,
+      "randomSpread": 18,
+      "max": 100
+    },
+    "outcomes": [
+      {
+        "id": "cleared",
+        "label": "CLEARED",
+        "weight": 40,
+        "evidenceBias": -0.85,
+        "text": "The inquiry found nothing to answer. Your campaign carries on.",
+        "heat": -12,
+        "support": 1.5,
+        "seats": 3,
+        "counts": false
+      },
+      {
+        "id": "warning",
+        "label": "WARNING",
+        "weight": 25,
+        "evidenceBias": 0.15,
+        "text": "A formal warning is recorded against your campaign.",
+        "heat": -4,
+        "support": -1.5,
+        "seats": 3,
+        "counts": true
+      },
+      {
+        "id": "fine",
+        "label": "FINE",
+        "weight": 18,
+        "evidenceBias": 0.6,
+        "text": "Your campaign is fined.",
+        "fine": 2500000,
+        "heat": -6,
+        "support": -2.5,
+        "seats": 4,
+        "counts": true
+      },
+      {
+        "id": "majorFine",
+        "label": "MAJOR FINE",
+        "weight": 10,
+        "evidenceBias": 1,
+        "text": "A substantial fine is imposed after a damaging finding.",
+        "fine": 7500000,
+        "heat": -8,
+        "support": -4,
+        "seats": 6,
+        "counts": true
+      },
+      {
+        "id": "restriction",
+        "label": "CAMPAIGN RESTRICTION",
+        "weight": 7,
+        "evidenceBias": 0.9,
+        "text": "You are barred from the riskier campaign methods for a time.",
+        "restrictTurns": 3,
+        "heat": -10,
+        "support": -3,
+        "seats": 4,
+        "counts": true
+      },
+      {
+        "id": "disqualification",
+        "label": "DISQUALIFICATION",
+        "weight": 1,
+        "evidenceBias": 1.8,
+        "minEvidence": 78,
+        "minReports": 3,
+        "text": "Your candidature is cancelled under the rules of the game.",
+        "disqualify": true,
+        "counts": true
+      }
+    ],
+    "insufficientFunds": {
+      "_comment": "If a fine cannot be paid, the budget is emptied and the rest is taken out in other ways. A budget must never go negative.",
+      "restrictTurns": 2,
+      "support": -3,
+      "seats": 5,
+      "text": "Your campaign could not pay the fine in full, and paid for it in other ways."
+    },
+    "publicReaction": {
+      "opened": {
+        "text": "Investigation announced — public support falls slightly.",
+        "support": -1.2,
+        "seats": 4
+      }
+    }
+  }
 }

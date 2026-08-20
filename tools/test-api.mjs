@@ -319,7 +319,9 @@ check('games are stored on the server', files.length >= 1, files.length + ' file
 const raw = JSON.parse(fs.readFileSync(path.join(DATA, files[0]), 'utf8'));
 check('stored game has a code', typeof raw.code === 'string');
 check('stored game has players', Object.keys(raw.players).length >= 1);
-check('stored game keeps a constituency container', raw.constituencies !== undefined);
+check('stored game keeps the incumbency baseline', raw.incumbency !== undefined);
+check('stored game keeps coalition state', raw.coalition !== undefined);
+check('stored game keeps a result slot', 'result' in raw);
 check('the data directory is protected from the web', fs.existsSync(path.join(DATA, '.htaccess')));
 
 const publicFields = JSON.stringify(afterLeave.game);

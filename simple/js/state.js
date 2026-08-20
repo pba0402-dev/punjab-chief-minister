@@ -34,6 +34,7 @@ CMP.state = (function () {
 
       // Support per constituency, keyed by number: { aap: 31.2, inc: 28.0, ... }
       support: {},
+      incumbency: {},
       // Every action taken, newest last.
       actions: [],
 
@@ -47,33 +48,58 @@ CMP.state = (function () {
   }
 
   /**
-   * Build the opening political map. Seeded, so the same game always starts
-   * the same way, and every party begins genuinely in contention somewhere.
+   * Build the opening political map from the real sitting MLAs.
+   *
+   * The party holding a seat starts ahead in it, by an amount rolled per seat
+   * from the game seed so the map is not uniform. Incumbents whose party is
+   * not one of the four playable ones sit under "Others".
+   *
+   * This is a starting position, not a prediction: campaigning can overturn
+   * any of it, and the game never reproduces the real result on its own.
    */
   function seedSupport(game) {
     var rand = CMP.rng.create(game.seed + ':support');
+    var cfg = CMP.CAMPAIGN.incumbency;
     var parties = CMP.PARTIES.map(function (p) {
       return p.id;
     });
 
-    // Each party gets a regional bias so the map has strongholds rather than
-    // 117 identical seats.
-    var bias = {};
+    // One swing per party per game, applied to every seat. This is what stops
+    // the real membership replaying itself: the incumbent bloc can start the
+    // game under real pressure, or with a commanding lead, depending on the roll.
+    var swing = {};
     parties.forEach(function (id) {
-      bias[id] = (rand() - 0.5) * 12;
+      // Others never gets a statewide swing — small parties and independents
+      // hold seats one at a time, they do not surge across Punjab.
+      swing[id] = id === 'oth'
+        ? cfg.othersHandicap
+        : (rand() - 0.5) * cfg.partySwingSpread;
     });
 
     var support = {};
+    var incumbency = {};
+
     CMP.CONSTITUENCIES.forEach(function (c) {
+      var sitting = CMP.getIncumbent(c.number);
+      var holder = sitting ? CMP.campaign.gamePartyFor(sitting.party) : 'oth';
+
+      // How entrenched is this particular incumbent?
+      var level = CMP.campaign.weightedPick(cfg.levels, rand());
+
       var seat = {};
       parties.forEach(function (id) {
-        seat[id] = Math.max(3, 25 + bias[id] + (rand() - 0.5) * 22);
+        seat[id] = Math.max(2, cfg.baseSupport + swing[id] + (rand() - 0.5) * cfg.spread);
       });
+      seat[holder] += level.advantage;
+
       CMP.campaign.normalise(seat);
       support[c.number] = seat;
+      incumbency[c.number] = { party: holder, level: level.id, label: level.label };
     });
 
+    game.swing = swing;
     game.support = support;
+    game.incumbency = incumbency;
   }
 
   /** Check the setup form before starting. Budget is not asked for. */

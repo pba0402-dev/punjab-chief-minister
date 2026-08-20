@@ -320,7 +320,7 @@ CMP.ui.lobby = (function () {
       var mine = me();
       mount(
         partyNode,
-        CMP.PARTIES.map(function (party) {
+        CMP.PLAYABLE_PARTIES.map(function (party) {
           var takenByOther =
             view.takenParties.indexOf(party.id) !== -1 &&
             !(mine && mine.partyId === party.id);

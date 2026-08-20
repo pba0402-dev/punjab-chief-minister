@@ -368,6 +368,123 @@ check(
   statOf(host, 'Remaining Budget') + ' vs ' + statOf(players[1], 'Remaining Budget')
 );
 
+/* --------------------------------------------- constituency + oversight */
+
+section('Constituency detail shows real MLA and fictional race');
+
+const tabButton = (client, label) =>
+  client.qq('.panel-tab').find((t) => t.textContent === label);
+
+host.click(tabButton(host, 'Constituency'));
+await host.until('seat detail', () => !!host.q('.seat-detail'));
+check('the constituency tab opens', !!host.q('.seat-detail'));
+check('it names the seat and its AC number', /AC \d+/.test(host.q('.seat-detail-name').textContent),
+  host.q('.seat-detail-name').textContent);
+check('the sitting MLA is shown', !!host.q('.incumbent-name') && host.q('.incumbent-name').textContent.length > 2,
+  host.q('.incumbent-name') ? host.q('.incumbent-name').textContent : 'missing');
+check('their party is shown', !!host.q('.incumbent-party'));
+check('incumbency strength is shown', !!host.q('.incumbent-strength'),
+  host.q('.incumbent-strength') ? host.q('.incumbent-strength').textContent : 'missing');
+check('it is labelled as real reference data',
+  /takes no part in the game/i.test(host.q('.seat-detail').textContent));
+check('the fictional race is shown separately', /Current Game Race/.test(host.q('.seat-detail').textContent));
+check('every party has a bar', host.qq('.race-row').length >= 4, String(host.qq('.race-row').length));
+check('one party is marked LEADING', host.qq('.race-lead').length === 1);
+check('a projected winner is named', !!host.q('.projected-party'));
+check('a LEADING badge is shown at the top', !!host.q('.leading-badge'));
+
+section('Reporting a rival');
+host.click(tabButton(host, 'Rivals'));
+await host.until('rivals', () => !!host.q('.rival-list'));
+check('the rivals tab opens', !!host.q('.rival-list'));
+check('it lists the other three players', host.qq('.rival-row').length === 3,
+  String(host.qq('.rival-row').length));
+check('each rival shows their Political Heat', host.qq('.rival-heat').length === 3);
+check('a report button is offered', host.qq('.btn-report').length === 3);
+
+host.click(host.qq('.btn-report')[0]);
+await host.until('reasons', () => !!host.q('.reason-list'));
+check('choosing REPORT asks for a reason', !!host.q('.reason-list'));
+check('the configured reasons are offered',
+  host.qq('.reason-option').length === host.dom.window.CMP.CAMPAIGN.investigation.reasons.length);
+check('it warns that a report is not a verdict',
+  /not a verdict/i.test(host.q('.reason-picker').textContent));
+
+host.click(host.qq('.reason-option')[0]);
+const reported = await host.until('reported', () => !!host.q('.rival-done'));
+check('the report is recorded', reported);
+check('you cannot report the same player twice',
+  host.qq('.btn-report').length === 2, String(host.qq('.btn-report').length));
+
+// A second, different player reporting the same rival opens an inquiry.
+const targetName = host.qq('.rival-row')[0].querySelector('.rival-name').textContent;
+players[1].click(tabButton(players[1], 'Rivals'));
+await players[1].until('rivals', () => !!players[1].q('.rival-list'));
+const sameTarget = players[1].qq('.rival-row').find((r) =>
+  r.querySelector('.rival-name').textContent.indexOf(targetName.replace(/^[A-Z]+/, '').trim()) !== -1
+);
+if (sameTarget && sameTarget.querySelector('.btn-report')) {
+  players[1].click(sameTarget.querySelector('.btn-report'));
+  await players[1].until('reasons', () => !!players[1].q('.reason-list'));
+  players[1].click(players[1].qq('.reason-option')[1]);
+  const inquiry = await players[1].until('finding', () => !!players[1].q('.rival-finding'));
+  check('a second reporter opens an inquiry with a finding', inquiry,
+    players[1].q('.rival-finding') ? players[1].q('.rival-finding').textContent : 'none');
+}
+
+check('the evidence score is never sent to the browser',
+  !JSON.stringify(host.dom.window.CMP.net.lastError() || {}).includes('evidence'));
+
+/* --------------------------------------------------------- the result */
+
+section('Closing the polls');
+host.click(tabButton(host, 'Campaign'));
+check('only the host is offered the declare button',
+  !!host.button('CLOSE THE POLLS') && !players[1].button('CLOSE THE POLLS'));
+
+host.click(host.button('CLOSE THE POLLS'));
+const hostResult = await host.until('result', () => !!host.q('.screen-result'), 25000);
+check('the host reaches the result screen', hostResult);
+check('the result names the election', /Punjab Election Result/.test(host.text()));
+check('every party is listed', host.qq('.result-row').length >= 4, String(host.qq('.result-row').length));
+check('the seat totals are shown', /Total/.test(host.q('.result-totals').textContent));
+check('the majority is stated as 59', /59/.test(host.q('.result-totals').textContent));
+
+const seatSum = host
+  .qq('.result-seats')
+  .reduce((t, n) => t + Number(n.textContent), 0);
+check('the declared seats add to 117', seatSum === 117, String(seatSum));
+
+const others = await players[2].until('result', () => !!players[2].q('.screen-result'), 25000);
+check('the other players are carried to the result too', others);
+
+const verdict = host.q('.verdict-kicker').textContent;
+console.log('     verdict: ' + verdict);
+check('a verdict is declared',
+  /Majority Government|Hung Assembly|Coalition/.test(verdict), verdict);
+
+if (/Hung Assembly/.test(verdict)) {
+  check('coalition talks are offered', /Government Formation/.test(host.text()));
+  const pairs = host.qq('.pair-row');
+  check('possible pairings are listed', pairs.length > 0, String(pairs.length));
+  if (pairs.length) {
+    host.click(pairs[0]);
+    await host.until('terms', () => !!host.q('.terms-form'));
+    check('terms can be negotiated', !!host.q('.terms-form'));
+    check('a Chief Minister is chosen', host.qq('.term-group').length >= 4,
+      String(host.qq('.term-group').length));
+    host.qq('.term-group').forEach((grp) => {
+      const opt = grp.querySelector('.term-option');
+      if (opt) host.click(opt);
+    });
+    const proposeBtn = host.button('PROPOSE COALITION');
+    check('an offer can be proposed', !!proposeBtn && !proposeBtn.disabled);
+  }
+} else {
+  check('a Chief Minister is named', !!host.q('.verdict-name'),
+    host.q('.verdict-name') ? host.q('.verdict-name').textContent : 'none');
+}
+
 /* ---------------------------------------------------------------- reconnect */
 
 section('Reconnecting after closing the browser');
@@ -385,11 +502,23 @@ check(
 returning.click(returning.qq('.resume-link').find((b) => /Rejoin game/.test(b.textContent)));
 // The lobby renders immediately; the poll then carries them into the election
 // that started while they were away. Wait for that, not just for any screen.
-const backIn = await returning.until('back', () => !!returning.q('.screen-election'));
-check('they get back into the same game, already under way', backIn);
+// By this point the polls have closed, so a returning player should land on
+// whichever screen the game has actually reached.
+const backIn = await returning.until(
+  'back',
+  () => !!returning.q('.screen-election') || !!returning.q('.screen-result'),
+  25000
+);
+check('they get back into the same game, at whatever stage it has reached', backIn);
+check('and they see the declared result', !!returning.q('.screen-result'));
 const returningText = () =>
-  (returning.q('.screen-election') || returning.q('.screen-lobby') || { textContent: '' }).textContent;
-check('their party is still INC', /Indian National Congress/.test(returningText()));
+  (returning.q('.screen-election') || returning.q('.screen-result') ||
+    returning.q('.screen-lobby') || { textContent: '' }).textContent;
+// The result screen shows party codes and candidate names rather than full
+// party names, so check the restored state directly.
+check('their party is still INC',
+  returning.dom.window.CMP.app.getGame().partyId === 'inc',
+  returning.dom.window.CMP.app.getGame().partyId);
 check('their candidate survived', /Ravinder Singh Bajwa/.test(returningText()));
 
 /* ---------------------------------------------------------------- a 5th */

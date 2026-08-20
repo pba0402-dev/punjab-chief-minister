@@ -96,6 +96,11 @@ const SCENES = {
     "window.localStorage.setItem('cmp.punjab.session.v1', " +
     JSON.stringify(SESSION) +
     ");CMP.app.goTo('lobby');",
+  constituency:
+    "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
+    "slogan:'Naya Punjab, Sacha Punjab',seed:'shot-seat'});g.mode='solo';" +
+    "CMP.storage.save(g);CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "document.querySelectorAll('.panel-tab')[1].click();",
   campaign:
     "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
     "slogan:'Naya Punjab, Sacha Punjab',seed:'shot'});g.mode='solo';" +
@@ -107,9 +112,47 @@ const SCENES = {
     "g.seatsWon=CMP.campaign.seatsLed(g);CMP.storage.save(g);CMP.app.goTo('election');",
 };
 
+/* Play a game right through so the result screen has something to show. */
+const resultGame = await post('create');
+const rCreds = [{ code: resultGame.code, playerId: resultGame.playerId, token: resultGame.token }];
+for (let i = 1; i < 4; i++) {
+  const j = await post('join', { code: resultGame.code });
+  rCreds.push({ code: resultGame.code, playerId: j.playerId, token: j.token });
+}
+const rNames = [
+  ['aap', 'Simran Kaur Gill', 'Naya Punjab, Sacha Punjab'],
+  ['inc', 'Ravinder Singh Bajwa', 'Punjab First'],
+  ['bjp', 'Amrit Pal Sethi', 'Vikas Hi Vikas'],
+  ['sad', 'Jaspreet Kaur Dhillon', 'Sadda Punjab'],
+];
+for (let i = 0; i < 4; i++) {
+  await post('party', { ...rCreds[i], partyId: rNames[i][0] });
+  await post('details', { ...rCreds[i], candidateName: rNames[i][1], slogan: rNames[i][2] });
+  await post('ready', { ...rCreds[i], ready: true });
+}
+await post('start', rCreds[0]);
+// A few moves each, then a report, then close the polls.
+for (let i = 0; i < 4; i++) {
+  await post('campaign', { ...rCreds[i], actionId: 'rally', constituency: 20 + i });
+  await post('campaign', { ...rCreds[i], actionId: 'community', constituency: 40 + i });
+}
+await post('campaign', { ...rCreds[3], actionId: 'deal', constituency: 60 });
+await post('report', { ...rCreds[0], accusedId: rCreds[3].playerId, reason: 'spending' });
+await post('report', { ...rCreds[1], accusedId: rCreds[3].playerId, reason: 'influence' });
+await post('declare', rCreds[0]);
+
+const R_SESSION = JSON.stringify({
+  code: resultGame.code,
+  playerId: rCreds[0].playerId,
+  token: rCreds[0].token,
+});
+SCENES.result =
+  "window.localStorage.setItem('cmp.punjab.session.v1', " + JSON.stringify(R_SESSION) +
+  ");CMP.app.goTo('lobby');";
+
 const CASES = [
-  { w: 1200, h: 1700 },
-  { w: 390, h: 1500 },
+  { w: 1200, h: 1500 },
+  { w: 390, h: 1400 },
 ];
 
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

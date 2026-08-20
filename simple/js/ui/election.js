@@ -37,36 +37,139 @@ CMP.ui.election = (function () {
     var headNode = el('header', { class: 'election-head' });
     var logNode = el('div', { class: 'log' });
 
+    var tabsNode = el('div', { class: 'panel-tabs' });
+    var seatNode = el('div', { class: 'seat-detail-slot' });
+    var oversightNode = el('div', { class: 'oversight-slot' });
+    var campaignNode = el('div', { class: 'campaign-slot' });
+    var declareNode = el('div', { class: 'declare-slot' });
+
     var root = el('section', { class: 'screen screen-election' }, [
       el('div', { class: 'election-inner' }, [
         headNode,
         statsNode,
         heatNode,
+        tabsNode,
         reportNode,
-        el('div', { class: 'lobby-section' }, [
-          el('h2', { class: 'block-title', text: 'Target Constituency' }),
-          targetNode,
-        ]),
-        el('div', { class: 'lobby-section' }, [
-          el('div', { class: 'group-head' }, [
-            el('h2', { class: 'block-title', text: 'Safe Campaign' }),
-            el('span', { class: 'group-note', text: 'Predictable. Little or no heat.' }),
-          ]),
-          safeNode,
-        ]),
-        el('div', { class: 'lobby-section' }, [
-          el('div', { class: 'group-head' }, [
-            el('h2', { class: 'block-title risky-title', text: 'Risky Strategies' }),
-            el('span', { class: 'group-note', text: 'Bigger swings, uncertain results, and heat.' }),
-          ]),
-          riskyNode,
-        ]),
-        el('div', { class: 'lobby-section' }, [
-          el('h2', { class: 'block-title', text: 'Campaign Log' }),
-          logNode,
-        ]),
+        campaignNode,
+        seatNode,
+        oversightNode,
+        declareNode,
       ]),
     ]);
+
+    // The campaign tab's contents, built once and shown or hidden by tab.
+    CMP.ui.dom.mount(campaignNode, [
+      el('div', { class: 'lobby-section' }, [
+        el('h2', { class: 'block-title', text: 'Target Constituency' }),
+        targetNode,
+      ]),
+      el('div', { class: 'lobby-section' }, [
+        el('div', { class: 'group-head' }, [
+          el('h2', { class: 'block-title', text: 'Safe Campaign' }),
+          el('span', { class: 'group-note', text: 'Predictable. Little or no heat.' }),
+        ]),
+        safeNode,
+      ]),
+      el('div', { class: 'lobby-section' }, [
+        el('div', { class: 'group-head' }, [
+          el('h2', { class: 'block-title risky-title', text: 'Risky Strategies' }),
+          el('span', { class: 'group-note', text: 'Bigger swings, uncertain results, and heat.' }),
+        ]),
+        riskyNode,
+      ]),
+      el('div', { class: 'lobby-section' }, [
+        el('h2', { class: 'block-title', text: 'Campaign Log' }),
+        logNode,
+      ]),
+    ]);
+
+    var tab = 'campaign';
+    var oversight = null;
+
+    function setTab(next) {
+      tab = next;
+      paintTabs();
+    }
+
+    function paintTabs() {
+      var tabs = [{ id: 'campaign', label: 'Campaign' }, { id: 'seat', label: 'Constituency' }];
+      if (game && game.mode === 'multiplayer') tabs.push({ id: 'rivals', label: 'Rivals' });
+
+      mount(
+        tabsNode,
+        tabs.map(function (t) {
+          return el('button', {
+            class: 'panel-tab' + (tab === t.id ? ' is-active' : ''),
+            type: 'button',
+            text: t.label,
+            onclick: function () {
+              setTab(t.id);
+            },
+          });
+        })
+      );
+
+      campaignNode.style.display = tab === 'campaign' ? '' : 'none';
+      seatNode.style.display = tab === 'seat' ? '' : 'none';
+      oversightNode.style.display = tab === 'rivals' ? '' : 'none';
+
+      if (tab === 'seat') paintSeatDetail();
+      if (tab === 'rivals') paintOversight();
+    }
+
+    function paintSeatDetail() {
+      mount(seatNode, [
+        CMP.ui.constituency.render(game, selected, {
+          footer: el('button', {
+            class: 'btn btn-xl',
+            type: 'button',
+            text: 'CAMPAIGN HERE',
+            onclick: function () {
+              setTab('campaign');
+            },
+          }),
+        }),
+      ]);
+    }
+
+    function paintOversight() {
+      if (!opts.getServerView) return;
+      var serverView = opts.getServerView();
+      if (!serverView) {
+        mount(oversightNode, [el('p', { class: 'muted', text: 'Waiting for the server…' })]);
+        return;
+      }
+      if (!oversight) {
+        oversight = CMP.ui.oversight.create({});
+        mount(oversightNode, [oversight.root]);
+      }
+      oversight.update(serverView);
+    }
+
+    /** The host closes the polls; everyone else waits. */
+    function paintDeclare() {
+      if (!game || game.mode !== 'multiplayer' || !opts.getServerView) {
+        mount(declareNode, []);
+        return;
+      }
+      var serverView = opts.getServerView();
+      if (!serverView) return;
+
+      mount(declareNode, [
+        el('div', { class: 'declare-block' }, [
+          serverView.youAreHost
+            ? el('button', {
+                class: 'btn btn-primary btn-xl',
+                type: 'button',
+                text: 'CLOSE THE POLLS AND COUNT',
+                onclick: function () {
+                  if (opts.onDeclare) opts.onDeclare();
+                },
+              })
+            : el('p', { class: 'muted', text: 'The host will close the polls when everyone is done.' }),
+        ]),
+      ]);
+    }
 
     /* ------------------------------------------------------ helpers */
 
@@ -199,6 +302,7 @@ CMP.ui.election = (function () {
             onclick: openSeatPicker,
           }),
         ]),
+        CMP.ui.constituency.leadingBadge(game.support[selected], 'target-leading'),
         el('div', { class: 'target-numbers' }, [
           numberBlock('Your Support', view.player.toFixed(1) + '%', CMP.getParty(game.partyId).colour),
           numberBlock(
@@ -488,6 +592,8 @@ CMP.ui.election = (function () {
       paintActions();
       paintReport();
       paintLog();
+      paintTabs();
+      paintDeclare();
     }
 
     return {

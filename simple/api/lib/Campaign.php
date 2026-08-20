@@ -98,25 +98,62 @@ final class Campaign
 
     /* ------------------------------------------------------------ support */
 
-    /** Opening political map for a game, seeded so it is stable. */
-    public function seedSupport(array $constituencies, array $partyIds, string $seed): array
+    /**
+     * Opening political map, built from the real sitting MLAs.
+     *
+     * The party holding a seat starts ahead in it by an amount rolled per seat
+     * from the game seed. Incumbents outside the four playable parties sit
+     * under "oth". This is a starting position, not a prediction.
+     *
+     * $incumbents maps constituency number => real party code.
+     * Returns [support, incumbency].
+     */
+    public function seedSupport(array $constituencies, array $partyIds, string $seed, array $incumbents): array
     {
         $rand = self::seededSequence($seed . ':support');
+        $cfg = $this->config['incumbency'];
 
-        $bias = [];
+        // One swing per party per game, applied to every seat — see the note in
+        // campaign-config.json. Without it the real membership would replay
+        // itself and the largest incumbent bloc would start past the majority.
+        $swing = [];
         foreach ($partyIds as $id) {
-            $bias[$id] = ($rand() - 0.5) * 12;
+            // Others never gets a statewide swing — small parties and
+            // independents hold seats one at a time, they do not surge.
+            $swing[$id] = $id === 'oth'
+                ? (float) $cfg['othersHandicap']
+                : ($rand() - 0.5) * (float) $cfg['partySwingSpread'];
         }
 
         $support = [];
+        $incumbency = [];
+
         foreach ($constituencies as $number) {
+            $key = (string) $number;
+            $holder = self::gamePartyFor($incumbents[$key] ?? null, $partyIds);
+            $level = self::weightedPick($cfg['levels'], $rand());
+
             $seat = [];
             foreach ($partyIds as $id) {
-                $seat[$id] = max(3.0, 25 + $bias[$id] + ($rand() - 0.5) * 22);
+                $seat[$id] = max(2.0, $cfg['baseSupport'] + $swing[$id] + ($rand() - 0.5) * $cfg['spread']);
             }
-            $support[(string) $number] = self::normalise($seat);
+            $seat[$holder] += (float) $level['advantage'];
+
+            $support[$key] = self::normalise($seat);
+            $incumbency[$key] = [
+                'party' => $holder,
+                'level' => $level['id'],
+                'label' => $level['label'],
+            ];
         }
-        return $support;
+        return [$support, $incumbency];
+    }
+
+    /** Real party code -> game party. Anything unplayable becomes "oth". */
+    public static function gamePartyFor(?string $realCode, array $playable): string
+    {
+        $id = strtolower((string) $realCode);
+        return in_array($id, $playable, true) ? $id : 'oth';
     }
 
     public static function normalise(array $seat): array
@@ -271,6 +308,8 @@ final class Campaign
         }
         $numbers = array_keys($player['support']);
         usort($numbers, function ($a, $b) use ($touched, $player) {
+            $a = (string) $a;
+            $b = (string) $b;
             $diff = ($touched[$b] ?? 0) <=> ($touched[$a] ?? 0);
             if ($diff !== 0) {
                 return $diff;
@@ -282,7 +321,7 @@ final class Campaign
         $hit = [];
         $count = min((int) ($pick['seats'] ?? 1), count($numbers));
         for ($i = 0; $i < $count; $i++) {
-            $k = $numbers[$i];
+            $k = (string) $numbers[$i];
             $seat = $player['support'][$k];
             $before = $seat[$player['partyId']] ?? 0;
             $seat[$player['partyId']] = self::clamp($before + (float) $pick['support'], 1, 95);

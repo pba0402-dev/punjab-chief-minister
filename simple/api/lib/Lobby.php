@@ -19,6 +19,9 @@ final class Lobby
     /** Party ids a player may pick. Mirrors js/data/parties.js. */
     public const PARTIES = ['aap', 'inc', 'bjp', 'sad'];
 
+    /** Every party the board tracks, including the unplayable Others bucket. */
+    public const GAME_PARTIES = ['aap', 'inc', 'bjp', 'sad', 'oth'];
+
     public static function newGame(string $code): array
     {
         $now = time();
@@ -31,8 +34,10 @@ final class Lobby
             'hostId' => null,
             'turn' => 0,
             'players' => [],
-            'constituencies' => (object) [],
-            'results' => null,
+            'incumbency' => (object) [],
+            'result' => null,
+            'coalition' => Coalition::newState(),
+            'possibleCoalitions' => [],
             'createdAt' => $now,
             'updatedAt' => $now,
         ];
@@ -62,6 +67,9 @@ final class Lobby
             'ready' => false,
             'joinedAt' => $now,
             'lastSeen' => $now,
+
+            // Reports, penalties and restrictions all live together.
+            'record' => Investigation::newRecord(),
         ];
     }
 
@@ -214,6 +222,18 @@ final class Lobby
                 'seatsLed' => (int) ($p['seatsLed'] ?? 0),
                 'ready' => (bool) $p['ready'],
                 'complete' => self::playerIsComplete($p),
+
+                // Public oversight figures. Everyone can see how many
+                // reports stand against a player and whether they have been
+                // penalised; the evidence score behind an investigation is
+                // never sent to anyone.
+                'reportsAgainst' => count($p['record']['reportsAgainst'] ?? []),
+                'penalties' => count($p['record']['penalties'] ?? []),
+                'restricted' => Investigation::isRestricted($p, (int) ($game['turn'] ?? 1)),
+                'disqualified' => !empty($p['record']['disqualified']),
+                'investigations' => $p['record']['investigations'] ?? [],
+                'youReported' => $viewerId !== null
+                    && isset($p['record']['reportsAgainst'][$viewerId]),
             ];
             // Only ever ship a player their own board and their own history.
             if ($isYou) {
@@ -236,6 +256,11 @@ final class Lobby
             'players' => $slots,
             'takenParties' => self::takenParties($game),
             'startBlockedReason' => self::startBlockedReason($game),
+            'incumbency' => $game['incumbency'] ?? null,
+            'result' => $game['result'] ?? null,
+            'coalition' => $game['coalition'] ?? null,
+            'possibleCoalitions' => $game['possibleCoalitions'] ?? [],
+            'lastInvestigation' => $game['lastInvestigation'] ?? null,
             'updatedAt' => (int) $game['updatedAt'],
         ];
     }

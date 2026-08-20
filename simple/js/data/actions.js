@@ -441,7 +441,218 @@ CMP.CAMPAIGN = {
       "seats": 8,
       "heat": 6
     }
-  ]
+  ],
+  "incumbency": {
+    "levels": [
+      {
+        "id": "weak",
+        "label": "Weak",
+        "advantage": 5,
+        "weight": 30
+      },
+      {
+        "id": "medium",
+        "label": "Medium",
+        "advantage": 10,
+        "weight": 45
+      },
+      {
+        "id": "strong",
+        "label": "Strong",
+        "advantage": 17,
+        "weight": 25
+      }
+    ],
+    "baseSupport": 24,
+    "spread": 14,
+    "partySwingSpread": 22,
+    "othersHandicap": -7
+  },
+  "election": {
+    "seatNoise": 3.2,
+    "majority": 59,
+    "totalSeats": 117
+  },
+  "coalition": {
+    "maxPartners": 2,
+    "requiredSeats": 59,
+    "cabinetSplits": [
+      {
+        "id": "even",
+        "label": "50 / 50",
+        "proposer": 50,
+        "partner": 50
+      },
+      {
+        "id": "leader",
+        "label": "60 / 40 to the larger party",
+        "proposer": 60,
+        "partner": 40
+      },
+      {
+        "id": "generous",
+        "label": "40 / 60 to the partner",
+        "proposer": 40,
+        "partner": 60
+      }
+    ],
+    "policies": [
+      {
+        "id": "farm",
+        "label": "Farm support and procurement"
+      },
+      {
+        "id": "jobs",
+        "label": "Jobs and industry"
+      },
+      {
+        "id": "health",
+        "label": "Health and education"
+      },
+      {
+        "id": "law",
+        "label": "Law and order"
+      },
+      {
+        "id": "power",
+        "label": "Power and infrastructure"
+      }
+    ],
+    "resourceTerms": [
+      {
+        "id": "equal",
+        "label": "Split campaign resources equally next time"
+      },
+      {
+        "id": "proposerFirst",
+        "label": "Proposer gets first call on resources"
+      },
+      {
+        "id": "partnerFirst",
+        "label": "Partner gets first call on resources"
+      }
+    ]
+  },
+  "investigation": {
+    "reportsToOpen": 2,
+    "reportsForHighPriority": 3,
+    "reasons": [
+      {
+        "id": "activity",
+        "label": "Suspicious Campaign Activity"
+      },
+      {
+        "id": "spending",
+        "label": "Unusual Spending"
+      },
+      {
+        "id": "rules",
+        "label": "Campaign Rule Violation"
+      },
+      {
+        "id": "influence",
+        "label": "Undisclosed Influence"
+      },
+      {
+        "id": "other",
+        "label": "Other"
+      }
+    ],
+    "evidence": {
+      "perRiskyAction": 6,
+      "riskyActionCap": 36,
+      "heatWeight": 0.45,
+      "perPriorPenalty": 12,
+      "priorPenaltyCap": 24,
+      "perReportOverThreshold": 5,
+      "randomSpread": 18,
+      "max": 100
+    },
+    "outcomes": [
+      {
+        "id": "cleared",
+        "label": "CLEARED",
+        "weight": 40,
+        "evidenceBias": -0.85,
+        "text": "The inquiry found nothing to answer. Your campaign carries on.",
+        "heat": -12,
+        "support": 1.5,
+        "seats": 3,
+        "counts": false
+      },
+      {
+        "id": "warning",
+        "label": "WARNING",
+        "weight": 25,
+        "evidenceBias": 0.15,
+        "text": "A formal warning is recorded against your campaign.",
+        "heat": -4,
+        "support": -1.5,
+        "seats": 3,
+        "counts": true
+      },
+      {
+        "id": "fine",
+        "label": "FINE",
+        "weight": 18,
+        "evidenceBias": 0.6,
+        "text": "Your campaign is fined.",
+        "fine": 2500000,
+        "heat": -6,
+        "support": -2.5,
+        "seats": 4,
+        "counts": true
+      },
+      {
+        "id": "majorFine",
+        "label": "MAJOR FINE",
+        "weight": 10,
+        "evidenceBias": 1,
+        "text": "A substantial fine is imposed after a damaging finding.",
+        "fine": 7500000,
+        "heat": -8,
+        "support": -4,
+        "seats": 6,
+        "counts": true
+      },
+      {
+        "id": "restriction",
+        "label": "CAMPAIGN RESTRICTION",
+        "weight": 7,
+        "evidenceBias": 0.9,
+        "text": "You are barred from the riskier campaign methods for a time.",
+        "restrictTurns": 3,
+        "heat": -10,
+        "support": -3,
+        "seats": 4,
+        "counts": true
+      },
+      {
+        "id": "disqualification",
+        "label": "DISQUALIFICATION",
+        "weight": 1,
+        "evidenceBias": 1.8,
+        "minEvidence": 78,
+        "minReports": 3,
+        "text": "Your candidature is cancelled under the rules of the game.",
+        "disqualify": true,
+        "counts": true
+      }
+    ],
+    "insufficientFunds": {
+      "restrictTurns": 2,
+      "support": -3,
+      "seats": 5,
+      "text": "Your campaign could not pay the fine in full, and paid for it in other ways."
+    },
+    "publicReaction": {
+      "opened": {
+        "text": "Investigation announced — public support falls slightly.",
+        "support": -1.2,
+        "seats": 4
+      }
+    }
+  }
 };
 
 CMP.STARTING_BUDGET = CMP.CAMPAIGN.startingBudget;

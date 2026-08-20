@@ -139,6 +139,21 @@ CMP.net = (function () {
     }));
   }
 
+  /** Report a rival. Each player may report each rival once. */
+  function report(accusedId, reason) {
+    return request('report', authed({ accusedId: accusedId, reason: reason }));
+  }
+
+  /** Host only: close the polls and count all 117 seats. */
+  function declare() {
+    return request('declare', authed());
+  }
+
+  /** Coalition talks: propose / accept / reject. */
+  function coalition(payload) {
+    return request('coalition', authed(payload || {}));
+  }
+
   function setReady(ready) {
     return request('ready', authed({ ready: !!ready }));
   }
@@ -210,6 +225,9 @@ CMP.net = (function () {
     setParty: setParty,
     setDetails: setDetails,
     playAction: playAction,
+    report: report,
+    declare: declare,
+    coalition: coalition,
     setReady: setReady,
     start: start,
     leave: leave,
