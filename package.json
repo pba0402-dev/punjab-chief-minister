@@ -11,7 +11,12 @@
     "data": "node tools/build-data.mjs && node tools/build-geometry.mjs && node tools/build.mjs",
     "test:v1": "node tools/test-simple.mjs",
     "shots:v1": "node tools/shots-simple.mjs",
-    "data:v1": "node tools/build-simple-data.mjs"
+    "data:v1": "node tools/build-simple-data.mjs",
+    "test:api": "node tools/test-api.mjs",
+    "test:mp": "node tools/test-multiplayer.mjs",
+    "test:all": "node tools/test-simple.mjs && node tools/test-api.mjs && node tools/test-multiplayer.mjs",
+    "shots:lobby": "node tools/shots-lobby.mjs",
+    "serve": "php -S 127.0.0.1:8080 -t simple"
   },
   "license": "UNLICENSED",
   "type": "commonjs",

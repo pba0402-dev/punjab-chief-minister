@@ -2,3 +2,6 @@ node_modules/
 
 # Local deploy script: contains private server host/port, keep it off GitHub
 tools/deploy-hostinger.sh
+
+# Runtime multiplayer state, created by the API on the server
+simple/api/data/

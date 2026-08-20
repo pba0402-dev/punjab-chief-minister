@@ -1,9 +1,9 @@
 /**
  * Home screen.
  * ------------------------------------------------------------------
- * The first thing anyone sees. Shows the title and the seat count, then
- * either CONTINUE GAME / NEW GAME if a save exists, or START NEW ELECTION
- * if it does not.
+ * Deliberately bare: the title, the seat count, and the two ways to play.
+ * Anything already in progress appears as a quiet line underneath rather
+ * than competing with the two main choices.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -14,7 +14,8 @@ CMP.ui.home = (function () {
   var el = CMP.ui.dom.el;
 
   function render(opts) {
-    var saved = CMP.storage.load();
+    var soloSave = CMP.storage.load();
+    var session = CMP.net.getSession();
 
     return el('section', { class: 'screen screen-home' }, [
       el('div', { class: 'home-inner' }, [
@@ -23,113 +24,68 @@ CMP.ui.home = (function () {
         el('p', { class: 'subtitle' }, [
           el('strong', { text: CMP.TOTAL_SEATS + ' Assembly Constituencies' }),
         ]),
-        el('p', {
-          class: 'lede',
-          text:
-            'Lead a party through the Punjab Assembly election. Win ' +
-            CMP.MAJORITY +
-            ' of the ' +
-            CMP.TOTAL_SEATS +
-            ' seats and you become Chief Minister.',
-        }),
 
-        saved ? savedCard(saved, opts) : null,
+        el('h2', { class: 'choose-title', text: 'Choose How to Play' }),
 
         el('div', { class: 'home-actions' }, [
-          saved
-            ? el('button', {
-                class: 'btn btn-primary btn-xl',
-                type: 'button',
-                text: 'CONTINUE GAME',
-                onclick: opts.onContinue,
-              })
-            : null,
-          saved
-            ? el('button', {
-                class: 'btn btn-quiet btn-xl',
-                type: 'button',
-                text: 'NEW GAME',
-                onclick: function () {
-                  confirmNewGame(opts);
-                },
-              })
-            : el('button', {
-                class: 'btn btn-primary btn-xl',
-                type: 'button',
-                text: 'START NEW ELECTION',
-                onclick: opts.onNew,
-              }),
-        ]),
-
-        el('p', {
-          class: 'disclaimer',
-          text:
-            'A fictional strategy game. Constituency names and districts are real public information; everything else is invented. Not a prediction of any real election.',
-        }),
-      ]),
-    ]);
-  }
-
-  /** A short summary of the campaign waiting to be resumed. */
-  function savedCard(saved, opts) {
-    var party = CMP.getParty(saved.partyId);
-    return el('div', { class: 'saved-card', style: { '--party': party.colour } }, [
-      el('span', { class: 'saved-flag', text: party.short }),
-      el('div', { class: 'saved-body' }, [
-        el('strong', { class: 'saved-name', text: saved.candidateName }),
-        el('span', {
-          class: 'saved-meta',
-          text:
-            party.name +
-            ' · ' +
-            saved.seatsWon +
-            ' of ' +
-            saved.totalSeats +
-            ' seats · ' +
-            CMP.ui.money.format(saved.budget),
-        }),
-      ]),
-    ]);
-  }
-
-  /** NEW GAME wipes a save, so ask once before doing it. */
-  function confirmNewGame(opts) {
-    var overlay = el('div', { class: 'overlay' });
-
-    function close() {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    }
-
-    CMP.ui.dom.mount(overlay, [
-      el('div', { class: 'modal' }, [
-        el('h2', { text: 'Start a new election?' }),
-        el('p', {
-          text: 'Your saved campaign will be deleted. This cannot be undone.',
-        }),
-        el('div', { class: 'modal-actions' }, [
-          el('button', {
-            class: 'btn btn-quiet',
-            type: 'button',
-            text: 'Cancel',
-            onclick: close,
-          }),
-          el('button', {
-            class: 'btn btn-danger',
-            type: 'button',
-            text: 'Delete and start new',
-            onclick: function () {
-              close();
-              opts.onNew({ clear: true });
+          el(
+            'button',
+            {
+              class: 'mode-card',
+              type: 'button',
+              onclick: opts.onSolo,
             },
-          }),
+            [
+              el('span', { class: 'mode-label', text: 'PLAY SOLO' }),
+              el('span', { class: 'mode-note', text: 'One player. Start straight away.' }),
+            ]
+          ),
+          el(
+            'button',
+            {
+              class: 'mode-card mode-card-alt',
+              type: 'button',
+              onclick: opts.onMultiplayer,
+            },
+            [
+              el('span', { class: 'mode-label', text: 'PLAY WITH FRIENDS' }),
+              el('span', { class: 'mode-note', text: 'Up to 4 players, one party each.' }),
+            ]
+          ),
         ]),
+
+        resumeRow(soloSave, session, opts),
       ]),
     ]);
+  }
 
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) close();
-    });
-    document.body.appendChild(overlay);
+  /** One quiet line for anything already under way. Nothing if there is not. */
+  function resumeRow(soloSave, session, opts) {
+    var links = [];
+
+    if (session) {
+      links.push(
+        el('button', {
+          class: 'resume-link',
+          type: 'button',
+          text: 'Rejoin game ' + session.code,
+          onclick: opts.onRejoin,
+        })
+      );
+    }
+    if (soloSave) {
+      links.push(
+        el('button', {
+          class: 'resume-link',
+          type: 'button',
+          text: 'Continue solo campaign',
+          onclick: opts.onContinueSolo,
+        })
+      );
+    }
+    if (!links.length) return null;
+
+    return el('div', { class: 'resume-row' }, links);
   }
 
   return { render: render };

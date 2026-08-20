@@ -98,8 +98,10 @@ let dom = await openPage();
 check('1. first screen loads', !!q(dom, '.screen-home'));
 check('2. "Chief Minister of Punjab" is displayed', /Chief Minister of Punjab/.test(text(dom)));
 check('3. "117 Assembly Constituencies" is displayed', /117 Assembly Constituencies/.test(text(dom)));
-check('   no save yet, so START NEW ELECTION is offered', /START NEW ELECTION/.test(text(dom)));
-check('   CONTINUE GAME is not offered', !/CONTINUE GAME/.test(text(dom)));
+check('   PLAY SOLO is offered', /PLAY SOLO/.test(text(dom)));
+check('   PLAY WITH FRIENDS is offered', /PLAY WITH FRIENDS/.test(text(dom)));
+check('   "Choose How to Play" is shown', /Choose How to Play/.test(text(dom)));
+check('   nothing to resume yet', !/Continue solo campaign/.test(text(dom)));
 
 check('   constituency data loaded', dom.window.CMP.CONSTITUENCIES.length === 117);
 check('   majority computed as 59', dom.window.CMP.MAJORITY === 59);
@@ -116,7 +118,7 @@ check(
 /* ---------------------------------------------------------------- 4-7 */
 
 section('4-7. Setup form');
-clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'START NEW ELECTION'));
+clickIt(dom, qq(dom, '.mode-card').find((b) => b.textContent.indexOf('PLAY SOLO') === 0));
 check('   setup screen opens', !!q(dom, '.screen-setup'));
 
 const partyCards = qq(dom, '.party-card');
@@ -210,12 +212,10 @@ dom.window.close();
 dom = await openPage({ key: 'cmp.punjab.save.v1', value: rawSave });
 
 check('10. saved game survives a reload', !!dom.window.CMP.storage.load());
-check('11. CONTINUE GAME is offered', /CONTINUE GAME/.test(text(dom)));
-check('11. NEW GAME is offered', /NEW GAME/.test(text(dom)));
-check('11. START NEW ELECTION is not offered', !/START NEW ELECTION/.test(text(dom)));
-check('11. the saved campaign is summarised', /Simran Kaur Gill/.test(text(dom)));
+check('11. a way to continue is offered', /Continue solo campaign/.test(text(dom)));
+check('11. PLAY SOLO is still offered', /PLAY SOLO/.test(text(dom)));
 
-clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'CONTINUE GAME'));
+clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue solo/.test(b.textContent)));
 check('11. continue returns to the election screen', !!q(dom, '.screen-election'));
 const resumed = text(dom);
 check('10. candidate name survived', /Simran Kaur Gill/.test(resumed));
@@ -225,32 +225,42 @@ check('10. party survived', /Indian National Congress/.test(resumed));
 
 /* ---------------------------------------------------------------- 12 */
 
-section('12. New game clears the save');
+section('12. Starting again replaces the old save');
 clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'Menu'));
 check('   menu returns home', !!q(dom, '.screen-home'));
-clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'NEW GAME'));
-check('12. NEW GAME asks before deleting', !!q(dom, '.overlay'));
 
-clickIt(dom, qq(dom, '.modal-actions .btn').find((b) => b.textContent === 'Cancel'));
-check('12. cancelling keeps the save', !!dom.window.CMP.storage.load());
-
-clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'NEW GAME'));
-clickIt(dom, qq(dom, '.modal-actions .btn').find((b) => b.textContent === 'Delete and start new'));
-check('12. confirming clears the saved game', dom.window.CMP.storage.load() === null);
-check(
-  '12. localStorage key removed',
-  dom.window.localStorage.getItem('cmp.punjab.save.v1') === null
-);
-check('12. player lands on a fresh setup screen', !!q(dom, '.screen-setup'));
+clickIt(dom, qq(dom, '.mode-card').find((b) => b.textContent.indexOf('PLAY SOLO') === 0));
+check('12. PLAY SOLO opens a fresh setup screen', !!q(dom, '.screen-setup'));
 check('12. no party pre-selected', qq(dom, '.party-card.is-selected').length === 0);
+check('12. the old save is still there until a new one starts', !!dom.window.CMP.storage.load());
+
+clickIt(dom, qq(dom, '.party-card').find((c) => c.textContent.includes('BJP')));
+const fresh = qq(dom, '.field-input');
+typeInto(dom, fresh[0], 'Gurpreet Singh Mann');
+typeInto(dom, fresh[1], 'Badlaav');
+typeInto(dom, q(dom, '.field-money'), '50000000');
+clickIt(dom, q(dom, '.btn-start'));
+
+const replaced = dom.window.CMP.storage.load();
+check('12. the new campaign replaces the old save', replaced.candidateName === 'Gurpreet Singh Mann');
+check('12. the old party is gone', replaced.partyId === 'bjp');
+check('12. only one save is kept', replaced.budget === 50000000);
 
 /* ---------------------------------------------------------------- validation */
 
 section('Validation');
+// Get back to a fresh setup form first — check 12 left us on the election screen.
+clickIt(dom, qq(dom, 'button').find((b) => b.textContent === 'Menu'));
+clickIt(dom, qq(dom, '.mode-card').find((b) => b.textContent.indexOf('PLAY SOLO') === 0));
+const savedBefore = JSON.stringify(dom.window.CMP.storage.load());
+
 clickIt(dom, q(dom, '.btn-start'));
-check('   empty form is refused', !!q(dom, '.screen-setup'), 'should not have advanced');
-check('   errors are shown', qq(dom, '.field-error').length >= 3);
-check('   still nothing saved', dom.window.CMP.storage.load() === null);
+check('   an empty form is refused', !!q(dom, '.screen-setup'), 'should not have advanced');
+check('   errors are shown on the empty fields', qq(dom, '.field-error').length >= 3);
+check(
+  '   a refused start does not touch the existing save',
+  JSON.stringify(dom.window.CMP.storage.load()) === savedBefore
+);
 
 /* ---------------------------------------------------------------- 13 */
 

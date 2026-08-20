@@ -1,0 +1,217 @@
+/**
+ * Multiplayer client.
+ * ------------------------------------------------------------------
+ * Talks to api/index.php and keeps a poll running while the player is in a
+ * lobby. Shared hosting cannot hold a WebSocket open, so "realtime" here is a
+ * short poll — which doubles as the heartbeat that keeps the player marked
+ * connected on the server.
+ *
+ * Credentials (code + playerId + token) are kept in localStorage so closing
+ * the tab and coming back rejoins the same seat rather than taking a new one.
+ */
+window.CMP = window.CMP || {};
+
+CMP.net = (function () {
+  'use strict';
+
+  var ENDPOINT = 'api/index.php';
+  var SESSION_KEY = 'cmp.punjab.session.v1';
+  var POLL_MS = 2500;
+
+  var pollTimer = null;
+  var listeners = [];
+  var lastError = null;
+
+  /* ------------------------------------------------------ session store */
+
+  function readSession() {
+    try {
+      var raw = window.localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      var s = JSON.parse(raw);
+      return s && s.code && s.playerId && s.token ? s : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeSession(s) {
+    try {
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+    } catch (e) {
+      /* private mode — the session just will not survive a refresh */
+    }
+  }
+
+  function clearSession() {
+    try {
+      window.localStorage.removeItem(SESSION_KEY);
+    } catch (e) {
+      /* nothing to do */
+    }
+  }
+
+  /* ------------------------------------------------------ transport */
+
+  function request(action, payload, method) {
+    var url = ENDPOINT + '?action=' + encodeURIComponent(action);
+    var opts = { method: method || 'POST', headers: { 'Content-Type': 'application/json' } };
+
+    if (opts.method === 'GET') {
+      var parts = [];
+      Object.keys(payload || {}).forEach(function (k) {
+        parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(payload[k]));
+      });
+      url += parts.length ? '&' + parts.join('&') : '';
+      delete opts.headers;
+      opts = { method: 'GET' };
+    } else {
+      opts.body = JSON.stringify(payload || {});
+    }
+
+    return fetch(url, opts)
+      .then(function (res) {
+        return res.json().then(function (json) {
+          json.status = res.status;
+          return json;
+        });
+      })
+      .catch(function () {
+        return {
+          ok: false,
+          offline: true,
+          error: 'Cannot reach the game server. Check your connection.',
+          code: 'offline',
+        };
+      });
+  }
+
+  function authed(extra) {
+    var s = readSession() || {};
+    var payload = { code: s.code, playerId: s.playerId, token: s.token };
+    Object.keys(extra || {}).forEach(function (k) {
+      payload[k] = extra[k];
+    });
+    return payload;
+  }
+
+  /* ------------------------------------------------------ actions */
+
+  function create() {
+    return request('create', {}).then(function (res) {
+      if (res.ok) {
+        writeSession({ code: res.code, playerId: res.playerId, token: res.token });
+      }
+      return res;
+    });
+  }
+
+  function join(code) {
+    return request('join', { code: code }).then(function (res) {
+      if (res.ok) {
+        writeSession({ code: res.code, playerId: res.playerId, token: res.token });
+      }
+      return res;
+    });
+  }
+
+  function state() {
+    return request('state', authed(), 'GET');
+  }
+
+  function setParty(partyId) {
+    return request('party', authed({ partyId: partyId || '' }));
+  }
+
+  function setDetails(candidateName, slogan, budget) {
+    return request('details', authed({
+      candidateName: candidateName,
+      slogan: slogan,
+      budget: budget,
+    }));
+  }
+
+  function setReady(ready) {
+    return request('ready', authed({ ready: !!ready }));
+  }
+
+  function start() {
+    return request('start', authed());
+  }
+
+  function leave() {
+    return request('leave', authed()).then(function (res) {
+      clearSession();
+      return res;
+    });
+  }
+
+  function health() {
+    return request('health', {}, 'GET');
+  }
+
+  /* ------------------------------------------------------ polling */
+
+  function emit(res) {
+    listeners.forEach(function (fn) {
+      try {
+        fn(res);
+      } catch (e) {
+        if (window.console) window.console.error(e);
+      }
+    });
+  }
+
+  function tick() {
+    state().then(function (res) {
+      lastError = res.ok ? null : res;
+      emit(res);
+    });
+  }
+
+  function startPolling(onUpdate) {
+    if (onUpdate && listeners.indexOf(onUpdate) === -1) listeners.push(onUpdate);
+    if (pollTimer !== null) return;
+    tick();
+    pollTimer = window.setInterval(tick, POLL_MS);
+  }
+
+  function stopPolling(onUpdate) {
+    if (onUpdate) {
+      var i = listeners.indexOf(onUpdate);
+      if (i !== -1) listeners.splice(i, 1);
+    } else {
+      listeners = [];
+    }
+    if (listeners.length === 0 && pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  /** Poll once right now, e.g. straight after an action changed something. */
+  function refresh() {
+    tick();
+  }
+
+  return {
+    POLL_MS: POLL_MS,
+    create: create,
+    join: join,
+    state: state,
+    setParty: setParty,
+    setDetails: setDetails,
+    setReady: setReady,
+    start: start,
+    leave: leave,
+    health: health,
+    startPolling: startPolling,
+    stopPolling: stopPolling,
+    refresh: refresh,
+    getSession: readSession,
+    clearSession: clearSession,
+    lastError: function () {
+      return lastError;
+    },
+  };
+})();
