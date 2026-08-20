@@ -1,0 +1,19 @@
+{
+  "name": "punjab-chief-minister",
+  "version": "1.0.0",
+  "description": "A fictional election strategy game across Punjab's 117 assembly constituencies.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node tools/build.mjs && node tools/test.mjs",
+    "balance": "node tools/balance.mjs 80",
+    "audit": "node tools/build.mjs && node tools/audit-layout.mjs",
+    "shots": "node tools/build.mjs && node tools/shots.mjs",
+    "data": "node tools/build-data.mjs && node tools/build-geometry.mjs && node tools/build.mjs"
+  },
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  },
+  "private": true
+}

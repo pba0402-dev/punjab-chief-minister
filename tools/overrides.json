@@ -1,0 +1,23 @@
+{
+ "15": {"lat":31.6560,"lon":74.8720,"why":"Amritsar city N ward"},
+ "16": {"lat":31.6220,"lon":74.8340,"why":"Amritsar city W ward"},
+ "17": {"lat":31.6250,"lon":74.8750,"why":"Amritsar city centre"},
+ "18": {"lat":31.6300,"lon":74.9150,"why":"Amritsar city E ward"},
+ "19": {"lat":31.5940,"lon":74.8760,"why":"Amritsar city S ward"},
+ "34": {"lat":31.3180,"lon":75.5380,"why":"Jalandhar city W ward"},
+ "35": {"lat":31.3260,"lon":75.5762,"why":"Jalandhar city centre"},
+ "36": {"lat":31.3520,"lon":75.5700,"why":"Jalandhar city N ward"},
+ "37": {"lat":31.2940,"lon":75.6180,"why":"Jalandhar Cantt SE of city"},
+ "52": {"lat":30.7460,"lon":76.6470,"why":"Kharar NW of Mohali"},
+ "53": {"lat":30.7050,"lon":76.7180,"why":"SAS Nagar (Mohali) town"},
+ "60": {"lat":30.9080,"lon":75.8930,"why":"Ludhiana city E ward"},
+ "61": {"lat":30.8720,"lon":75.8560,"why":"Ludhiana city S ward"},
+ "62": {"lat":30.8890,"lon":75.8830,"why":"Atam Nagar, Ludhiana city"},
+ "63": {"lat":30.9010,"lon":75.8520,"why":"Ludhiana city centre"},
+ "64": {"lat":30.9060,"lon":75.8140,"why":"Ludhiana city W ward"},
+ "65": {"lat":30.9270,"lon":75.8480,"why":"Ludhiana city N ward"},
+ "66": {"lat":30.8850,"lon":75.8080,"why":"Gill, SW Ludhiana"},
+ "77": {"lat":30.8800,"lon":74.6900,"why":"Firozpur Rural ring around city"},
+ "93": {"lat":30.1450,"lon":74.9250,"why":"Bathinda Rural ring around city"},
+ "110":{"lat":30.3850,"lon":76.3350,"why":"Patiala Rural ring around city"}
+}

@@ -1,0 +1,559 @@
+{
+ "1": {
+  "lat": 32.31549,
+  "lon": 75.606966,
+  "src": "Sujanpur, Pathankot Tahsil, Pathankot, Punjab, 145023, India"
+ },
+ "2": {
+  "lat": 32.2500924,
+  "lon": 75.5294267,
+  "src": "Primary Health Centre, Bhoa, Delhi - Amritsar - Katra Expressway, Muthi Jagir, Pathankot Tahsil, Pathankot, Punjab, 145025, India"
+ },
+ "3": {
+  "lat": 32.2692452,
+  "lon": 75.6528858,
+  "src": "Pathankot, Pathankot Tahsil, Pathankot, Punjab, 145001, India"
+ },
+ "4": {
+  "lat": 32.0419134,
+  "lon": 75.4001677,
+  "src": "Gurdaspur, Gurdaspur Tahsil, Gurdaspur, Punjab, 143521, India"
+ },
+ "5": {
+  "lat": 32.1332966,
+  "lon": 75.467288,
+  "src": "Dina Nagar, Dinanagar Bypass, Dinanagar, Dinanagar Tahsil, Gurdaspur, Punjab, 143531, India"
+ },
+ "6": {
+  "lat": 31.8194314,
+  "lon": 75.3765813,
+  "src": "Qadian, Batala Tahsil, Gurdaspur, Punjab, 143516, India"
+ },
+ "7": {
+  "lat": 31.8193025,
+  "lon": 75.1999941,
+  "src": "Batala, Batala Tahsil, Gurdaspur, Punjab, 143500, India"
+ },
+ "8": {
+  "lat": 31.6875406,
+  "lon": 75.4784376,
+  "src": "Sri Hargobindpur, Batala Tahsil, Gurdaspur, Punjab, India"
+ },
+ "9": {
+  "lat": 31.8636479,
+  "lon": 74.9414924,
+  "src": "Fatehgarh Churian, Talwandi Nahar - Boharwala Road, Talwandi Nahr, Ajnala Tahsil, Amritsar, Punjab, 143602, India"
+ },
+ "10": {
+  "lat": 32.0317917,
+  "lon": 75.0284641,
+  "src": "Dera Baba Nanak, Dera Baba Nanak Tahsil, Gurdaspur, Punjab, 143604, India"
+ },
+ "11": {
+  "lat": 31.8442334,
+  "lon": 74.7625233,
+  "src": "Ajnala, Ajnala Tahsil, Amritsar, Punjab, India"
+ },
+ "12": {
+  "lat": 31.7197333,
+  "lon": 74.8004741,
+  "src": "Raja Sansi, Ajnala Tahsil, Amritsar, Punjab, 143101, India"
+ },
+ "13": {
+  "lat": 31.7565085,
+  "lon": 74.9567976,
+  "src": "Majitha, Majitha Tahsil, Amritsar, Punjab, 143601, India"
+ },
+ "14": {
+  "lat": 31.5608562,
+  "lon": 75.0276084,
+  "src": "Jandiala, Amritsar II Tahsil, Amritsar, Punjab, 143115, India"
+ },
+ "15": null,
+ "16": {
+  "lat": 30.8091369,
+  "lon": 75.7303332,
+  "src": "Delhi - Amritsar - Katra Expressway, Ballowal, Ludhiana (West) Tahsil, Ludhiana, Punjab, 141029, India"
+ },
+ "17": {
+  "lat": 31.600074,
+  "lon": 74.8429257,
+  "src": "Amritsar Central Jail, State Highway 21, Barariwala, Amritsar I Tahsil, Amritsar, Punjab, 143002, India"
+ },
+ "18": {
+  "lat": 30.7050507,
+  "lon": 75.7796365,
+  "src": "Delhi - Amritsar - Katra Expressway, Chhapar, Raikot Tahsil, Ludhiana, Punjab, 141205, India"
+ },
+ "19": null,
+ "20": {
+  "lat": 31.6008513,
+  "lon": 74.6060595,
+  "src": "Attari, Amritsar I Tahsil, Amritsar, Punjab, 143108, India"
+ },
+ "21": {
+  "lat": 31.3978315,
+  "lon": 74.9481782,
+  "src": "India Oil, NH54, Chak Banwalipur, Rasul Pur, Tarn Taran Tahsil, Tarn Taran, Punjab, India"
+ },
+ "22": {
+  "lat": 31.144424,
+  "lon": 74.559673,
+  "src": "Khem Karan, Patti Tahsil, Tarn Taran, Punjab, 143419, India"
+ },
+ "23": {
+  "lat": 31.2802361,
+  "lon": 74.8551871,
+  "src": "Patti, Patti Tahsil, Tarn Taran, Punjab, 143416, India"
+ },
+ "24": {
+  "lat": 31.4241739,
+  "lon": 75.0982026,
+  "src": "Khadur Sahib, Khadur Sahib Tahsil, Tarn Taran, Punjab, 143117, India"
+ },
+ "25": {
+  "lat": 31.5547266,
+  "lon": 75.2658599,
+  "src": "Baba Bakala, Baba Bakala Tahsil, Amritsar, Punjab, 143202, India"
+ },
+ "26": {
+  "lat": 31.5422961,
+  "lon": 75.5076163,
+  "src": "Bholath, Bhulath Tahsil, Kapurthala, Punjab, 144622, India"
+ },
+ "27": {
+  "lat": 31.3815015,
+  "lon": 75.3843769,
+  "src": "Kapurthala, Kapurthala Tahsil, Kapurthala, Punjab, 144601, India"
+ },
+ "28": {
+  "lat": 31.2144692,
+  "lon": 75.19477,
+  "src": "Sultanpur Lodhi, Sultanpur Lodhi Tahsil, Kapurthala, Punjab, 144626, India"
+ },
+ "29": {
+  "lat": 31.2206734,
+  "lon": 75.7696463,
+  "src": "Phagwara, Phagwara Tahsil, Kapurthala, Punjab, 144400, India"
+ },
+ "30": {
+  "lat": 31.018294,
+  "lon": 75.7839116,
+  "src": "Phillaur, Phillaur Tahsil, Jalandhar, Punjab, 144410, India"
+ },
+ "31": {
+  "lat": 31.1264364,
+  "lon": 75.4761382,
+  "src": "Nakodar, Nakodar Tahsil, Jalandhar, Punjab, 141310, India"
+ },
+ "32": {
+  "lat": 31.0831064,
+  "lon": 75.3366711,
+  "src": "Shahkot, 144702, Shahkot Tahsil, Jalandhar, Punjab, 144702, India"
+ },
+ "33": {
+  "lat": 31.4397157,
+  "lon": 75.4989077,
+  "src": "Kartarpur, Jalandhar II Tahsil, Jalandhar, Punjab, 144801, India"
+ },
+ "34": null,
+ "35": null,
+ "36": null,
+ "37": {
+  "lat": 31.2909358,
+  "lon": 75.6212238,
+  "src": "Jalandhar Cantonment, Sansarpur, Jalandhar I Tahsil, Jalandhar, Punjab, India"
+ },
+ "38": {
+  "lat": 31.4310724,
+  "lon": 75.7161526,
+  "src": "Adampur, Jalandhar I Tahsil, Jalandhar, Punjab, 144103, India"
+ },
+ "39": {
+  "lat": 31.94205,
+  "lon": 75.6121906,
+  "src": "Mukerian, NH44, Khanpur, Mukerian Tahsil, Hoshiarpur, Punjab, 144211, India"
+ },
+ "40": {
+  "lat": 31.8143209,
+  "lon": 75.6573028,
+  "src": "Dasuya, Dasua Tahsil, Hoshiarpur, Punjab, 144205, India"
+ },
+ "41": {
+  "lat": 31.6809219,
+  "lon": 75.6323719,
+  "src": "ਉੜਮੁੜ ਟਾਂਡਾ, Dasua Tahsil, Hoshiarpur, Punjab, 144204, India"
+ },
+ "42": {
+  "lat": 31.4583623,
+  "lon": 75.7660121,
+  "src": "Sham Chaurasi, Hoshiarpur - Jallandhar Road, Adampur, Jalandhar I Tahsil, Jalandhar, Punjab, 144106, India"
+ },
+ "43": {
+  "lat": 31.5328523,
+  "lon": 75.9025485,
+  "src": "Hoshiarpur, Hoshiarpur Tahsil, Hoshiarpur, Punjab, 146001, India"
+ },
+ "44": {
+  "lat": 31.4449097,
+  "lon": 75.9879297,
+  "src": "Government Hospital Chabbewal, NH103A, Chabewal, Hoshiarpur Tahsil, Hoshiarpur, Punjab, 146102, India"
+ },
+ "45": {
+  "lat": 31.2154716,
+  "lon": 76.1426888,
+  "src": "Garhshankar, Garhshankar Tahsil, Hoshiarpur, Punjab, 144527, India"
+ },
+ "46": {
+  "lat": 31.186355,
+  "lon": 75.999248,
+  "src": "Banga Dental Clinic, NH344A, Banga, Banga Tahsil, Shaheed Bhagat Singh Nagar, Punjab, 144505, India"
+ },
+ "47": {
+  "lat": 31.126969,
+  "lon": 76.1598988,
+  "src": "Shaheed Bhagat Singh Nagar, Punjab, India"
+ },
+ "48": {
+  "lat": 31.0634777,
+  "lon": 76.2959789,
+  "src": "Balachaur, Balachaur Tahsil, Shaheed Bhagat Singh Nagar, Punjab, 144521, India"
+ },
+ "49": {
+  "lat": 31.2299862,
+  "lon": 76.5005778,
+  "src": "Anandpur Sahib, NH503, Ghattiwal, Anandpur Sahib, Anandpur Sahib Tahsil, Rupnagar, Punjab, 140118, India"
+ },
+ "50": {
+  "lat": 30.9688367,
+  "lon": 76.526088,
+  "src": "Rupnagar, Rupnagar Tahsil, Rupnagar, Punjab, 140001, India"
+ },
+ "51": {
+  "lat": 30.8971758,
+  "lon": 76.4116372,
+  "src": "Chamkaur Sahib, Chamkaur Sahib Tahsil, Rupnagar, Punjab, 140112, India"
+ },
+ "52": {
+  "lat": 30.708303,
+  "lon": 76.6575811,
+  "src": "Kharar-Banur Road, Sector 116, Chappar Chiri, S.A.S. Nagar (Mohali) Tahsil, Sahibzada Ajit Singh Nagar, Punjab, 140307, India"
+ },
+ "53": {
+  "lat": 30.7442722,
+  "lon": 76.6511232,
+  "src": "Kaushal Hospital, Mohali, Chandigarh Road, Sector 126, Kharar, Kharar Tahsil, Sahibzada Ajit Singh Nagar, Punjab, 140301, India"
+ },
+ "54": {
+  "lat": 30.6896408,
+  "lon": 76.4042392,
+  "src": "Bassi Pathana, Bassi Pathana Tahsil, Fatehgarh Sahib, Punjab, 140412, India"
+ },
+ "55": {
+  "lat": 30.6511423,
+  "lon": 76.3887015,
+  "src": "Fatehgarh Sahib, Morinda-Fatehgarh Sahib Road, Fatehgarh Sahib, Fatehgarh Sahib Tahsil, Fatehgarh Sahib, Punjab, 140407, India"
+ },
+ "56": {
+  "lat": 30.6115717,
+  "lon": 76.2316357,
+  "src": "Amloh, Amloh Tahsil, Fatehgarh Sahib, Punjab, 147203, India"
+ },
+ "57": {
+  "lat": 30.700625,
+  "lon": 76.2220763,
+  "src": "Khanna, Khanna Tahsil, Ludhiana, Punjab, 141401, India"
+ },
+ "58": {
+  "lat": 30.8368764,
+  "lon": 76.1913755,
+  "src": "Samrala, Samrala Tahsil, Ludhiana, Punjab, 141114, India"
+ },
+ "59": {
+  "lat": 30.8402061,
+  "lon": 75.983601,
+  "src": "Sahnewal, Ludhiana (East) Tahsil, Ludhiana, Punjab, 141120, India"
+ },
+ "60": {
+  "lat": 30.8489819,
+  "lon": 75.99925,
+  "src": "Ludhiana (East) Tahsil, Ludhiana, Punjab, India"
+ },
+ "61": null,
+ "62": {
+  "lat": 30.8864536,
+  "lon": 75.8526762,
+  "src": "Atam nagar, Ludhiana, Ludhiana (West) Tahsil, Ludhiana, Punjab, 141003, India"
+ },
+ "63": {
+  "lat": 30.6493005,
+  "lon": 75.5990584,
+  "src": "The Ludhiana Central Co-Operative Bank, Old Tehsil Road, Raikot, Raikot Tahsil, Ludhiana, Punjab, 141109, India"
+ },
+ "64": {
+  "lat": 30.8738574,
+  "lon": 75.7946277,
+  "src": "Ludhiana (West) Tahsil, Ludhiana, Punjab, India"
+ },
+ "65": null,
+ "66": {
+  "lat": 30.846374,
+  "lon": 75.8628312,
+  "src": "Gill, Ludhiana (West) Tahsil, Ludhiana, Punjab, India"
+ },
+ "67": {
+  "lat": 30.7220819,
+  "lon": 76.0591435,
+  "src": "Payal, Payal Tahsil, Ludhiana, Punjab, 141416, India"
+ },
+ "68": {
+  "lat": 30.8587005,
+  "lon": 75.6902056,
+  "src": "Dakha, Ludhiana (West) Tahsil, Ludhiana, Punjab, 141102, India"
+ },
+ "69": {
+  "lat": 30.6496526,
+  "lon": 75.5993128,
+  "src": "Raikot, Raikot Tahsil, Ludhiana, Punjab, 141109, India"
+ },
+ "70": {
+  "lat": 30.8041704,
+  "lon": 75.4753645,
+  "src": "Jagraon, Jagraon Tahsil, Ludhiana, Punjab, 142026, India"
+ },
+ "71": {
+  "lat": 30.5896671,
+  "lon": 75.2805144,
+  "src": "Nihal Singh Wala, Nihal Singhwala Tahsil, Moga, Punjab, 142055, India"
+ },
+ "72": {
+  "lat": 30.6879319,
+  "lon": 75.0961232,
+  "src": "Bagha Purana, Bagha Purana Tahsil, Moga, Punjab, 142038, India"
+ },
+ "73": {
+  "lat": 30.8223408,
+  "lon": 75.1730967,
+  "src": "Moga, Moga Tahsil, Moga, Punjab, 142001, India"
+ },
+ "74": {
+  "lat": 30.9432095,
+  "lon": 75.2327764,
+  "src": "Dharamkot, Dharamkot Tahsil, Moga, Punjab, 142042, India"
+ },
+ "75": {
+  "lat": 30.971299,
+  "lon": 74.9881797,
+  "src": "Zira, Zira Tahsil, Firozpur, Punjab, 142047, India"
+ },
+ "76": {
+  "lat": 30.9611784,
+  "lon": 74.6092483,
+  "src": "Firozpur, Firozpur Tahsil, Firozpur, Punjab, 152001, India"
+ },
+ "77": {
+  "lat": 30.9611784,
+  "lon": 74.6092483,
+  "src": "Firozpur, Firozpur Tahsil, Firozpur, Punjab, 152001, India"
+ },
+ "78": {
+  "lat": 30.708855,
+  "lon": 74.4034695,
+  "src": "Guru Har Sahai, Guruharsahai Tahsil, Firozpur, Punjab, 152022, India"
+ },
+ "79": {
+  "lat": 30.6065977,
+  "lon": 74.2581087,
+  "src": "Jalalabad, Jalalabad Tahsil, Fazilka, Punjab, 152024, India"
+ },
+ "80": {
+  "lat": 30.4032097,
+  "lon": 74.0310609,
+  "src": "Fazilka, Fazilka Tahsil, Fazilka, Punjab, 152123, India"
+ },
+ "81": {
+  "lat": 30.1450543,
+  "lon": 74.1956597,
+  "src": "Abohar, Abohar Tahsil, Fazilka, Punjab, 152116, India"
+ },
+ "82": {
+  "lat": 30.1753788,
+  "lon": 74.3129958,
+  "src": "Balluana, Abohar Tahsil, Fazilka, Punjab, 152117, India"
+ },
+ "83": {
+  "lat": 30.0574589,
+  "lon": 74.6106435,
+  "src": "Lambi, Malout Tahsil, Sri Muktsar Sahib, Punjab, 152113, India"
+ },
+ "84": {
+  "lat": 30.2867162,
+  "lon": 74.6386534,
+  "src": "Gidderbaha Tahsil, Sri Muktsar Sahib, Punjab, India"
+ },
+ "85": {
+  "lat": 30.1890608,
+  "lon": 74.4994549,
+  "src": "Malout, Malout Tahsil, Sri Muktsar Sahib, Punjab, India"
+ },
+ "86": {
+  "lat": 30.4692,
+  "lon": 74.5182,
+  "src": "Sri Muktsar Sahib, Muktsar Tahsil, Sri Muktsar Sahib, Punjab, 152026, India"
+ },
+ "87": {
+  "lat": 30.6729772,
+  "lon": 74.7517033,
+  "src": "Faridkot, Faridkot Tahsil, Faridkot, Punjab, 151200, India"
+ },
+ "88": {
+  "lat": 30.5842864,
+  "lon": 74.8089127,
+  "src": "Kotkapura Tahsil, Faridkot, Punjab, India"
+ },
+ "89": {
+  "lat": 30.4485444,
+  "lon": 74.8892204,
+  "src": "Jaito, Jaitu Tahsil, Faridkot, Punjab, 151202, India"
+ },
+ "90": {
+  "lat": 30.2703978,
+  "lon": 75.2373537,
+  "src": "Rampura Phul, Rampura Phul Tahsil, Bathinda, Punjab, 151103, India"
+ },
+ "91": {
+  "lat": 30.2151729,
+  "lon": 75.0933937,
+  "src": "Bhucho Mandi, Bathinda Tahsil, Bathinda, Punjab, 151101, India"
+ },
+ "92": {
+  "lat": 30.206791,
+  "lon": 74.9463699,
+  "src": "Bathinda, Bathinda Tahsil, Bathinda, Punjab, 151001, India"
+ },
+ "93": {
+  "lat": 30.206791,
+  "lon": 74.9463699,
+  "src": "Bathinda, Bathinda Tahsil, Bathinda, Punjab, 151001, India"
+ },
+ "94": {
+  "lat": 29.9838213,
+  "lon": 75.081768,
+  "src": "Talwandi Sabo, Talwandi Sabo Tahsil, Bathinda, Punjab, 151302, India"
+ },
+ "95": {
+  "lat": 30.0661125,
+  "lon": 75.2298534,
+  "src": "Maur, Maur Tahsil, Bathinda, Punjab, 151509, India"
+ },
+ "96": {
+  "lat": 29.9946852,
+  "lon": 75.4022224,
+  "src": "Mansa, Mansa Tehsil, Mansa, Punjab, 151505, India"
+ },
+ "97": {
+  "lat": 29.6934466,
+  "lon": 75.23753,
+  "src": "Sardulgarh, Sardulgarh Tehsil, Mansa, Punjab, 151507, India"
+ },
+ "98": {
+  "lat": 29.9255593,
+  "lon": 75.549854,
+  "src": "Budhlada, Budhlada Tahsil, Mansa, Punjab, 151502, India"
+ },
+ "99": {
+  "lat": 29.9371188,
+  "lon": 75.8000781,
+  "src": "Lehragaga, Lehra Tahsil, Sangrur, Punjab, 148031, India"
+ },
+ "100": {
+  "lat": 30.0722475,
+  "lon": 75.9952782,
+  "src": "Dirba, Dirba Tahsil, Sangrur, Punjab, 148035, India"
+ },
+ "101": {
+  "lat": 30.134004,
+  "lon": 75.8062777,
+  "src": "Sunam, Sunam Tahsil, Sangrur, Punjab, 148028, India"
+ },
+ "102": {
+  "lat": 30.4763027,
+  "lon": 75.329823,
+  "src": "Bhadaur, Tapa Tahsil, Barnala, Punjab, 148102, India"
+ },
+ "103": {
+  "lat": 30.3762012,
+  "lon": 75.5435927,
+  "src": "Barnala, Barnala Tahsil, Barnala, Punjab, 148101, India"
+ },
+ "104": {
+  "lat": 30.5293884,
+  "lon": 75.5653904,
+  "src": "Mehal Kalan, Barnala Tahsil, Barnala, Punjab, 148104, India"
+ },
+ "105": {
+  "lat": 30.533129,
+  "lon": 75.8807604,
+  "src": "Malerkotla, Malerkotla Tahsil, Malerkotla, Punjab, 148023, India"
+ },
+ "106": {
+  "lat": 30.4634148,
+  "lon": 76.0115571,
+  "src": "Amargarh, Malerkotla Tahsil, Malerkotla, Punjab, 148022, India"
+ },
+ "107": {
+  "lat": 30.3708266,
+  "lon": 75.8647369,
+  "src": "Dhuri, Dhuri Tahsil, Sangrur, Punjab, 148024, India"
+ },
+ "108": {
+  "lat": 30.2432006,
+  "lon": 75.8358123,
+  "src": "Sangrur, Sangrur Tahsil, Sangrur, Punjab, 148001, India"
+ },
+ "109": {
+  "lat": 30.3739948,
+  "lon": 76.1528674,
+  "src": "Nabha, Nabha Tahsil, Patiala, Punjab, 147201, India"
+ },
+ "110": {
+  "lat": 30.3301995,
+  "lon": 76.4007656,
+  "src": "Patiala, Patiala Tahsil, Patiala, Punjab, India"
+ },
+ "111": {
+  "lat": 30.4776857,
+  "lon": 76.5937658,
+  "src": "Rajpura, Rajpura Tahsil, Patiala, Punjab, 140401, India"
+ },
+ "112": {
+  "lat": 30.5882408,
+  "lon": 76.8438542,
+  "src": "Dera Bassi, Dera Bassi Tahsil, Sahibzada Ajit Singh Nagar, Punjab, 140412, India"
+ },
+ "113": {
+  "lat": 30.3312684,
+  "lon": 76.6120004,
+  "src": "Ghanaur, Rajpura Tahsil, Patiala, Punjab, 140702, India"
+ },
+ "114": {
+  "lat": 30.3016735,
+  "lon": 76.4569821,
+  "src": "Sanaur, Patiala Tahsil, Patiala, Punjab, 147103, India"
+ },
+ "115": {
+  "lat": 30.3301995,
+  "lon": 76.4007656,
+  "src": "Patiala, Patiala Tahsil, Patiala, Punjab, India"
+ },
+ "116": {
+  "lat": 30.1552451,
+  "lon": 76.2024326,
+  "src": "Samana, State Highway 10, Malkana, Majri, Samana Tahsil, Patiala, Punjab, 147100, India"
+ },
+ "117": {
+  "lat": 29.9087377,
+  "lon": 76.0975734,
+  "src": "CHC Shutrana, NH52, Jogewala, Patran Tahsil, Patiala, Punjab, 147105, India"
+ }
+}

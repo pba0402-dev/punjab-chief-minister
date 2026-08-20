@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Punjab Chief Minister</title>
+    <meta
+      name="description"
+      content="A fictional election strategy game: campaign across all 117 Punjab assembly constituencies and win the 59 seats you need to become Chief Minister."
+    />
+    <link rel="stylesheet" href="src/ui/styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- Data: reference data and configuration -->
+    <script src="src/data/issues.js"></script>
+    <script src="src/data/parties.js"></script>
+    <script src="src/data/strategies.js"></script>
+    <script src="src/data/punjab-seats.js"></script>
+    <script src="src/data/punjab-geometry.js"></script>
+    <script src="src/data/states.js"></script>
+    <script src="src/data/lookup.js"></script>
+
+    <!-- Engine: rules and simulation, no DOM -->
+    <script src="src/engine/rng.js"></script>
+    <script src="src/engine/model.js"></script>
+    <script src="src/engine/actions.js"></script>
+    <script src="src/engine/events.js"></script>
+    <script src="src/engine/ai.js"></script>
+    <script src="src/engine/engine.js"></script>
+
+    <!-- Persistence -->
+    <script src="src/persistence/storage.js"></script>
+
+    <!-- UI -->
+    <script src="src/ui/dom.js"></script>
+    <script src="src/ui/map.js"></script>
+    <script src="src/ui/hud.js"></script>
+    <script src="src/ui/panel.js"></script>
+    <script src="src/ui/setup.js"></script>
+    <script src="src/ui/results.js"></script>
+    <script src="src/ui/app.js"></script>
+    <script src="src/ui/boot.js"></script>
+  </body>
+</html>
