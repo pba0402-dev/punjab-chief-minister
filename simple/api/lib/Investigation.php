@@ -76,9 +76,16 @@ final class Investigation
             return [$game, ['ok' => false, 'error' => 'That player is already out of the election.']];
         }
 
-        // One report per reporter per accused, ever. This is what stops the
-        // count being inflated by a single player.
-        if (isset($accused['record']['reportsAgainst'][$reporterId])) {
+        // One report per reporter per accused, for the whole game.
+        //
+        // reportsAgainst is cleared when an investigation resolves, so checking
+        // only that would let two players cycle reports at a third and grind
+        // them down with repeated inquiries — each one costs the accused some
+        // support even when it clears them. reportsMade is never cleared, so it
+        // is the check that actually holds.
+        $alreadyReported = isset($accused['record']['reportsAgainst'][$reporterId])
+            || !empty($game['players'][$reporterId]['record']['reportsMade'][$accusedId]);
+        if ($alreadyReported) {
             return [$game, ['ok' => false, 'error' => 'You have already reported that player.']];
         }
 

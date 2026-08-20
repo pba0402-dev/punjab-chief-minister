@@ -205,6 +205,16 @@ check('the finding is one of the configured outcomes',
     .includes(acc2.investigations[0].outcomeLabel),
   acc2.investigations[0].outcomeLabel);
 check('reports are consumed once acted on', acc2.reportsAgainst === 0, String(acc2.reportsAgainst));
+
+// Reports being consumed must not reopen the door: two players cycling reports
+// at a third would otherwise grind them down with repeated inquiries.
+const recycled = await J('report', { ...a, accusedId: accused, reason: 'rules' });
+check('a reporter cannot report the same player again after an inquiry',
+  recycled.ok === false, JSON.stringify(recycled).slice(0, 100));
+check('the refusal is the same one', /already reported/i.test(recycled.error || ''), recycled.error);
+const stillClear = await G('state', a);
+check('no second inquiry was triggered',
+  (stillClear.game.players.find((p) => p.id === accused).investigations || []).length === 1);
 console.log('     finding: ' + acc2.investigations[0].outcomeLabel);
 
 check('the evidence score is never sent to clients',
