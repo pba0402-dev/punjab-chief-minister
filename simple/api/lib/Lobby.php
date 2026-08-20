@@ -38,7 +38,7 @@ final class Lobby
         ];
     }
 
-    public static function newPlayer(int $slot): array
+    public static function newPlayer(int $slot, int $startingBudget): array
     {
         $now = time();
         return [
@@ -48,7 +48,17 @@ final class Lobby
             'partyId' => null,
             'candidateName' => '',
             'slogan' => '',
-            'budget' => 0,
+
+            // Every player is granted the same purse. It is never entered by
+            // hand, and it is theirs alone — nothing is pooled.
+            'budget' => $startingBudget,
+            'spent' => 0,
+            'heat' => 0,
+            'support' => (object) [],
+            'actions' => [],
+            'rollCount' => 0,
+            'seatsLed' => 0,
+
             'ready' => false,
             'joinedAt' => $now,
             'lastSeen' => $now,
@@ -135,8 +145,7 @@ final class Lobby
     {
         return !empty($p['partyId'])
             && trim((string) $p['candidateName']) !== ''
-            && trim((string) $p['slogan']) !== ''
-            && (int) $p['budget'] > 0;
+            && trim((string) $p['slogan']) !== '';
     }
 
     /**
@@ -159,7 +168,7 @@ final class Lobby
 
         foreach ($connected as $p) {
             if (!self::playerIsComplete($p)) {
-                return 'Every player needs a party, a candidate, a slogan and a budget.';
+                return 'Every player needs a party, a candidate and a slogan.';
             }
             if (empty($p['ready'])) {
                 return 'Waiting for all players to be ready.';
@@ -187,20 +196,31 @@ final class Lobby
                 continue;
             }
             $p = $bySlot[$slot];
-            $slots[] = [
+            $isYou = $viewerId !== null && $viewerId === $p['id'];
+            $entry = [
                 'slot' => $slot,
                 'empty' => false,
                 'id' => $p['id'],
                 'isHost' => $game['hostId'] === $p['id'],
-                'isYou' => $viewerId !== null && $viewerId === $p['id'],
+                'isYou' => $isYou,
                 'connected' => self::isConnected($p, $now),
                 'partyId' => $p['partyId'],
                 'candidateName' => $p['candidateName'],
                 'slogan' => $p['slogan'],
-                'budget' => (int) $p['budget'],
+                'budget' => (int) ($p['budget'] ?? 0),
+                'spent' => (int) ($p['spent'] ?? 0),
+                'remaining' => max(0, (int) ($p['budget'] ?? 0) - (int) ($p['spent'] ?? 0)),
+                'heat' => (float) ($p['heat'] ?? 0),
+                'seatsLed' => (int) ($p['seatsLed'] ?? 0),
                 'ready' => (bool) $p['ready'],
                 'complete' => self::playerIsComplete($p),
             ];
+            // Only ever ship a player their own board and their own history.
+            if ($isYou) {
+                $entry['support'] = $p['support'] ?? (object) [];
+                $entry['actions'] = array_slice($p['actions'] ?? [], -12);
+            }
+            $slots[] = $entry;
         }
 
         return [

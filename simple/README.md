@@ -20,17 +20,63 @@ From the repository root:
 
 ```
 npm run serve               # php -S on http://127.0.0.1:8080 (multiplayer needs PHP)
-npm run test:all            # all three suites below
-npm run test:v1             # 62 checks: solo flow through the real UI
-npm run test:api            # 76 checks: the multiplayer API
-npm run test:mp             # 59 checks: four browsers in one lobby
+npm run test:all            # all four suites below
+npm run test:campaign       # 60 checks: engine parity, budget, heat, balance
+npm run test:v1             # 67 checks: solo flow through the real UI
+npm run test:api            # 79 checks: the multiplayer API
+npm run test:mp             # 84 checks: four browsers in one lobby
 npm run shots:v1            # render at 1400 / 768 / 390 / 360 px
 npm run shots:lobby         # render the multiplayer screens
 npm run data:v1             # regenerate the constituency data file
+npm run data:campaign       # regenerate actions.js from campaign-config.json
 ```
 
 Solo mode works by opening `simple/index.html` directly. Multiplayer needs the
 page served by PHP, since the lobby talks to `api/index.php`.
+
+## Budget, risk and Political Heat
+
+Every player — solo or multiplayer — is **granted ₹5,00,00,000**. It is never
+typed in, and in multiplayer the server grants it, so a client cannot set its
+own purse. Each player's budget, spending, heat and board are entirely their
+own; nothing is pooled.
+
+Eight ways to spend it, in two groups:
+
+| Safe campaign | Cost | | Risky strategies | Cost |
+| --- | --- | --- | --- | --- |
+| Village Outreach | ₹10 lakh | | Negative Campaign | ₹30 lakh |
+| Public Rally | ₹15 lakh | | Secret Influence | ₹40 lakh |
+| Community Development | ₹20 lakh | | Underground Deal | ₹60 lakh |
+| Media Campaign | ₹25 lakh | | Last-Minute Push | ₹70 lakh |
+
+Safe actions vary a little. Risky ones roll on a weighted table that can pay
+big, do nothing, or backfire outright — **the odds are never shown to the
+player**, only a cost, a risk word and an impact word.
+
+**Political Heat** runs 0–100 (Low / Moderate / High / Critical). Safe play
+barely moves it; risky play sends it up fast. Heat does not punish on a
+schedule — it raises the *odds* of trouble after each action, and below the
+configured floor nothing fires at all. At high heat you can draw rumours, media
+scrutiny, a controversy, an opponent attack, a public backlash or an
+investigation, each taking support off you in the seats you have been working
+hardest.
+
+The balance test plays whole games both ways: spending the full ₹5 crore
+recklessly leads 30 seats on average with heat pinned at 100, against 38 for
+sensible play. Risk is a real option, not a free win.
+
+### Everything is configurable
+
+`api/campaign-config.json` is the single balance sheet: costs, support effects,
+risk labels, heat, outcome weights and consequences. PHP reads it directly;
+`npm run data:campaign` regenerates `js/data/actions.js` from it for the
+browser. Nothing in the UI hard-codes a number.
+
+The rules exist twice — `js/engine/campaign.js` for solo, `api/lib/Campaign.php`
+for multiplayer, because a client cannot be trusted to roll its own dice.
+`npm run test:campaign` proves the two agree: same seeded random sequence, same
+outcome for the same roll, same cost and heat.
 
 ## Multiplayer
 
@@ -92,12 +138,14 @@ in `index.php` that constructs the store.
   line underneath
 - **Setup** — pick AAP, INC, BJP or SAD, then candidate name, slogan and budget
   (formatted in Indian grouping as you type: `₹10,00,00,000`)
-- **Election** — party, candidate, slogan, budget, Seats Won, Majority Required
-  (59), and all 117 constituencies grouped by their 23 districts
+- **Election** — the campaign panel: party, budget, spent, remaining, seats led,
+  Political Heat, a target constituency with both sides' support and a
+  SAFE/LIKELY/LEAN/TOSS-UP status, and the eight ways to spend
 - **Autosave** — solo progress writes to `localStorage` on every change and
   needs no server; multiplayer state lives on the server and is polled
 
-Not built yet, on purpose: the map, campaigning, polling, events, results.
+Not built yet, on purpose: the interactive map, turn structure, election day
+and final results.
 
 ## Files
 
@@ -108,6 +156,9 @@ simple/
   js/
     data/parties.js          the four parties — the only place a party is defined
     data/constituencies.js   GENERATED: the 117 seats
+    data/actions.js          GENERATED: costs, outcomes, heat, consequences
+    engine/rng.js            seeded randomness
+    engine/campaign.js       campaign rules for solo play
     state.js                 the game object, validation, starting a campaign
     storage.js               localStorage save/load behind a tiny adapter
     ui/dom.js                element helper + Indian currency formatting
@@ -123,6 +174,8 @@ simple/
     lib/Store.php            storage interface + FileStore
     lib/Code.php             game code generation
     lib/Lobby.php            lobby rules, pure functions
+    lib/Campaign.php         the same campaign rules, server-authoritative
+    campaign-config.json     THE balance sheet — both sides read this
 ```
 
 UI, game state, party data, constituency data and save/load are separate

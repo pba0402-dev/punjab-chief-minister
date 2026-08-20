@@ -16,6 +16,7 @@ CMP.app = (function () {
   var game = null; // solo game only
   var screen = 'home';
   var lobbyView = null; // live CMP.ui.lobby instance while in the lobby
+  var electionView = null; // live CMP.ui.election instance while campaigning
 
   function mount(node) {
     root = node;
@@ -79,6 +80,15 @@ CMP.app = (function () {
     lobbyView = null;
   }
 
+  /** While campaigning in multiplayer, refresh our own figures from the server. */
+  function onElectionUpdate(res) {
+    if (!res.ok || screen !== 'election' || !game || game.mode !== 'multiplayer') return;
+    var mine = mineFrom(res.game);
+    if (!mine) return;
+    applyServerPlayer(mine);
+    if (electionView) electionView.render(game);
+  }
+
   /**
    * The host pressed start. Version 1 hands every player the same election
    * screen built from their own lobby entry; the shared campaign itself is
@@ -92,17 +102,21 @@ CMP.app = (function () {
     if (!mine) return;
 
     stopLobby();
-    var mp = CMP.state.startElection({
-      partyId: mine.partyId,
-      candidateName: mine.candidateName,
-      slogan: mine.slogan,
-      budget: mine.budget,
-    });
+    var mp = CMP.state.create();
     mp.mode = 'multiplayer';
     mp.gameCode = view.code;
-    game = mp; // not saved locally: the server is the source of truth
+    mp.partyId = mine.partyId;
+    mp.candidateName = mine.candidateName;
+    mp.slogan = mine.slogan;
+    mp.screen = 'election';
+    game = mp; // the server is the source of truth; nothing is saved locally
+    applyServerPlayer(mine);
+    electionView = null;
     screen = 'election';
     paint();
+
+    // Keep our own figures in step with the server while the election runs.
+    CMP.net.startPolling(onElectionUpdate);
   }
 
   /* ------------------------------------------------------ rendering */
@@ -112,11 +126,16 @@ CMP.app = (function () {
     var view;
 
     if (screen === 'election' && game) {
-      view = CMP.ui.election.render(game, {
-        onMenu: function () {
-          goTo('home');
-        },
-      });
+      if (!electionView) {
+        electionView = CMP.ui.election.create({
+          onMenu: function () {
+            goTo('home');
+          },
+          play: playAction,
+        });
+      }
+      electionView.render(game);
+      view = electionView.root;
     } else if (screen === 'setup') {
       view = CMP.ui.setup.render({
         onBack: function () {
@@ -173,8 +192,59 @@ CMP.app = (function () {
 
   function goTo(name) {
     if (name !== 'lobby') stopLobby();
+    if (name !== 'election') {
+      electionView = null;
+      CMP.net.stopPolling(onElectionUpdate);
+    }
     screen = name;
     paint();
+  }
+
+  /**
+   * One entry point for spending money, whichever mode is running.
+   * Solo rolls locally; multiplayer asks the server, because a client must
+   * not be able to choose its own outcome or set its own budget.
+   */
+  function playAction(actionId, constituency) {
+    if (game && game.mode === 'multiplayer') {
+      return CMP.net.playAction(actionId, constituency).then(function (res) {
+        if (!res.ok) return { ok: false, reason: res.error };
+        var mine = mineFrom(res.game);
+        if (mine) applyServerPlayer(mine);
+        return { ok: true, report: lastServerReport(mine), game: game };
+      });
+    }
+
+    var rolls = CMP.rng.rollsFor(game);
+    var res = CMP.campaign.play(game, actionId, constituency, rolls);
+    if (!res.ok) return { ok: false, reason: res.reason };
+    game.seatsWon = CMP.campaign.seatsLed(game);
+    CMP.storage.save(game);
+    return { ok: true, report: res.report, game: game };
+  }
+
+  function mineFrom(view) {
+    if (!view || !view.players) return null;
+    for (var i = 0; i < view.players.length; i++) {
+      if (!view.players[i].empty && view.players[i].isYou) return view.players[i];
+    }
+    return null;
+  }
+
+  /** Copy the server's authoritative figures onto the local view object. */
+  function applyServerPlayer(mine) {
+    if (!game || !mine) return;
+    game.budget = mine.budget;
+    game.spent = mine.spent;
+    game.heat = mine.heat;
+    game.seatsWon = mine.seatsLed;
+    if (mine.support) game.support = mine.support;
+    if (mine.actions) game.actions = mine.actions;
+  }
+
+  function lastServerReport(mine) {
+    if (!mine || !mine.actions || !mine.actions.length) return null;
+    return mine.actions[mine.actions.length - 1];
   }
 
   return {

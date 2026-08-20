@@ -15,7 +15,7 @@ CMP.ui.setup = (function () {
   var money = CMP.ui.money;
 
   function render(opts) {
-    var draft = { partyId: null, candidateName: '', slogan: '', budget: 0 };
+    var draft = { partyId: null, candidateName: '', slogan: '' };
     var errors = {};
 
     var root = el('section', { class: 'screen screen-setup' });
@@ -124,10 +124,10 @@ CMP.ui.setup = (function () {
               setError('slogan'),
             ]),
 
-            el('label', { class: 'field' }, [
-              el('span', { class: 'field-label', text: 'Election Budget' }),
-              budgetInput(),
-              setError('budget'),
+            el('p', { class: 'granted-note' }, [
+              'Every candidate is given ',
+              el('strong', { text: CMP.ui.money.format(CMP.STARTING_BUDGET) }),
+              ' to run the campaign.',
             ]),
           ]),
 
@@ -155,48 +155,6 @@ CMP.ui.setup = (function () {
           ]),
         ]),
       ]);
-    }
-
-    /**
-     * The budget field shows grouped rupees as you type (₹10,00,00,000) while
-     * keeping a plain number in the draft.
-     */
-    function budgetInput() {
-      var hint = el('span', {
-        class: 'field-hint',
-        text: draft.budget ? money.words(draft.budget) : 'For example: ₹10,00,00,000',
-      });
-
-      var input = el('input', {
-        class: 'field-input field-money' + (errors.budget ? ' has-error' : ''),
-        type: 'text',
-        inputmode: 'numeric',
-        autocomplete: 'off',
-        value: draft.budget ? money.format(draft.budget) : '',
-        placeholder: '₹10,00,00,000',
-        oninput: function (e) {
-          var caretFromEnd = e.target.value.length - e.target.selectionStart;
-          draft.budget = money.parse(e.target.value);
-          e.target.value = draft.budget ? money.format(draft.budget) : '';
-          var pos = Math.max(0, e.target.value.length - caretFromEnd);
-          try {
-            e.target.setSelectionRange(pos, pos);
-          } catch (err) {
-            /* some browsers refuse on certain input types */
-          }
-          hint.textContent = draft.budget
-            ? money.words(draft.budget)
-            : 'For example: ₹10,00,00,000';
-          if (errors.budget) {
-            delete errors.budget;
-            e.target.classList.remove('has-error');
-            var msg = e.target.parentNode.querySelector('.field-error');
-            if (msg) msg.remove();
-          }
-        },
-      });
-
-      return el('span', { class: 'field-money-wrap' }, [input, hint]);
     }
 
     function submit() {

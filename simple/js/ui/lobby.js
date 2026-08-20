@@ -56,28 +56,6 @@ CMP.ui.lobby = (function () {
       oninput: queueDetails,
     });
 
-    var budgetHint = el('span', { class: 'field-hint', text: 'For example: ₹10,00,00,000' });
-    var budgetInput = el('input', {
-      class: 'field-input field-money',
-      type: 'text',
-      inputmode: 'numeric',
-      autocomplete: 'off',
-      placeholder: '₹10,00,00,000',
-      oninput: function (e) {
-        var caretFromEnd = e.target.value.length - e.target.selectionStart;
-        var amount = money.parse(e.target.value);
-        e.target.value = amount ? money.format(amount) : '';
-        var pos = Math.max(0, e.target.value.length - caretFromEnd);
-        try {
-          e.target.setSelectionRange(pos, pos);
-        } catch (err) {
-          /* ignore */
-        }
-        budgetHint.textContent = amount ? money.words(amount) : 'For example: ₹10,00,00,000';
-        queueDetails();
-      },
-    });
-
     var readyBtn = el('button', {
       class: 'btn btn-xl btn-ready',
       type: 'button',
@@ -139,9 +117,10 @@ CMP.ui.lobby = (function () {
             el('span', { class: 'field-label', text: 'Election Slogan' }),
             sloganInput,
           ]),
-          el('label', { class: 'field' }, [
-            el('span', { class: 'field-label', text: 'Election Budget' }),
-            el('span', { class: 'field-money-wrap' }, [budgetInput, budgetHint]),
+          el('p', { class: 'granted-note' }, [
+            'Every player is given ',
+            el('strong', { text: money.format(CMP.STARTING_BUDGET) }),
+            ' of their own to spend.',
           ]),
         ]),
 
@@ -239,7 +218,7 @@ CMP.ui.lobby = (function () {
     function sendDetails() {
       detailsTimer = null;
       CMP.net
-        .setDetails(nameInput.value, sloganInput.value, money.parse(budgetInput.value))
+        .setDetails(nameInput.value, sloganInput.value)
         .then(function (res) {
           if (!res.ok && !res.offline) setNotice(res.error);
           if (res.game) update(res.game);
@@ -394,15 +373,6 @@ CMP.ui.lobby = (function () {
       }
       if (document.activeElement !== sloganInput && sloganInput.value !== mine.slogan) {
         sloganInput.value = mine.slogan;
-      }
-      if (document.activeElement !== budgetInput) {
-        var shown = mine.budget ? money.format(mine.budget) : '';
-        if (budgetInput.value !== shown) {
-          budgetInput.value = shown;
-          budgetHint.textContent = mine.budget
-            ? money.words(mine.budget)
-            : 'For example: ₹10,00,00,000';
-        }
       }
     }
 

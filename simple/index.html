@@ -10,6 +10,7 @@
     />
     <meta name="theme-color" content="#14110d" />
     <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/campaign.css" />
   </head>
   <body>
     <div id="app"></div>
@@ -17,6 +18,11 @@
     <!-- Data -->
     <script src="js/data/parties.js"></script>
     <script src="js/data/constituencies.js"></script>
+    <script src="js/data/actions.js"></script>
+
+    <!-- Engine: campaign rules and randomness, no DOM -->
+    <script src="js/engine/rng.js"></script>
+    <script src="js/engine/campaign.js"></script>
 
     <!-- Game state and persistence -->
     <script src="js/state.js"></script>

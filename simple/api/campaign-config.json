@@ -1,0 +1,267 @@
+{
+  "_comment": [
+    "Central balance sheet for the campaign system. This file is the single",
+    "source of truth: PHP reads it directly for multiplayer, and",
+    "tools/build-campaign-config.mjs generates js/data/actions.js from it for",
+    "solo play. Change a number here and both sides change together.",
+    "",
+    "All money is in rupees. Support effects are percentage points.",
+    "Outcome weights are relative and need not sum to 100.",
+    "",
+    "The actions below are fictional game mechanics. The 'risky' ones abstract",
+    "questionable political behaviour into a cost, a dice roll and a",
+    "consequence - they describe no real-world method and never explain how",
+    "anything would be done."
+  ],
+
+  "startingBudget": 50000000,
+
+  "heat": {
+    "max": 100,
+    "levels": [
+      { "id": "low", "label": "Low", "upTo": 25, "colour": "#7fd6a0" },
+      { "id": "moderate", "label": "Moderate", "upTo": 50, "colour": "#e8b93c" },
+      { "id": "high", "label": "High", "upTo": 75, "colour": "#e8863c" },
+      { "id": "critical", "label": "Critical", "upTo": 100, "colour": "#e2634f" }
+    ],
+    "_consequenceComment": "Chance of a consequence firing after an action = heat/100 * chanceFactor, floored below minHeat.",
+    "minHeat": 26,
+    "chanceFactor": 0.55
+  },
+
+  "ratings": [
+    { "id": "safe", "label": "SAFE", "minMargin": 15 },
+    { "id": "likely", "label": "LIKELY", "minMargin": 8 },
+    { "id": "lean", "label": "LEAN", "minMargin": 3 },
+    { "id": "tossup", "label": "TOSS-UP", "minMargin": 0 }
+  ],
+
+  "actions": [
+    {
+      "id": "rally",
+      "group": "safe",
+      "label": "Public Rally",
+      "icon": "📣",
+      "blurb": "A stage, a crowd and a speech in one constituency.",
+      "cost": 1500000,
+      "heat": 0,
+      "riskLabel": "Low risk",
+      "impactLabel": "Moderate gain",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "strong", "weight": 25, "label": "A big turnout", "support": 4.5, "heat": 0,
+          "text": "The ground was packed and the speech carried. Support is up sharply." },
+        { "id": "normal", "weight": 60, "label": "A solid rally", "support": 3.0, "heat": 0,
+          "text": "A good crowd and a clean message. Steady gain." },
+        { "id": "weak", "weight": 15, "label": "A thin crowd", "support": 1.2, "heat": 0,
+          "text": "Turnout was modest. Some gain, not much." }
+      ]
+    },
+    {
+      "id": "media",
+      "group": "safe",
+      "label": "Media Campaign",
+      "icon": "📺",
+      "blurb": "Cable spots, print and hoardings across the constituency.",
+      "cost": 2500000,
+      "heat": 1,
+      "riskLabel": "Low risk",
+      "impactLabel": "Good gain",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "strong", "weight": 30, "label": "The message cuts through", "support": 6.0, "heat": 1,
+          "text": "Your line is being repeated back to you on the street." },
+        { "id": "normal", "weight": 55, "label": "Steady coverage", "support": 4.0, "heat": 1,
+          "text": "Solid visibility for the money." },
+        { "id": "weak", "weight": 15, "label": "Lost in the noise", "support": 1.5, "heat": 2,
+          "text": "Everyone else was advertising too. Limited effect." }
+      ]
+    },
+    {
+      "id": "community",
+      "group": "safe",
+      "label": "Community Development",
+      "icon": "🏗️",
+      "blurb": "Fund something visible and useful that people will remember.",
+      "cost": 2000000,
+      "heat": 0,
+      "riskLabel": "Very low risk",
+      "impactLabel": "Moderate, durable gain",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "strong", "weight": 30, "label": "Genuinely appreciated", "support": 5.0, "heat": 0,
+          "text": "The work is visible and people credit you for it." },
+        { "id": "normal", "weight": 65, "label": "Well received", "support": 3.5, "heat": 0,
+          "text": "Quiet, solid goodwill." },
+        { "id": "weak", "weight": 5, "label": "Slow to land", "support": 1.5, "heat": 0,
+          "text": "It will be noticed eventually, but not before polling day." }
+      ]
+    },
+    {
+      "id": "outreach",
+      "group": "safe",
+      "label": "Village Outreach",
+      "icon": "🚪",
+      "blurb": "Workers walking door to door through the villages.",
+      "cost": 1000000,
+      "heat": 0,
+      "riskLabel": "Low risk",
+      "impactLabel": "Small, cheap gain",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "strong", "weight": 25, "label": "Warm reception", "support": 3.2, "heat": 0,
+          "text": "Doors opened and workers were listened to." },
+        { "id": "normal", "weight": 60, "label": "Ground covered", "support": 2.2, "heat": 0,
+          "text": "Slow, steady, dependable." },
+        { "id": "weak", "weight": 15, "label": "Hard going", "support": 0.9, "heat": 1,
+          "text": "A cold reception in places. Modest gain." }
+      ]
+    },
+
+    {
+      "id": "deal",
+      "group": "risky",
+      "label": "Underground Deal",
+      "icon": "🤝",
+      "blurb": "An arrangement with local powerbrokers, made quietly.",
+      "cost": 6000000,
+      "heat": 18,
+      "riskLabel": "High risk",
+      "impactLabel": "Big swing, or trouble",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "large", "weight": 35, "label": "The deal holds", "support": 12.0, "heat": 18,
+          "text": "Whole blocks of votes move your way. Nobody says how." },
+        { "id": "small", "weight": 30, "label": "Partly delivered", "support": 5.0, "heat": 18,
+          "text": "Less than promised, but something moved." },
+        { "id": "none", "weight": 20, "label": "Nothing came of it", "support": 0, "heat": 18,
+          "text": "The money went out and nothing came back." },
+        { "id": "backfire", "weight": 15, "label": "It got out", "support": -8.0, "heat": 30,
+          "text": "Word spread about the arrangement. This will follow you." }
+      ]
+    },
+    {
+      "id": "influence",
+      "group": "risky",
+      "label": "Secret Influence",
+      "icon": "🌀",
+      "blurb": "Quiet pressure applied through intermediaries.",
+      "cost": 4000000,
+      "heat": 12,
+      "riskLabel": "Medium risk",
+      "impactLabel": "Gain, or heat",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "gain", "weight": 40, "label": "Levers moved", "support": 7.0, "heat": 12,
+          "text": "The right people became helpful." },
+        { "id": "none", "weight": 35, "label": "No traction", "support": 0, "heat": 12,
+          "text": "Nothing shifted. The money is gone." },
+        { "id": "heat", "weight": 25, "label": "Questions are being asked", "support": 0, "heat": 26,
+          "text": "Someone noticed the pressure and started asking who applied it." }
+      ]
+    },
+    {
+      "id": "negative",
+      "group": "risky",
+      "label": "Negative Campaign",
+      "icon": "🗣️",
+      "blurb": "Turn the constituency against whoever is ahead of you.",
+      "cost": 3000000,
+      "heat": 10,
+      "riskLabel": "Medium risk",
+      "impactLabel": "Hurts your rival — usually",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "works", "weight": 45, "label": "It lands", "support": 0, "opponentSupport": -8.0, "heat": 10,
+          "text": "Your rival spends the week defending themselves instead of campaigning." },
+        { "id": "none", "weight": 30, "label": "Shrugged off", "support": 0, "heat": 10,
+          "text": "Voters have heard it all before." },
+        { "id": "backlash", "weight": 25, "label": "It rebounds", "support": -6.0, "heat": 20,
+          "text": "People thought it was beneath you, and said so." }
+      ]
+    },
+    {
+      "id": "lastpush",
+      "group": "risky",
+      "label": "Last-Minute Push",
+      "icon": "⚡",
+      "blurb": "Throw everything at one seat in the final stretch.",
+      "cost": 7000000,
+      "heat": 15,
+      "riskLabel": "High risk",
+      "impactLabel": "Can flip a marginal",
+      "needsConstituency": true,
+      "outcomes": [
+        { "id": "large", "weight": 30, "label": "The seat swings", "support": 15.0, "heat": 15,
+          "text": "A late surge. This could be the seat that decides it." },
+        { "id": "moderate", "weight": 40, "label": "Some movement", "support": 6.0, "heat": 15,
+          "text": "It moved, but not as far as you needed." },
+        { "id": "backlash", "weight": 30, "label": "Too much, too late", "support": -10.0, "heat": 25,
+          "text": "The blitz looked desperate, and voters read it that way." }
+      ]
+    }
+  ],
+
+  "consequences": [
+    {
+      "id": "rumours",
+      "minHeat": 26,
+      "weight": 30,
+      "label": "Rumours spreading",
+      "text": "Talk about your campaign's methods is doing the rounds.",
+      "support": -2.0,
+      "seats": 2,
+      "heat": 0
+    },
+    {
+      "id": "scrutiny",
+      "minHeat": 26,
+      "weight": 25,
+      "label": "Media scrutiny",
+      "text": "Reporters have started asking where your money is going.",
+      "support": -2.5,
+      "seats": 3,
+      "heat": 2
+    },
+    {
+      "id": "controversy",
+      "minHeat": 45,
+      "weight": 25,
+      "label": "Campaign controversy",
+      "text": "A story about your campaign has led the evening bulletins.",
+      "support": -4.0,
+      "seats": 3,
+      "heat": 3
+    },
+    {
+      "id": "attack",
+      "minHeat": 45,
+      "weight": 20,
+      "label": "Opponent attack",
+      "text": "Your rivals have built their week around attacking you.",
+      "support": -3.5,
+      "seats": 4,
+      "heat": 0
+    },
+    {
+      "id": "backlash",
+      "minHeat": 65,
+      "weight": 20,
+      "label": "Public backlash",
+      "text": "Voters across the region have turned on your campaign.",
+      "support": -5.0,
+      "seats": 6,
+      "heat": 4
+    },
+    {
+      "id": "investigation",
+      "minHeat": 80,
+      "weight": 20,
+      "label": "Investigation opened",
+      "text": "An inquiry into your campaign's conduct has been announced.",
+      "support": -7.0,
+      "seats": 8,
+      "heat": 6
+    }
+  ]
+}

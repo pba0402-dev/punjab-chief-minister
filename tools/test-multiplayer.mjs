@@ -18,9 +18,23 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { JSDOM, VirtualConsole } from 'jsdom';
 
+
+/** Ask the OS for a free port, so a stale server can never hijack a run. */
+async function freePort() {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const p = srv.address().port;
+      srv.close(() => resolve(p));
+    });
+  });
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', 'simple');
-const PORT = 8791;
+const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/';
 const DATA = path.join(os.tmpdir(), 'cmp-mp-test-' + Date.now());
 
@@ -46,6 +60,8 @@ const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   env: { ...process.env, CMP_DATA_DIR: DATA },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
+process.on('exit', () => { try { php.kill(); } catch (e) {} });
+process.on('uncaughtException', (e) => { try { php.kill(); } catch (x) {} throw e; });
 const phpErrors = [];
 php.stderr.on('data', (d) => {
   const s = String(d);
@@ -113,8 +129,13 @@ async function openClient(label, seedSession) {
       node.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     },
     button: (label2) => qq('button').find((b) => b.textContent.indexOf(label2) === 0),
-    /** Wait until a predicate holds, letting polls land in between. */
-    until: async (name, fn, timeout = 9000) => {
+    /**
+     * Wait until a predicate holds, letting polls land in between.
+     * The timeout is generous because `php -S` is single-threaded: four
+     * clients polling at once queue up behind each other on a dev server in a
+     * way they would not behind Apache.
+     */
+    until: async (name, fn, timeout = 20000) => {
       const started = Date.now();
       while (Date.now() - started < timeout) {
         if (fn()) return true;
@@ -218,19 +239,19 @@ check('all four parties are claimed', allPicked);
 
 section('Candidate details and ready');
 const CANDIDATES = [
-  ['Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', '100000000'],
-  ['Ravinder Singh Bajwa', 'Punjab First', '90000000'],
-  ['Amrit Pal Sethi', 'Vikas Hi Vikas', '80000000'],
-  ['Jaspreet Kaur Dhillon', 'Sadda Punjab', '70000000'],
+  ['Simran Kaur Gill', 'Naya Punjab, Sacha Punjab'],
+  ['Ravinder Singh Bajwa', 'Punjab First'],
+  ['Amrit Pal Sethi', 'Vikas Hi Vikas'],
+  ['Jaspreet Kaur Dhillon', 'Sadda Punjab'],
 ];
 
 players.forEach((c, i) => {
   const fields = c.qq('.screen-lobby .field-input');
   c.type(fields[0], CANDIDATES[i][0]);
   c.type(fields[1], CANDIDATES[i][1]);
-  c.type(c.q('.field-money'), CANDIDATES[i][2]);
 });
-check('budget shows Indian grouping in the lobby', host.q('.field-money').value === '₹10,00,00,000');
+check('the lobby asks for no budget', !host.q('.screen-lobby .field-money'));
+check('the granted purse is stated in the lobby', /₹5,00,00,000/.test(host.text()));
 
 await sleep(1200); // let the debounced save fire
 
@@ -265,7 +286,10 @@ check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
 check("the host's own party is shown", /Aam Aadmi Party/.test(onElection(host)));
 check('the host sees their candidate', /Simran Kaur Gill/.test(onElection(host)));
-check('all 117 constituencies render', host.qq('.seat').length === 117);
+check('the campaign panel renders', host.qq('.action-card').length === 8);
+check('a target constituency is chosen', !!host.q('.target-name'));
+check('all 117 seats are reachable from the picker',
+  Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);
@@ -279,6 +303,70 @@ check(
 const p4Started = await players[3].until('election', () => !!players[3].q('.screen-election'));
 check('player 4 is taken along too', p4Started);
 check('player 4 sees Shiromani Akali Dal', /Shiromani Akali Dal/.test(onElection(players[3])));
+
+/* ------------------------------------------------- independent budgets */
+
+section('Every player has their own ₹5 crore');
+
+function statOf(client, label) {
+  const tile = client.qq('.stat').find((n) => {
+    const l = n.querySelector('.stat-label');
+    return l && l.textContent === label;
+  });
+  return tile ? tile.querySelector('.stat-value').textContent : null;
+}
+
+for (const c of players) {
+  check(
+    c.label + ' starts on ₹5,00,00,000',
+    statOf(c, 'Election Budget') === '₹5,00,00,000',
+    statOf(c, 'Election Budget')
+  );
+}
+check('the host sees a campaign panel', host.qq('.action-card').length === 8);
+check('four safe and four risky actions', host.qq('.action-card.action-safe').length === 4);
+check('political heat starts at zero', /0 \/ 100/.test(host.q('.heat-card').textContent));
+
+// The host spends; nobody else's purse may move.
+const dealCost = host.dom.window.CMP.getAction('deal').cost;
+const hostCard = host.qq('.action-card').find((c) => {
+  const n = c.querySelector('.action-label');
+  return n && n.textContent === 'Underground Deal';
+});
+host.click(hostCard);
+const hostSpent = await host.until('spent', () => statOf(host, 'Spent') !== '₹0', 12000);
+check('the host can spend', hostSpent, statOf(host, 'Spent'));
+check(
+  'the server deducted exactly the action cost',
+  statOf(host, 'Spent') === host.dom.window.CMP.ui.money.format(dealCost),
+  statOf(host, 'Spent')
+);
+check('the remaining budget dropped', statOf(host, 'Remaining Budget') !== '₹5,00,00,000');
+check('a risky action raised the host heat', !/^0 \//.test(host.q('.heat-value').textContent),
+  host.q('.heat-value').textContent);
+check('the outcome is reported to the host', !!host.q('.report'));
+
+// Give the other clients a poll or two to refresh, then confirm they are untouched.
+await sleep(3500);
+for (const c of [players[1], players[2], players[3]]) {
+  check(c.label + " budget is untouched by the host's spending",
+    statOf(c, 'Remaining Budget') === '₹5,00,00,000', statOf(c, 'Remaining Budget'));
+  check(c.label + ' heat is untouched', /0 \/ 100/.test(c.q('.heat-card').textContent));
+}
+
+// A second player spends independently.
+const p2Card = players[1].qq('.action-card').find((c) => {
+  const n = c.querySelector('.action-label');
+  return n && n.textContent === 'Public Rally';
+});
+players[1].click(p2Card);
+const p2Spent = await players[1].until('spent', () => statOf(players[1], 'Spent') !== '₹0', 12000);
+check('player 2 can spend their own money', p2Spent);
+check(
+  'the two players have different amounts left',
+  statOf(host, 'Remaining Budget') !== statOf(players[1], 'Remaining Budget'),
+  statOf(host, 'Remaining Budget') + ' vs ' + statOf(players[1], 'Remaining Budget')
+);
 
 /* ---------------------------------------------------------------- reconnect */
 
@@ -337,11 +425,14 @@ solo.click(solo.qq('.party-card').find((c) => c.textContent.includes('BJP')));
 const soloFields = solo.qq('.field-input');
 solo.type(soloFields[0], 'Solo Candidate');
 solo.type(soloFields[1], 'Solo slogan');
-solo.type(solo.q('.field-money'), '10000000');
+check('solo asks for no budget either', !solo.q('.field-money'));
 solo.click(solo.q('.btn-start'));
 check('solo election starts', !!solo.q('.screen-election'));
 check('solo game is saved locally', !!solo.dom.window.CMP.storage.load());
 check('solo save is marked solo', solo.dom.window.CMP.storage.load().mode === 'solo');
+check('solo is granted the same ₹5 crore',
+  solo.dom.window.CMP.storage.load().budget === 50000000,
+  String(solo.dom.window.CMP.storage.load().budget));
 
 /* ---------------------------------------------------------------- console */
 

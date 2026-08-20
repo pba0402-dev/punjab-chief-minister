@@ -14,9 +14,23 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
+
+/** Ask the OS for a free port, so a stale server can never hijack a run. */
+async function freePort() {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const p = srv.address().port;
+      srv.close(() => resolve(p));
+    });
+  });
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', 'simple');
-const PORT = 8788;
+const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/api/index.php';
 const DATA = path.join(os.tmpdir(), 'cmp-api-test-' + Date.now());
 
@@ -42,6 +56,8 @@ const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   env: { ...process.env, CMP_DATA_DIR: DATA },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
+process.on('exit', () => { try { php.kill(); } catch (e) {} });
+process.on('uncaughtException', (e) => { try { php.kill(); } catch (x) {} throw e; });
 const phpErrors = [];
 php.stderr.on('data', (d) => {
   const s = String(d);
@@ -205,13 +221,21 @@ const withDetails = await p1.state();
 const me = withDetails.game.players.find((s) => s.isYou);
 check('details are stored', me.candidateName === 'Simran Kaur Gill');
 check('slogan is stored', me.slogan === 'Naya Punjab, Sacha Punjab');
-check('budget is stored', me.budget === 100000000, 'got ' + me.budget);
+check('every player is granted ₹5 crore', me.budget === 50000000, 'got ' + me.budget);
+check('nothing is spent yet', me.spent === 0);
+check('remaining equals the full purse', me.remaining === 50000000);
+check('political heat starts at zero', me.heat === 0);
 check('player reads as complete', me.complete === true);
 
+// The client sends a budget on purpose here: the server must ignore it.
 const tooLong = await p1.details('x'.repeat(200), 'y'.repeat(200), 999999999999999);
 const capped = tooLong.game.players.find((s) => s.isYou);
 check('long name is truncated', capped.candidateName.length <= 60, 'len ' + capped.candidateName.length);
-check('budget is capped', capped.budget <= 1000000000000, 'got ' + capped.budget);
+check(
+  'a client cannot set its own budget',
+  capped.budget === 50000000,
+  'got ' + capped.budget
+);
 await p1.details('Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', 100000000);
 
 /* ---------------------------------------------------------------- start */

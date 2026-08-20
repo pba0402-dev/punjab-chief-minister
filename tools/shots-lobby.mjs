@@ -13,11 +13,25 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 
 const run = promisify(execFile);
+
+/** Ask the OS for a free port, so a stale server can never hijack a run. */
+async function freePort() {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const p = srv.address().port;
+      srv.close(() => resolve(p));
+    });
+  });
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', 'simple');
 const OUT = process.argv[2] || path.join(os.tmpdir(), 'cmp-lobby-shots');
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const PORT = 8793;
+const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/';
 const API = BASE + 'api/index.php';
 const DATA = path.join(os.tmpdir(), 'cmp-shot-data-' + Date.now());
@@ -32,6 +46,7 @@ const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   env: { ...process.env, CMP_DATA_DIR: DATA },
   stdio: 'ignore',
 });
+process.on('exit', () => { try { php.kill(); } catch (e) {} });
 for (let i = 0; i < 60; i++) {
   try {
     if ((await fetch(API + '?action=health')).ok) break;
@@ -57,14 +72,14 @@ const others = [];
 for (let i = 0; i < 3; i++) others.push(await post('join', { code: host.code }));
 
 const roster = [
-  [host, 'aap', 'Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', 100000000, true],
-  [others[0], 'inc', 'Ravinder Singh Bajwa', 'Punjab First', 90000000, true],
-  [others[1], 'bjp', 'Amrit Pal Sethi', 'Vikas Hi Vikas', 80000000, false],
-  [others[2], 'sad', 'Jaspreet Kaur Dhillon', 'Sadda Punjab', 70000000, true],
+  [host, 'aap', 'Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', true],
+  [others[0], 'inc', 'Ravinder Singh Bajwa', 'Punjab First', true],
+  [others[1], 'bjp', 'Amrit Pal Sethi', 'Vikas Hi Vikas', false],
+  [others[2], 'sad', 'Jaspreet Kaur Dhillon', 'Sadda Punjab', true],
 ];
-for (const [who, party, name, slogan, budget, ready] of roster) {
+for (const [who, party, name, slogan, ready] of roster) {
   await post('party', { ...creds(who), partyId: party });
-  await post('details', { ...creds(who), candidateName: name, slogan, budget });
+  await post('details', { ...creds(who), candidateName: name, slogan });
   if (ready) await post('ready', { ...creds(who), ready: true });
 }
 
@@ -81,11 +96,20 @@ const SCENES = {
     "window.localStorage.setItem('cmp.punjab.session.v1', " +
     JSON.stringify(SESSION) +
     ");CMP.app.goTo('lobby');",
+  campaign:
+    "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
+    "slogan:'Naya Punjab, Sacha Punjab',seed:'shot'});g.mode='solo';" +
+    "CMP.storage.save(g);CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "var seats=Object.keys(g.support);" +
+    "CMP.campaign.play(g,'rally',seats[12],CMP.rng.rollsFor(g));" +
+    "CMP.campaign.play(g,'community',seats[12],CMP.rng.rollsFor(g));" +
+    "CMP.campaign.play(g,'deal',seats[12],{outcome:0.05,consequence:0.99,consequencePick:0.5});" +
+    "g.seatsWon=CMP.campaign.seatsLed(g);CMP.storage.save(g);CMP.app.goTo('election');",
 };
 
 const CASES = [
-  { w: 1200, h: 950 },
-  { w: 390, h: 900 },
+  { w: 1200, h: 1700 },
+  { w: 390, h: 1500 },
 ];
 
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

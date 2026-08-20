@@ -1,41 +1,82 @@
 /**
  * Game state.
  * ------------------------------------------------------------------
- * One plain object describing a campaign, plus the few functions that make
- * and validate one. No DOM, no storage — the UI reads this, storage.js
- * persists it.
+ * One plain object describing a campaign, plus the functions that make and
+ * validate one. No DOM, no storage, no network.
+ *
+ * Every player starts on the same budget from the config — it is never
+ * entered by hand, and nothing here hard-codes the amount.
  */
 window.CMP = window.CMP || {};
 
 CMP.state = (function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
 
   /** A blank campaign, before the player has filled anything in. */
   function create() {
     return {
       version: VERSION,
-      screen: 'setup', // setup | election
+      mode: 'solo', // solo | multiplayer
+      screen: 'setup',
       partyId: null,
       candidateName: '',
       slogan: '',
-      budget: 0,
+
+      budget: CMP.STARTING_BUDGET,
+      spent: 0,
+      heat: 0,
+
       seatsWon: 0,
       totalSeats: CMP.TOTAL_SEATS,
       majority: CMP.MAJORITY,
-      // Filled in constituency by constituency in a later version. Keyed by
-      // constituency number so results can be written in any order.
-      constituencies: {},
+
+      // Support per constituency, keyed by number: { aap: 31.2, inc: 28.0, ... }
+      support: {},
+      // Every action taken, newest last.
+      actions: [],
+
+      turn: 1,
+      seed: null,
+      rollCount: 0,
+
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
   }
 
   /**
-   * Check a setup form before starting. Returns { ok, errors } where errors is
-   * keyed by field, so the UI can show each message next to its input.
+   * Build the opening political map. Seeded, so the same game always starts
+   * the same way, and every party begins genuinely in contention somewhere.
    */
+  function seedSupport(game) {
+    var rand = CMP.rng.create(game.seed + ':support');
+    var parties = CMP.PARTIES.map(function (p) {
+      return p.id;
+    });
+
+    // Each party gets a regional bias so the map has strongholds rather than
+    // 117 identical seats.
+    var bias = {};
+    parties.forEach(function (id) {
+      bias[id] = (rand() - 0.5) * 12;
+    });
+
+    var support = {};
+    CMP.CONSTITUENCIES.forEach(function (c) {
+      var seat = {};
+      parties.forEach(function (id) {
+        seat[id] = Math.max(3, 25 + bias[id] + (rand() - 0.5) * 22);
+      });
+      CMP.campaign.normalise(seat);
+      support[c.number] = seat;
+    });
+
+    game.support = support;
+  }
+
+  /** Check the setup form before starting. Budget is not asked for. */
   function validateSetup(draft) {
     var errors = {};
 
@@ -48,9 +89,6 @@ CMP.state = (function () {
     if (!draft.slogan || !draft.slogan.trim()) {
       errors.slogan = 'Enter an election slogan.';
     }
-    if (!draft.budget || draft.budget <= 0) {
-      errors.budget = 'Enter your election budget.';
-    }
 
     var ok = true;
     for (var k in errors) {
@@ -59,14 +97,17 @@ CMP.state = (function () {
     return { ok: ok, errors: errors };
   }
 
-  /** Apply a validated setup form to a fresh game and move to the election. */
+  /** Apply a validated setup to a fresh game and open the election screen. */
   function startElection(draft) {
     var game = create();
     game.partyId = draft.partyId;
-    game.candidateName = draft.candidateName.trim();
-    game.slogan = draft.slogan.trim();
-    game.budget = draft.budget;
+    game.candidateName = (draft.candidateName || '').trim();
+    game.slogan = (draft.slogan || '').trim();
+    game.mode = draft.mode || 'solo';
+    game.seed = draft.seed || CMP.rng.newSeed();
     game.screen = 'election';
+    seedSupport(game);
+    game.seatsWon = CMP.campaign.seatsLed(game);
     game.updatedAt = Date.now();
     return game;
   }
@@ -78,13 +119,17 @@ CMP.state = (function () {
       game.version === VERSION &&
       game.partyId &&
       CMP.getParty(game.partyId) &&
-      typeof game.seatsWon === 'number'
+      typeof game.spent === 'number' &&
+      typeof game.heat === 'number' &&
+      game.support &&
+      typeof game.support === 'object'
     );
   }
 
   return {
     VERSION: VERSION,
     create: create,
+    seedSupport: seedSupport,
     validateSetup: validateSetup,
     startElection: startElection,
     isValid: isValid,

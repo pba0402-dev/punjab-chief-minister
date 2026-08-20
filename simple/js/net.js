@@ -123,11 +123,19 @@ CMP.net = (function () {
     return request('party', authed({ partyId: partyId || '' }));
   }
 
-  function setDetails(candidateName, slogan, budget) {
+  function setDetails(candidateName, slogan) {
+    // Budget is granted by the server, never submitted by the client.
     return request('details', authed({
       candidateName: candidateName,
       slogan: slogan,
-      budget: budget,
+    }));
+  }
+
+  /** Play one campaign action. The server rolls the outcome, not us. */
+  function playAction(actionId, constituency) {
+    return request('campaign', authed({
+      actionId: actionId,
+      constituency: constituency,
     }));
   }
 
@@ -201,6 +209,7 @@ CMP.net = (function () {
     state: state,
     setParty: setParty,
     setDetails: setDetails,
+    playAction: playAction,
     setReady: setReady,
     start: start,
     leave: leave,

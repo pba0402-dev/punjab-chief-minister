@@ -28,6 +28,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
+require __DIR__ . '/lib/Campaign.php';
 
 /* ---------------------------------------------------------------- config */
 
@@ -36,6 +37,23 @@ const MAX_ACTIVE_GAMES = 500;     // a cheap ceiling on abuse
 
 $dataDir = getenv('CMP_DATA_DIR') ?: __DIR__ . '/data';
 $store = new FileStore($dataDir);
+$campaign = new Campaign(__DIR__ . '/campaign-config.json');
+
+/* The seat list the board is dealt from. Read once from the generated data
+   file so the server and browser always agree on which seats exist. */
+$constituencyNumbers = (function (): array {
+    $js = @file_get_contents(__DIR__ . '/../js/data/constituencies.js');
+    if ($js === false) {
+        return range(1, 117);
+    }
+    if (preg_match('/CMP\.CONSTITUENCIES = (\[.*?\]);/s', $js, $m)) {
+        $list = json_decode($m[1], true);
+        if (is_array($list)) {
+            return array_map(static fn($c) => (int) $c['number'], $list);
+        }
+    }
+    return range(1, 117);
+})();
 
 /* ---------------------------------------------------------------- errors */
 
@@ -196,7 +214,7 @@ switch (route()) {
         }
 
         $game = Lobby::newGame(Code::generateUnique($store));
-        $player = Lobby::newPlayer(1);
+        $player = Lobby::newPlayer(1, $campaign->startingBudget());
         $game['players'][$player['id']] = $player;
         $game['hostId'] = $player['id'];
         $store->save($game);
@@ -234,7 +252,7 @@ switch (route()) {
                 $reason = 'That game is full — it takes ' . Lobby::MAX_PLAYERS . ' players.';
                 return $g;
             }
-            $player = Lobby::newPlayer($slot);
+            $player = Lobby::newPlayer($slot, $GLOBALS['campaign']->startingBudget());
             $g['players'][$player['id']] = $player;
             if ($g['hostId'] === null) {
                 $g['hostId'] = $player['id'];
@@ -294,15 +312,14 @@ switch (route()) {
         [$game, $playerId] = authenticate($store);
         $name = clean((string) input('candidateName', ''), 60);
         $slogan = clean((string) input('slogan', ''), 80);
-        $budget = max(0, min(1000000000000, (int) input('budget', 0)));
+        // Budget is granted, not submitted — a client cannot set its own purse.
 
-        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan, $budget) {
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan) {
             if ($g['phase'] !== 'lobby') {
                 throw new LobbyError('The election has already started.');
             }
             $g['players'][$playerId]['candidateName'] = $name;
             $g['players'][$playerId]['slogan'] = $slogan;
-            $g['players'][$playerId]['budget'] = $budget;
             return $g;
         });
     }
@@ -341,6 +358,53 @@ switch (route()) {
             }
             $g['phase'] = 'election';
             $g['turn'] = 1;
+
+            // Deal every player their own copy of the opening map, seeded per
+            // game so all four see the same political landscape.
+            $engine = $GLOBALS['campaign'];
+            $numbers = $GLOBALS['constituencyNumbers'];
+            $parties = Lobby::PARTIES;
+            $board = $engine->seedSupport($numbers, $parties, $g['id']);
+            foreach ($g['players'] as $pid => $p) {
+                $g['players'][$pid]['support'] = $board;
+                $g['players'][$pid]['seatsLed'] = $engine->seatsLed($g['players'][$pid]);
+            }
+            return $g;
+        });
+    }
+
+    /* ---------------------------------------------------------- campaign */
+    case 'campaign': {
+        [$game, $playerId] = authenticate($store);
+        $actionId = preg_replace('/[^a-z]/i', '', (string) input('actionId', ''));
+        $target = input('constituency', null);
+        $target = ($target === null || $target === '') ? null : (int) $target;
+
+        if ($campaign->action($actionId) === null) {
+            fail('Unknown action.', 400, 'bad_action');
+        }
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $actionId, $target) {
+            if ($g['phase'] !== 'election') {
+                throw new LobbyError('The election has not started yet.', 'not_started');
+            }
+            $engine = $GLOBALS['campaign'];
+            $player = $g['players'][$playerId];
+
+            $blocked = $engine->blockedReason($player, $actionId, $target);
+            if ($blocked !== null) {
+                throw new LobbyError($blocked, 'blocked');
+            }
+
+            // The server rolls, so no client can pick its own outcome.
+            $rolls = Campaign::rollsFor($g['id'] . ':' . $playerId, (int) ($player['rollCount'] ?? 0));
+            $player['rollCount'] = (int) ($player['rollCount'] ?? 0) + 1;
+
+            [$player, $report] = $engine->play($player, $actionId, $target, $rolls);
+            $player['seatsLed'] = $engine->seatsLed($player);
+
+            $g['players'][$playerId] = $player;
+            $g['lastReport'] = $report;
             return $g;
         });
     }
