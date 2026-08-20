@@ -1,0 +1,10 @@
+# The API front controller is the only thing here that should be reachable.
+# campaign-config.json holds the outcome weights behind the risky actions, and
+# the game deliberately never shows a player the odds — so it is not served.
+# PHP still reads it straight off disk, which .htaccess does not affect.
+<FilesMatch "\.(json|md)$">
+  Require all denied
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
