@@ -20,18 +20,19 @@ From the repository root:
 
 ```
 npm run serve               # php -S on http://127.0.0.1:8080 (multiplayer needs PHP)
-npm run test:all            # all five suites below — 399 checks
+npm run test:all            # all five suites below — 426 checks
 npm run test:campaign       # 60: engine parity, budget, heat, balance
-npm run test:v1             # 67: solo flow through the real UI
+npm run test:v1             # 87: solo flow and the map, through the real UI
 npm run test:api            # 81: the multiplayer API
 npm run test:systems        # 75: incumbents, elections, coalitions, investigations
-npm run test:mp             # 116: four browsers in one lobby, start to result
+npm run test:mp             # 120: four browsers in one lobby, start to result
 npm run measure:board       # opening-board balance across 60 games
 npm run shots:v1            # render at 1400 / 768 / 390 / 360 px
 npm run shots:lobby         # render the multiplayer screens
 npm run data:v1             # regenerate the constituency data file
 npm run data:campaign       # regenerate actions.js from campaign-config.json
 npm run data:incumbents     # regenerate the sitting-MLA data
+npm run data:map            # regenerate the map geometry
 ```
 
 Solo mode works by opening `simple/index.html` directly. Multiplayer needs the
@@ -72,6 +73,30 @@ Measured over 60 games (`npm run measure:board`): incumbents hold their own seat
 in **74 of 117 on average**, range 22 to 110. Incumbency is a real advantage —
 chance alone would give 23 — but the map differs every game, and the incumbent
 party leads the board in roughly two games in three rather than all of them.
+
+## The map
+
+All 117 seats, coloured by whoever leads them in the game, fading as the lead
+narrows so a toss-up does not read as decided. Click a seat to target it; the
+map repaints after every campaign action. Hovering names the seat, its leader,
+its rating and its real sitting MLA. The legend's party counts always total 117.
+
+Two views:
+
+- **Map** — cells over the real OpenStreetMap outline of Punjab, positioned
+  from the geocoded centre of each constituency's town.
+- **Tiles** — one equal hex per seat, so a marginal in an Amritsar ward is as
+  easy to hit as a huge rural seat.
+
+> **On boundaries.** These are **not** official constituency boundaries, and
+> none has been invented to look like one. Positions and adjacency are real —
+> every seat sits where it is, beside the seats it really borders — and each
+> cell shape is an approximation of the area it covers. The map says so on
+> screen, and the tiles view makes no geographic claim at all.
+
+`tools/build-map-data.mjs` re-checks the join against the constituency list and
+fails rather than ship a mismatch: a wrong shape would put a seat in the wrong
+place.
 
 ## Election day and government formation
 
@@ -232,9 +257,8 @@ in `index.php` that constructs the store.
 - **Autosave** — solo progress writes to `localStorage` on every change and
   needs no server; multiplayer state lives on the server and is polled
 
-Not built yet, on purpose: the interactive Punjab map (each constituency's
-leader is already computed and shown, so that is a rendering job rather than a
-modelling one), turn structure, and AI opponents for unclaimed parties.
+Not built yet, on purpose: turn structure, and AI opponents for the parties no
+human is playing.
 
 ## Files
 
@@ -247,6 +271,7 @@ simple/
     data/constituencies.js   GENERATED: the 117 seats
     data/actions.js          GENERATED: costs, outcomes, heat, consequences
     data/incumbents.js       GENERATED: the 117 sitting MLAs
+    data/geometry.js         GENERATED: map shapes and hex tiles
     engine/rng.js            seeded randomness
     engine/campaign.js       campaign rules for solo play
     state.js                 the game object, validation, starting a campaign
@@ -257,6 +282,7 @@ simple/
     ui/setup.js              solo party + candidate form
     ui/multiplayer.js        create game / join game
     ui/lobby.js              the four-player lobby
+    ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: real MLA above, game race below
     ui/oversight.js          rivals, reporting and your own record
     ui/result.js             result, hung assembly and coalition talks

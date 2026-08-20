@@ -1,0 +1,152 @@
+/* ------------------------------------------------------------------
+   The constituency map. Loaded after systems.css.
+   ------------------------------------------------------------------ */
+
+.map-block { display: flex; flex-direction: column; gap: 12px; }
+
+.map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.map-modes { gap: 6px; }
+
+.map-zoom { display: flex; gap: 6px; }
+.map-zoom-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--cream);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.map-zoom-btn:hover { border-color: var(--wheat-deep); background: var(--ink-3); }
+.map-zoom-btn:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+
+.map-frame {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(700px 460px at 50% 0%, rgba(88, 168, 184, 0.07), transparent 65%),
+    var(--ink-2);
+  overflow: hidden;
+  height: min(62vh, 620px);
+}
+
+.punjab-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+.punjab-map.is-dragging { cursor: grabbing; }
+
+.map-outline {
+  fill: #171410;
+  stroke: #3a3227;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-cell {
+  stroke: var(--ink);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill 0.35s ease, fill-opacity 0.35s ease;
+}
+.map-cell:hover { stroke: var(--cream); stroke-width: 1.8; }
+.map-cell.is-selected { stroke: var(--cream); stroke-width: 2; }
+
+.map-district-line {
+  fill: none;
+  stroke: rgba(246, 241, 231, 0.26);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.map-selection {
+  fill: none;
+  stroke: var(--wheat);
+  stroke-width: 2.6;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.map-labels { --map-k: 1; pointer-events: none; }
+.map-seat-num {
+  fill: rgba(255, 255, 255, 0.85);
+  font-family: var(--font);
+  font-size: calc(11px / var(--map-k));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(10, 8, 5, 0.75);
+  stroke-width: calc(2.6px / var(--map-k));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.map-labels.show-nums .map-seat-num { opacity: 1; }
+
+/* ---------------------------------------------------------- readout */
+
+.map-readout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 30px;
+  padding: 9px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  background: var(--ink-2);
+  font-size: 0.86rem;
+}
+.readout-ac { color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.readout-name { font-family: var(--font-display); font-size: 1rem; font-weight: 600; }
+.readout-leading {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--party);
+  color: var(--party-ink, #fff);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+.readout-band { font-weight: 700; font-size: 0.74rem; letter-spacing: 0.04em; }
+.readout-mla { color: var(--muted-2); margin-left: auto; }
+
+/* ---------------------------------------------------------- legend */
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px 16px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-item.is-you .legend-label { color: var(--cream); font-weight: 700; }
+.legend-swatch { width: 11px; height: 11px; border-radius: 3px; }
+.legend-label { color: var(--muted); }
+.legend-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.legend-majority { margin-left: auto; color: var(--muted-2); }
+
+.map-note { margin: 0; font-size: 0.76rem; color: var(--muted-2); line-height: 1.55; }
+
+@media (max-width: 720px) {
+  .map-frame { height: min(52vh, 440px); }
+  .readout-mla { margin-left: 0; width: 100%; }
+  .legend-majority { margin-left: 0; }
+}

@@ -96,6 +96,20 @@ const SCENES = {
     "window.localStorage.setItem('cmp.punjab.session.v1', " +
     JSON.stringify(SESSION) +
     ");CMP.app.goTo('lobby');",
+  map:
+    "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
+    "slogan:'Naya Punjab, Sacha Punjab',seed:'shot-map'});g.mode='solo';" +
+    "CMP.storage.save(g);CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "var t=[].slice.call(document.querySelectorAll('.panel-tab'));" +
+    "t.filter(function(x){return x.textContent==='Map';})[0].click();",
+  tiles:
+    "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
+    "slogan:'Naya Punjab, Sacha Punjab',seed:'shot-map'});g.mode='solo';" +
+    "CMP.storage.save(g);CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "var t=[].slice.call(document.querySelectorAll('.panel-tab'));" +
+    "t.filter(function(x){return x.textContent==='Map';})[0].click();" +
+    "var m=[].slice.call(document.querySelectorAll('.map-modes .term-option'));" +
+    "m.filter(function(x){return x.textContent==='Tiles';})[0].click();",
   constituency:
     "var g=CMP.state.startElection({partyId:'aap',candidateName:'Simran Kaur Gill'," +
     "slogan:'Naya Punjab, Sacha Punjab',seed:'shot-seat'});g.mode='solo';" +

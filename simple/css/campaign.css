@@ -377,3 +377,4 @@
   .picker-row { grid-template-columns: 30px 1fr auto; }
   .picker-rating { display: none; }
 }
+.target-buttons { display: flex; gap: 6px; }

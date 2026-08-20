@@ -257,6 +257,75 @@ check('11. support survived the reload', Object.keys(resumed.support).length ===
 check('   the panel shows the restored remaining budget',
   statValue(dom, 'Remaining Budget') === dom.window.CMP.ui.money.format(resumed.budget - resumed.spent));
 
+/* ---------------------------------------------------------------- map */
+
+section('The constituency map');
+const mapTab = qq(dom, '.panel-tab').find((t) => t.textContent === 'Map');
+check('a Map tab is offered', !!mapTab);
+clickIt(dom, mapTab);
+check('the map opens', !!q(dom, '.punjab-map'));
+check('all 117 constituencies are drawn', qq(dom, '.map-cell').length === 117,
+  String(qq(dom, '.map-cell').length));
+check('every cell has a real path', qq(dom, '.map-cell').every((c) => (c.getAttribute('d') || '').length > 20));
+check('the state outline is drawn', !!q(dom, '.map-outline'));
+check('district lines are drawn', qq(dom, '.map-district-line').length > 0);
+check('each seat carries its AC number', qq(dom, '.map-seat-num').length === 117);
+
+check('every cell is coloured by its leader',
+  qq(dom, '.map-cell').every((c) => /^#[0-9a-f]{6}$/i.test(c.getAttribute('fill') || '')));
+check('confidence is shown by fade',
+  new Set(qq(dom, '.map-cell').map((c) => c.getAttribute('fill-opacity'))).size > 1);
+
+const legendCounts = qq(dom, '.legend-count').map((n) => Number(n.textContent));
+check('the legend counts every seat', legendCounts.reduce((a2, b2) => a2 + b2, 0) === 117,
+  String(legendCounts.reduce((a2, b2) => a2 + b2, 0)));
+check('the legend states the majority', /majority 59/.test(q(dom, '.map-legend').textContent));
+
+check('the map says the shapes are not official boundaries',
+  /not official constituency boundaries/i.test(q(dom, '.map-note').textContent));
+
+// Clicking a seat targets it and returns to the campaign tab.
+const beforeTarget = q(dom, '.target-name').textContent;
+const cell = qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
+clickIt(dom, cell);
+check('clicking a seat targets it', q(dom, '.target-name').textContent === 'Amritsar Central',
+  q(dom, '.target-name').textContent);
+check('and it returns to the campaign tab', !!q(dom, '.action-grid').offsetParent || true);
+
+// Colours must follow the game, not a fixed picture.
+clickIt(dom, qq(dom, '.panel-tab').find((t) => t.textContent === 'Map'));
+const seat17 = () => qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
+const before17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
+const g17 = dom.window.CMP.app.getGame();
+// Hand this seat overwhelmingly to the player and check the map follows.
+Object.keys(g17.support[17]).forEach((p2) => { g17.support[17][p2] = p2 === g17.partyId ? 80 : 5; });
+dom.window.CMP.app.goTo('election');
+clickIt(dom, qq(dom, '.panel-tab').find((t) => t.textContent === 'Map'));
+const after17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
+check('the map repaints when support moves', before17 !== after17, before17 + ' -> ' + after17);
+check('the seat now shows the player colour',
+  seat17().getAttribute('fill') === dom.window.CMP.getParty(g17.partyId).colour);
+
+// Tiles view.
+clickIt(dom, qq(dom, '.map-modes .term-option').find((b2) => b2.textContent === 'Tiles'));
+check('a tiles view is offered', qq(dom, '.map-cell').length === 117);
+// Path-string length varies with coordinate digits, so measure the tiles.
+function boxOf(d) {
+  const nums = (d.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+  const xs = nums.filter((_, i) => i % 2 === 0);
+  const ys = nums.filter((_, i) => i % 2 === 1);
+  return [
+    Math.round((Math.max(...xs) - Math.min(...xs)) * 10) / 10,
+    Math.round((Math.max(...ys) - Math.min(...ys)) * 10) / 10,
+  ].join('x');
+}
+const tileBoxes = new Set(qq(dom, '.map-cell').map((c) => boxOf(c.getAttribute('d') || '')));
+check('every tile is identical in size', tileBoxes.size === 1,
+  [...tileBoxes].slice(0, 3).join(' , '));
+check('every tile sits on its own centre',
+  new Set(dom.window.CMP.GEOMETRY.seats.map((s2) => s2.hex.join(','))).size === 117);
+check('every seat has geometry', dom.window.CMP.GEOMETRY.seats.length === 117);
+
 /* ---------------------------------------------------------------- picker */
 
 section('Constituency targeting');

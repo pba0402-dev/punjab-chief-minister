@@ -8,7 +8,7 @@
     "balance": "node tools/balance.mjs 80",
     "audit": "node tools/build.mjs && node tools/audit-layout.mjs",
     "shots": "node tools/build.mjs && node tools/shots.mjs",
-    "data": "node tools/build-simple-data.mjs && node tools/build-incumbents.mjs && node tools/build-campaign-config.mjs",
+    "data": "node tools/build-simple-data.mjs && node tools/build-incumbents.mjs && node tools/build-campaign-config.mjs && node tools/build-map-data.mjs",
     "test:v1": "node tools/test-simple.mjs",
     "shots:v1": "node tools/shots-simple.mjs",
     "data:v1": "node tools/build-simple-data.mjs",
@@ -21,7 +21,8 @@
     "test:campaign": "node tools/test-campaign.mjs",
     "data:incumbents": "node tools/build-incumbents.mjs",
     "test:systems": "node tools/test-systems.mjs",
-    "measure:board": "node tools/measure-board.mjs 60"
+    "measure:board": "node tools/measure-board.mjs 60",
+    "data:map": "node tools/build-map-data.mjs"
   },
   "license": "UNLICENSED",
   "type": "commonjs",

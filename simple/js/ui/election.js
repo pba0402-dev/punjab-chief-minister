@@ -39,6 +39,7 @@ CMP.ui.election = (function () {
 
     var tabsNode = el('div', { class: 'panel-tabs' });
     var seatNode = el('div', { class: 'seat-detail-slot' });
+    var mapNode = el('div', { class: 'map-slot' });
     var oversightNode = el('div', { class: 'oversight-slot' });
     var campaignNode = el('div', { class: 'campaign-slot' });
     var declareNode = el('div', { class: 'declare-slot' });
@@ -51,6 +52,7 @@ CMP.ui.election = (function () {
         tabsNode,
         reportNode,
         campaignNode,
+        mapNode,
         seatNode,
         oversightNode,
         declareNode,
@@ -85,6 +87,7 @@ CMP.ui.election = (function () {
 
     var tab = 'campaign';
     var oversight = null;
+    var mapView = null;
 
     function setTab(next) {
       tab = next;
@@ -92,7 +95,11 @@ CMP.ui.election = (function () {
     }
 
     function paintTabs() {
-      var tabs = [{ id: 'campaign', label: 'Campaign' }, { id: 'seat', label: 'Constituency' }];
+      var tabs = [
+        { id: 'campaign', label: 'Campaign' },
+        { id: 'map', label: 'Map' },
+        { id: 'seat', label: 'Constituency' },
+      ];
       if (game && game.mode === 'multiplayer') tabs.push({ id: 'rivals', label: 'Rivals' });
 
       mount(
@@ -110,11 +117,32 @@ CMP.ui.election = (function () {
       );
 
       campaignNode.style.display = tab === 'campaign' ? '' : 'none';
+      mapNode.style.display = tab === 'map' ? '' : 'none';
       seatNode.style.display = tab === 'seat' ? '' : 'none';
       oversightNode.style.display = tab === 'rivals' ? '' : 'none';
 
+      if (tab === 'map') paintMap();
       if (tab === 'seat') paintSeatDetail();
       if (tab === 'rivals') paintOversight();
+    }
+
+    /**
+     * The map is built once and then repainted, because rebuilding 117 paths on
+     * every campaign action would throw away the zoom and be visibly slow.
+     */
+    function paintMap() {
+      if (!mapView) {
+        mapView = CMP.ui.map.create({
+          onSelect: function (num) {
+            selected = num;
+            paintTarget();
+            paintActions();
+            setTab('campaign');
+          },
+        });
+        mount(mapNode, [mapView.root]);
+      }
+      mapView.render(game, selected);
     }
 
     function paintSeatDetail() {
@@ -295,12 +323,22 @@ CMP.ui.election = (function () {
             el('strong', { class: 'target-name', text: def.name }),
             el('span', { class: 'target-district', text: def.district }),
           ]),
-          el('button', {
-            class: 'btn btn-quiet btn-small',
-            type: 'button',
-            text: 'Change',
-            onclick: openSeatPicker,
-          }),
+          el('span', { class: 'target-buttons' }, [
+            el('button', {
+              class: 'btn btn-quiet btn-small',
+              type: 'button',
+              text: 'Map',
+              onclick: function () {
+                setTab('map');
+              },
+            }),
+            el('button', {
+              class: 'btn btn-quiet btn-small',
+              type: 'button',
+              text: 'Change',
+              onclick: openSeatPicker,
+            }),
+          ]),
         ]),
         CMP.ui.constituency.leadingBadge(game.support[selected], 'target-leading'),
         el('div', { class: 'target-numbers' }, [
@@ -594,6 +632,7 @@ CMP.ui.election = (function () {
       paintLog();
       paintTabs();
       paintDeclare();
+      if (mapView) mapView.render(game, selected);
     }
 
     return {
