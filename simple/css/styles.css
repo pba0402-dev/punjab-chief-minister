@@ -1,0 +1,584 @@
+/* ------------------------------------------------------------------
+   Chief Minister of Punjab — Version 1
+
+   A committed single visual world: warm ink ground, wheat gold accent,
+   river teal as the second voice. Every colour is painted explicitly so the
+   page holds up wherever it is embedded.
+
+   Type: Fraunces carries the titles — a serif with enough character to feel
+   like a campaign masthead rather than a form. Karla runs the interface.
+   ------------------------------------------------------------------ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap');
+
+:root {
+  --ink: #14110d;
+  --ink-2: #1e1a15;
+  --ink-3: #26211a;
+  --line: #352d23;
+  --line-soft: #241f19;
+  --cream: #f6f1e7;
+  --muted: #a89b89;
+  --muted-2: #766c5e;
+  --wheat: #e8b93c;
+  --wheat-deep: #c2900f;
+  --river: #58a8b8;
+  --danger: #e2634f;
+
+  --font: 'Karla', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+  --wrap: 860px;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--cream);
+  background:
+    radial-gradient(1200px 640px at 50% -12%, #2c2317 0%, transparent 60%),
+    radial-gradient(760px 520px at 92% 108%, #1d2a2b 0%, transparent 62%),
+    var(--ink);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app { min-height: 100vh; }
+
+/* ---------------------------------------------------------- typography */
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.4rem, 7vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-wrap: balance;
+  color: var(--cream);
+}
+.title-sm { font-size: clamp(1.6rem, 3.6vw, 2.3rem); }
+
+.eyebrow {
+  margin: 0 0 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+
+.subtitle {
+  margin: 14px 0 0;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+.subtitle strong {
+  color: var(--cream);
+  font-weight: 600;
+  border-bottom: 2px solid var(--wheat-deep);
+  padding-bottom: 2px;
+}
+
+.lede {
+  margin: 22px 0 0;
+  font-size: 1.05rem;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+.block-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--cream);
+}
+
+.disclaimer {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted-2);
+  max-width: 56ch;
+}
+
+.muted { color: var(--muted); }
+
+/* ---------------------------------------------------------- buttons */
+
+.btn {
+  appearance: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--cream);
+  padding: 11px 20px;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.btn:hover { background: #2f2820; border-color: #463c2e; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--wheat), var(--wheat-deep));
+  border-color: #f0c85f;
+  color: #241a00;
+  box-shadow: 0 10px 26px -10px rgba(232, 185, 60, 0.75);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #f2c655, #d09d13);
+  border-color: #f7d685;
+}
+
+.btn-quiet { background: transparent; color: var(--muted); }
+.btn-quiet:hover { color: var(--cream); background: rgba(255, 255, 255, 0.04); }
+
+.btn-danger {
+  background: var(--danger);
+  border-color: #ef8271;
+  color: #2b0b05;
+}
+.btn-danger:hover { background: #ea7462; }
+
+.btn-xl {
+  padding: 17px 30px;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+.back-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 0;
+  align-self: flex-start;
+}
+.back-link:hover { color: var(--wheat); }
+.back-link:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+
+/* ---------------------------------------------------------- home */
+
+.screen-home {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 56px 22px;
+}
+.home-inner {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: left;
+}
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 36px 0 28px;
+}
+
+.saved-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 30px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--party, var(--wheat));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.saved-flag {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--party, var(--wheat));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+.saved-body { display: flex; flex-direction: column; min-width: 0; }
+.saved-name { font-size: 1rem; }
+.saved-meta { font-size: 0.85rem; color: var(--muted); }
+
+/* ---------------------------------------------------------- setup */
+
+.screen-setup { padding: 40px 22px 64px; }
+.setup-inner {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 42px;
+}
+.setup-head { display: flex; flex-direction: column; gap: 6px; }
+.setup-head .title { margin-top: 10px; }
+
+.block { display: flex; flex-direction: column; gap: 18px; }
+
+/* party cards */
+
+.party-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.party-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--cream);
+  transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s ease;
+}
+.party-card:hover { border-color: var(--party); transform: translateY(-2px); }
+.party-card:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+.party-card.is-selected {
+  border-color: var(--party);
+  background: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--party), 0 14px 30px -18px var(--party);
+}
+
+.party-flag {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--party);
+  color: var(--party-ink, #fff);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+.party-text { display: flex; flex-direction: column; min-width: 0; }
+.party-short { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+.party-name { font-size: 0.85rem; color: var(--muted); }
+
+.party-tick {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--party);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.party-card.is-selected .party-tick { opacity: 1; }
+
+/* fields */
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.field-input {
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--cream);
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 15px 17px;
+  width: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.field-input::placeholder { color: var(--muted-2); }
+.field-input:focus {
+  outline: none;
+  border-color: var(--wheat);
+  background: var(--ink-3);
+  box-shadow: 0 0 0 3px rgba(232, 185, 60, 0.16);
+}
+.field-input.has-error { border-color: var(--danger); }
+
+.field-money-wrap { display: flex; flex-direction: column; gap: 6px; }
+.field-money {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.field-hint { font-size: 0.83rem; color: var(--muted-2); }
+.field-error { font-size: 0.83rem; color: var(--danger); font-weight: 600; }
+
+/* footer */
+
+.setup-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line-soft);
+}
+.setup-summary {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.summary-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+
+/* ---------------------------------------------------------- election */
+
+.screen-election { padding: 34px 22px 70px; }
+.election-head {
+  max-width: var(--wrap);
+  margin: 0 auto 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.election-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.campaign-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--party);
+  background: var(--ink-2);
+}
+.campaign-flag {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--party);
+  color: var(--party-ink, #fff);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.campaign-body { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.campaign-party {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.campaign-name {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.campaign-slogan { font-size: 0.95rem; color: var(--river); font-style: italic; }
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 15px 17px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+.stat-highlight { border-color: var(--wheat-deep); background: rgba(232, 185, 60, 0.07); }
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.stat-sub { font-size: 0.8rem; color: var(--muted-2); }
+
+.election-body { max-width: var(--wrap); margin: 0 auto; }
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.section-note { margin: 0; font-size: 0.9rem; color: var(--muted); max-width: 58ch; }
+
+.district-list { display: flex; flex-direction: column; gap: 28px; }
+.district-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+.district-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+.district-count {
+  font-size: 0.75rem;
+  color: var(--muted-2);
+  letter-spacing: 0.04em;
+}
+
+.seat-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  background: var(--ink-2);
+}
+.seat-number {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+}
+.seat-name {
+  font-size: 0.92rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat-tag {
+  margin-left: auto;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ink-3);
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------- overlay */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(10, 8, 5, 0.74);
+}
+.modal {
+  width: min(420px, 100%);
+  padding: 26px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.3rem;
+  margin: 0;
+}
+.modal p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+.boot-error { max-width: 460px; margin: 80px auto; padding: 0 22px; }
+.boot-error h1 { font-family: var(--font-display); font-size: 1.5rem; }
+.boot-error p { color: var(--muted); }
+
+/* ---------------------------------------------------------- responsive */
+
+@media (max-width: 720px) {
+  .party-grid { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: 1fr; }
+  .screen-setup { padding: 28px 16px 56px; }
+  .screen-election { padding: 24px 16px 56px; }
+  .screen-home { padding: 40px 18px; }
+  .setup-inner { gap: 34px; }
+  .election-head-top { flex-direction: row; align-items: center; }
+  .seat-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .campaign-card { padding: 15px 16px; gap: 13px; }
+  .campaign-flag { width: 48px; height: 48px; font-size: 0.9rem; }
+  .campaign-name { font-size: 1.2rem; }
+}
+
+@media (max-width: 400px) {
+  .seat-grid { grid-template-columns: 1fr; }
+  .btn-xl { padding: 15px 22px; font-size: 0.98rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
