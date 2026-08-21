@@ -9,7 +9,7 @@
 declare(strict_types=1);
 
 $base = __DIR__ . '/../simple/api';
-foreach (['Store', 'Code', 'Lobby', 'Campaign', 'Rounds', 'AI', 'Investigation', 'Election', 'Coalition'] as $class) {
+foreach (['Store', 'Code', 'Territory', 'Alliances', 'Lobby', 'Campaign', 'Rounds', 'AI', 'Investigation', 'Election', 'Coalition'] as $class) {
     require $base . '/lib/' . $class . '.php';
 }
 

@@ -192,15 +192,19 @@ check('   and the balance fell by exactly what was spent',
 
 // The ceiling on a single move is what stops money being dumped rather than
 // campaigned. It is a real limit and the plan says so rather than hiding it.
-const tooNarrow = engine.planBulk(g, 'rally', wideSeats.slice(0, 4), 20 * CR);
+const rallyCeiling = engine.amountRange(CMP.getAction('rally')).max;
+const narrow = wideSeats.slice(0, 3);
+const tooNarrow = engine.planBulk(g, 'rally', narrow, rallyCeiling * narrow.length + 10 * CR);
 check('11. money that will not fit is reported, not silently kept',
-  tooNarrow.unspent > 0, cr(tooNarrow.unspent) + ' left over on four seats');
+  tooNarrow.unspent > 0,
+  cr(tooNarrow.unspent) + ' left over on ' + narrow.length + ' seats');
 
 /* ------------------------------------------------------ the spending limit */
 
 section('X. A player cannot spend more than they hold');
 
 g = newGame('limit');
+g.cash = 60 * CR;                     // a campaign that has been saving
 const held = engine.remaining(g);
 const everySeat = CMP.DISTRICTS.flatMap((d) => d.seats);
 const overreach = engine.campaignBulk(g, 'rally', everySeat, held * 4, () => ROLLS);
@@ -212,7 +216,9 @@ check('   and never takes the campaign below zero', engine.remaining(g) >= 0,
 // A single move is separately capped at a multiple of its own cost, so a
 // rally is still a rally however rich the campaign.
 const rallyRange = engine.amountRange(CMP.getAction('rally'));
-const oneMove = engine.play(newGame('cap'), 'rally', everySeat[0], ROLLS, 50 * CR);
+const rich = newGame('cap');
+rich.cash = 100 * CR;
+const oneMove = engine.play(rich, 'rally', everySeat[0], ROLLS, 100 * CR);
 check('   one move cannot absorb a whole campaign',
   oneMove.ok && oneMove.report.cost === rallyRange.max,
   cr(oneMove.ok ? oneMove.report.cost : 0) + ', ceiling ' + cr(rallyRange.max));

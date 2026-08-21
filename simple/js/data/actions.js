@@ -74,7 +74,7 @@ CMP.CAMPAIGN = {
       "label": "Public Rally",
       "icon": "📣",
       "blurb": "A stage, a crowd and a speech in one constituency.",
-      "cost": 22500000,
+      "cost": 10000000,
       "heat": 0,
       "riskLabel": "Low risk",
       "impactLabel": "Moderate gain",
@@ -114,7 +114,7 @@ CMP.CAMPAIGN = {
       "label": "Media Campaign",
       "icon": "📺",
       "blurb": "Cable spots, print and hoardings across the constituency.",
-      "cost": 37500000,
+      "cost": 16500000,
       "heat": 1,
       "riskLabel": "Low risk",
       "impactLabel": "Good gain",
@@ -124,7 +124,7 @@ CMP.CAMPAIGN = {
           "id": "strong",
           "weight": 30,
           "label": "The message cuts through",
-          "support": 2.57,
+          "support": 2.72,
           "heat": 1,
           "text": "Your line is being repeated back to you on the street."
         },
@@ -132,7 +132,7 @@ CMP.CAMPAIGN = {
           "id": "normal",
           "weight": 55,
           "label": "Steady coverage",
-          "support": 1.72,
+          "support": 1.82,
           "heat": 1,
           "text": "Solid visibility for the money."
         },
@@ -140,7 +140,7 @@ CMP.CAMPAIGN = {
           "id": "weak",
           "weight": 15,
           "label": "Lost in the noise",
-          "support": 0.65,
+          "support": 0.69,
           "heat": 2,
           "text": "Everyone else was advertising too. Limited effect."
         }
@@ -158,7 +158,7 @@ CMP.CAMPAIGN = {
       "label": "Community Development",
       "icon": "🏗️",
       "blurb": "Fund something visible and useful that people will remember.",
-      "cost": 30000000,
+      "cost": 13500000,
       "heat": 0,
       "riskLabel": "Very low risk",
       "impactLabel": "Moderate, durable gain",
@@ -168,7 +168,7 @@ CMP.CAMPAIGN = {
           "id": "strong",
           "weight": 30,
           "label": "Genuinely appreciated",
-          "support": 2.75,
+          "support": 2.9,
           "heat": 0,
           "text": "The work is visible and people credit you for it."
         },
@@ -176,7 +176,7 @@ CMP.CAMPAIGN = {
           "id": "normal",
           "weight": 65,
           "label": "Well received",
-          "support": 1.92,
+          "support": 2.02,
           "heat": 0,
           "text": "Quiet, solid goodwill."
         },
@@ -184,7 +184,7 @@ CMP.CAMPAIGN = {
           "id": "weak",
           "weight": 5,
           "label": "Slow to land",
-          "support": 0.83,
+          "support": 0.88,
           "heat": 0,
           "text": "It will be noticed eventually, but not before polling day."
         }
@@ -202,7 +202,7 @@ CMP.CAMPAIGN = {
       "label": "Village Outreach",
       "icon": "🚪",
       "blurb": "Workers walking door to door through the villages.",
-      "cost": 15000000,
+      "cost": 6500000,
       "heat": 0,
       "riskLabel": "Low risk",
       "impactLabel": "Small, cheap gain",
@@ -212,7 +212,7 @@ CMP.CAMPAIGN = {
           "id": "strong",
           "weight": 25,
           "label": "Warm reception",
-          "support": 3.01,
+          "support": 4.5,
           "heat": 0,
           "text": "Doors opened and workers were listened to."
         },
@@ -220,7 +220,7 @@ CMP.CAMPAIGN = {
           "id": "normal",
           "weight": 60,
           "label": "Ground covered",
-          "support": 2.07,
+          "support": 3.1,
           "heat": 0,
           "text": "Slow, steady, dependable."
         },
@@ -228,7 +228,7 @@ CMP.CAMPAIGN = {
           "id": "weak",
           "weight": 15,
           "label": "Hard going",
-          "support": 0.84,
+          "support": 1.26,
           "heat": 1,
           "text": "A cold reception in places. Modest gain."
         }
@@ -242,7 +242,7 @@ CMP.CAMPAIGN = {
       "label": "Undisclosed Deal",
       "icon": "🤝",
       "blurb": "An arrangement with local powerbrokers, made quietly.",
-      "cost": 90000000,
+      "cost": 40000000,
       "heat": 18,
       "riskLabel": "High risk",
       "impactLabel": "Big swing, or trouble",
@@ -252,7 +252,7 @@ CMP.CAMPAIGN = {
           "id": "large",
           "weight": 35,
           "label": "The deal holds",
-          "support": 7.65,
+          "support": 8.03,
           "heat": 18,
           "text": "Whole blocks of votes move your way. Nobody says how."
         },
@@ -260,7 +260,7 @@ CMP.CAMPAIGN = {
           "id": "small",
           "weight": 30,
           "label": "Partly delivered",
-          "support": 3.19,
+          "support": 3.35,
           "heat": 18,
           "text": "Less than promised, but something moved."
         },
@@ -276,7 +276,7 @@ CMP.CAMPAIGN = {
           "id": "backfire",
           "weight": 15,
           "label": "It got out",
-          "support": -5.1,
+          "support": -5.35,
           "heat": 30,
           "text": "Word spread about the arrangement. This will follow you."
         }
@@ -294,7 +294,7 @@ CMP.CAMPAIGN = {
       "label": "Political Influence",
       "icon": "🌀",
       "blurb": "Quiet pressure applied through intermediaries.",
-      "cost": 60000000,
+      "cost": 26500000,
       "heat": 12,
       "riskLabel": "Medium risk",
       "impactLabel": "Gain, or heat",
@@ -304,7 +304,7 @@ CMP.CAMPAIGN = {
           "id": "gain",
           "weight": 40,
           "label": "Levers moved",
-          "support": 4.8,
+          "support": 5.29,
           "heat": 12,
           "text": "The right people became helpful."
         },
@@ -338,7 +338,7 @@ CMP.CAMPAIGN = {
       "label": "Negative Campaign",
       "icon": "🗣️",
       "blurb": "Turn the constituency against whoever is ahead of you.",
-      "cost": 45000000,
+      "cost": 20000000,
       "heat": 10,
       "riskLabel": "Medium risk",
       "impactLabel": "Hurts your rival — usually",
@@ -383,7 +383,7 @@ CMP.CAMPAIGN = {
       "label": "Last-Minute Push",
       "icon": "⚡",
       "blurb": "Throw everything at one seat in the final stretch.",
-      "cost": 105000000,
+      "cost": 46500000,
       "heat": 15,
       "riskLabel": "High risk",
       "impactLabel": "Can flip a marginal",
@@ -393,7 +393,7 @@ CMP.CAMPAIGN = {
           "id": "large",
           "weight": 30,
           "label": "The seat swings",
-          "support": 12.97,
+          "support": 12.16,
           "heat": 15,
           "text": "A late surge. This could be the seat that decides it."
         },
@@ -401,7 +401,7 @@ CMP.CAMPAIGN = {
           "id": "moderate",
           "weight": 40,
           "label": "Some movement",
-          "support": 5.19,
+          "support": 4.87,
           "heat": 15,
           "text": "It moved, but not as far as you needed."
         },
@@ -409,7 +409,7 @@ CMP.CAMPAIGN = {
           "id": "backlash",
           "weight": 30,
           "label": "Too much, too late",
-          "support": -8.64,
+          "support": -8.1,
           "heat": 25,
           "text": "The blitz looked desperate, and voters read it that way."
         }
@@ -639,7 +639,7 @@ CMP.CAMPAIGN = {
         "weight": 18,
         "evidenceBias": 0.6,
         "text": "Your campaign is fined.",
-        "fine": 37500000,
+        "fine": 16500000,
         "heat": -6,
         "support": -2.5,
         "seats": 4,
@@ -651,7 +651,7 @@ CMP.CAMPAIGN = {
         "weight": 10,
         "evidenceBias": 1,
         "text": "A substantial fine is imposed after a damaging finding.",
-        "fine": 112500000,
+        "fine": 50000000,
         "heat": -8,
         "support": -4,
         "seats": 6,
@@ -714,11 +714,11 @@ CMP.CAMPAIGN = {
     "loan": {
       "interestRate": 0.2,
       "repayAfterRounds": 4,
-      "minAmount": 15000000,
-      "maxAmount": 150000000,
-      "debtLimit": 300000000,
+      "minAmount": 6500000,
+      "maxAmount": 66500000,
+      "debtLimit": 133500000,
       "noBorrowingAfterRound": 16,
-      "increments": 15000000
+      "increments": 6500000
     },
     "default": {
       "heat": 22,
@@ -734,7 +734,7 @@ CMP.CAMPAIGN = {
       "id": "grant",
       "label": "Apply for a Grant",
       "icon": "🏛️",
-      "cost": 30000000,
+      "cost": 13500000,
       "heat": 0,
       "riskLabel": "No risk",
       "impactLabel": "Development work, uncertain funding",
@@ -745,7 +745,7 @@ CMP.CAMPAIGN = {
           "id": "large",
           "weight": 25,
           "label": "Application approved in full",
-          "funds": 37500000,
+          "funds": 16500000,
           "support": 3,
           "heat": 0,
           "text": "The work is done and the grant came through in full."
@@ -754,7 +754,7 @@ CMP.CAMPAIGN = {
           "id": "partial",
           "weight": 40,
           "label": "Partly funded",
-          "funds": 22500000,
+          "funds": 10000000,
           "support": 2.5,
           "heat": 0,
           "text": "Some of the money came back, and the work is visible."
@@ -763,7 +763,7 @@ CMP.CAMPAIGN = {
           "id": "small",
           "weight": 20,
           "label": "A token amount",
-          "funds": 7500000,
+          "funds": 3500000,
           "support": 2,
           "heat": 0,
           "text": "Barely worth the paperwork, but the work still counts."
@@ -796,7 +796,7 @@ CMP.CAMPAIGN = {
           "id": "big",
           "weight": 28,
           "label": "A large sum arrives",
-          "funds": 120000000,
+          "funds": 53500000,
           "heat": 24,
           "text": "The money is in the account. Nobody will say where it came from."
         },
@@ -804,7 +804,7 @@ CMP.CAMPAIGN = {
           "id": "medium",
           "weight": 32,
           "label": "Less than promised",
-          "funds": 60000000,
+          "funds": 26500000,
           "heat": 24,
           "text": "Well short of what was discussed, but it is money."
         },
@@ -812,7 +812,7 @@ CMP.CAMPAIGN = {
           "id": "small",
           "weight": 22,
           "label": "A token payment",
-          "funds": 30000000,
+          "funds": 13500000,
           "heat": 26,
           "text": "Barely worth the exposure."
         },
@@ -1008,16 +1008,16 @@ CMP.CAMPAIGN = {
   },
   "spending": {
     "enabled": true,
-    "minAmount": 7500000,
+    "minAmount": 3250000,
     "maxMultiple": 6,
     "minScale": 0.45,
     "maxScale": 2,
     "quickAmounts": [
-      15000000,
-      37500000,
-      75000000,
-      150000000,
-      375000000
+      6750000,
+      16750000,
+      33250000,
+      66750000,
+      166750000
     ],
     "curve": 0.72
   },
@@ -1029,7 +1029,7 @@ CMP.CAMPAIGN = {
         "icon": "🎲",
         "group": "risky",
         "menu": "bribe",
-        "cost": 30000000,
+        "cost": 13500000,
         "allowsAmount": true,
         "riskLabel": "Very high risk",
         "impactLabel": "A swing, or a scandal",
@@ -1043,7 +1043,7 @@ CMP.CAMPAIGN = {
             "id": "swing",
             "weight": 26,
             "label": "It moves",
-            "support": 6.4,
+            "support": 7.14,
             "heat": 26,
             "text": "Something shifted. Nobody is saying what."
           },
@@ -1051,7 +1051,7 @@ CMP.CAMPAIGN = {
             "id": "slight",
             "weight": 30,
             "label": "A small shift",
-            "support": 2.46,
+            "support": 2.74,
             "heat": 24,
             "text": "A little movement, and a lot of exposure for it."
           },
@@ -1067,7 +1067,7 @@ CMP.CAMPAIGN = {
             "id": "backfire",
             "weight": 18,
             "label": "It got out",
-            "support": -4.44,
+            "support": -4.95,
             "seats": 3,
             "heat": 36,
             "text": "Word travelled faster than the offer did."
@@ -1080,7 +1080,7 @@ CMP.CAMPAIGN = {
         "icon": "🤫",
         "group": "risky",
         "menu": "bribe",
-        "cost": 52500000,
+        "cost": 23500000,
         "allowsAmount": true,
         "riskLabel": "Very high risk",
         "impactLabel": "A big swing, or an inquiry",
@@ -1131,7 +1131,7 @@ CMP.CAMPAIGN = {
         "icon": "🎰",
         "group": "risky",
         "menu": "bribe",
-        "cost": 75000000,
+        "cost": 33500000,
         "allowsAmount": true,
         "riskLabel": "Extreme risk",
         "impactLabel": "Everything, or nothing at all",

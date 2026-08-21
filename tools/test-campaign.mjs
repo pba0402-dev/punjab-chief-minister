@@ -196,7 +196,7 @@ check('the refusal explains itself', refused.reason === 'More than you can spend
 
 /* A round is bounded by money and by END ROUND, not by a move counter. What
    stops a player is running out of cash or saying they are finished. */
-const roundBound = freshGame();
+const roundBound = freshGame('aap', CMP.getAction('rally').cost * 6);
 const quiet = { outcome: 0.5, consequence: 0.99, consequencePick: 0.5 };
 let playedThisRound = 0;
 for (let i = 0; i < 40; i++) {
