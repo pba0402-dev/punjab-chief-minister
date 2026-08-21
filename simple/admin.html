@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Punjab · analytics</title>
+
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/home.css" />
+
+    <style>
+      /*
+       * The owner's page. Deliberately plain: it exists to answer questions,
+       * not to be admired, and it shares the game's palette so it does not
+       * feel like a different product.
+       */
+      .ad {
+        width: min(880px, 100%);
+        margin: 0 auto;
+        padding: 22px 16px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .ad h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.4rem;
+        font-weight: 700;
+      }
+      .ad h2 {
+        margin: 0 0 10px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .ad-key {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .ad-key input {
+        flex: 1 1 220px;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--ink-2);
+        color: var(--cream);
+        font-family: var(--font);
+        font-size: 0.9rem;
+      }
+      .ad-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+      }
+      .ad-fig {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 11px 0;
+        border-top: 1px solid var(--line-soft);
+      }
+      .ad-fig strong {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--cream);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.1;
+      }
+      .ad-fig span {
+        font-size: 0.56rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+      }
+
+      /* The funnel: a bar per step, each as wide as its share of the first. */
+      .ad-funnel {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .ad-step {
+        display: grid;
+        grid-template-columns: 130px minmax(0, 1fr) 54px;
+        align-items: center;
+        gap: 10px;
+      }
+      .ad-step-name { font-size: 0.75rem; color: var(--muted); }
+      .ad-step-bar {
+        height: 16px;
+        border-radius: 4px;
+        background: var(--line-soft);
+        overflow: hidden;
+      }
+      .ad-step-fill {
+        display: block;
+        height: 100%;
+        border-radius: 4px;
+        background: var(--wheat-deep);
+      }
+      .ad-step-n {
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .ad-step-pc {
+        font-size: 0.62rem;
+        color: var(--muted-2);
+      }
+
+      /* Days, as columns. */
+      .ad-days {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        height: 110px;
+      }
+      .ad-day {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+      }
+      .ad-day-bar {
+        width: 100%;
+        border-radius: 3px 3px 0 0;
+        background: var(--river);
+        min-height: 2px;
+      }
+      .ad-day-label {
+        font-size: 0.52rem;
+        color: var(--muted-2);
+        white-space: nowrap;
+      }
+
+      .ad-table {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .ad-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 7px 0;
+        border-top: 1px solid var(--line-soft);
+        font-size: 0.8rem;
+      }
+      .ad-row span:last-child {
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .ad-note {
+        margin: 0;
+        font-size: 0.72rem;
+        line-height: 1.5;
+        color: var(--muted-2);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="ad" id="ad">
+      <header>
+        <h1>Analytics</h1>
+        <p class="ad-note">
+          Counts of things that happened, by day. No profiles, no journeys, no
+          third party — a visitor is a salted daily hash that exists only so one
+          person refreshing five times is counted once.
+        </p>
+      </header>
+
+      <div class="ad-key">
+        <input id="key" type="password" placeholder="Owner key" autocomplete="off" />
+        <button class="btn btn-primary" id="go" type="button">Show</button>
+      </div>
+
+      <div id="out"></div>
+    </div>
+
+    <script src="js/ui/dom.js"></script>
+    <script>
+      (function () {
+        'use strict';
+
+        var el = CMP.ui.dom.el;
+        var mount = CMP.ui.dom.mount;
+        var out = document.getElementById('out');
+        var keyInput = document.getElementById('key');
+
+        // The key lives in this browser so the page is not a login screen
+        // every morning. It is the owner's own machine.
+        var STORED = 'cmp.punjab.adminkey';
+        try {
+          keyInput.value = window.localStorage.getItem(STORED) || '';
+        } catch (e) {
+          /* private mode */
+        }
+
+        function fig(value, label) {
+          return el('div', { class: 'ad-fig' }, [
+            el('strong', { text: String(value) }),
+            el('span', { text: label }),
+          ]);
+        }
+
+        function section(title, children) {
+          return el('section', {}, [el('h2', { text: title })].concat(children));
+        }
+
+        function tally(map, title) {
+          var keys = Object.keys(map || {}).sort(function (a, b) {
+            return map[b] - map[a];
+          }).slice(0, 8);
+          if (!keys.length) return null;
+          return section(title, [
+            el('div', { class: 'ad-table' }, keys.map(function (k) {
+              return el('div', { class: 'ad-row' }, [
+                el('span', { text: k }),
+                el('span', { text: String(map[k]) }),
+              ]);
+            })),
+          ]);
+        }
+
+        function show(data) {
+          var today = data.today;
+          var range = data.range;
+          var ev = today.events;
+
+          var top = Math.max.apply(null, range.funnel.map(function (s) {
+            return s.count;
+          }).concat([1]));
+
+          var busiest = Math.max.apply(null, range.days.map(function (d) {
+            return d.events.landing_page_view;
+          }).concat([1]));
+
+          mount(out, [
+            section('Today', [
+              el('div', { class: 'ad-grid' }, [
+                fig(ev.landing_page_view, 'Page visits'),
+                fig(today.uniqueVisitors, 'Unique visitors'),
+                fig(ev.game_started, 'Games started'),
+                fig(ev.game_completed, 'Games completed'),
+                fig(ev.game_created + ev.game_joined, 'Multiplayer'),
+                fig(
+                  today.averageGameSeconds
+                    ? Math.round(today.averageGameSeconds / 60) + 'm'
+                    : '—',
+                  'Average length'
+                ),
+              ]),
+            ]),
+
+            section('All time', [
+              el('div', { class: 'ad-grid' }, [
+                fig(data.players.players, 'Players'),
+                fig(data.players.elections, 'Elections'),
+                fig(data.players.governments, 'Governments'),
+                fig(data.players.coalitions, 'Coalitions'),
+                fig(data.activeGames, 'Games in progress'),
+              ]),
+            ]),
+
+            section('Interest funnel · last ' + range.days.length + ' days', [
+              el('div', { class: 'ad-funnel' }, range.funnel.map(function (step) {
+                var share = top ? Math.round((step.count / top) * 100) : 0;
+                return el('div', { class: 'ad-step' }, [
+                  el('span', { class: 'ad-step-name', text: step.step }),
+                  el('span', { class: 'ad-step-bar' }, [
+                    el('span', { class: 'ad-step-fill', style: { width: share + '%' } }),
+                  ]),
+                  el('span', {}, [
+                    el('span', { class: 'ad-step-n', text: String(step.count) }),
+                  ]),
+                ]);
+              })),
+              el('p', {
+                class: 'ad-note',
+                text: 'Visits on their own say very little. The drop between ' +
+                  'arriving and finishing is the number worth watching.',
+              }),
+            ]),
+
+            section('Visits by day', [
+              el('div', { class: 'ad-days' }, range.days.map(function (d) {
+                var h = Math.round((d.events.landing_page_view / busiest) * 96);
+                return el('div', { class: 'ad-day' }, [
+                  el('span', {
+                    class: 'ad-day-bar',
+                    style: { height: Math.max(2, h) + 'px' },
+                    title: d.day + ': ' + d.events.landing_page_view,
+                  }),
+                  el('span', { class: 'ad-day-label', text: d.day.slice(5) }),
+                ]);
+              })),
+            ]),
+
+            tally(today.byParty, 'Party chosen today'),
+            tally(today.byRegion, 'Region opened today'),
+            tally(today.byDistrict, 'District targeted today'),
+          ].filter(Boolean));
+        }
+
+        function load() {
+          var key = keyInput.value.trim();
+          try {
+            window.localStorage.setItem(STORED, key);
+          } catch (e) {
+            /* private mode */
+          }
+
+          mount(out, [el('p', { class: 'ad-note', text: 'Counting…' })]);
+
+          fetch('api/index.php?action=analytics&days=14&key=' + encodeURIComponent(key))
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (data) {
+              if (!data.ok) {
+                mount(out, [el('p', { class: 'ad-note', text: data.error || 'Not available.' })]);
+                return;
+              }
+              show(data);
+            })
+            .catch(function () {
+              mount(out, [el('p', { class: 'ad-note', text: 'Could not reach the server.' })]);
+            });
+        }
+
+        document.getElementById('go').addEventListener('click', load);
+        keyInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') load();
+        });
+        if (keyInput.value) load();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,350 @@
+/* ------------------------------------------------------------------
+   The active election screen.
+
+   A heads-up display rather than a page: a ring that drains, a money strip,
+   a menu, a scoreboard, and the button that ends the round. No title, no
+   portrait card, no numerals counting down.
+   ------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------- the top bar */
+
+.g-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+}
+
+.g-who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.g-who-party {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--party, var(--line));
+  color: var(--party, var(--cream));
+}
+.g-who-you {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.g-more {
+  min-height: 36px;
+  padding: 6px 11px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+/* --------------------------------------------------------- the ring */
+
+.round-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.round-bar-main {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.round-timer {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+.rt-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.rt-track { stroke: var(--line-soft); }
+.rt-arc {
+  stroke: var(--wheat);
+  /* Long enough to read as movement, short enough not to lag the clock. */
+  transition: stroke-dasharray 0.45s linear;
+}
+.round-timer.is-low .rt-arc { stroke: var(--danger); }
+.round-timer.is-counting .rt-arc { stroke: var(--river); }
+
+.rt-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The round number, not a countdown. */
+.round-clock {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.round-clock.is-low { color: var(--danger); }
+.round-clock.is-counting { color: var(--river); }
+
+.round-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.round-of {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.round-final {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+.round-final.is-quiet { color: var(--river); }
+
+.round-steps { display: none; }
+
+/* ------------------------------------------------------ the money strip */
+
+.g-player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.g-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  min-height: 0;
+  font-family: var(--font);
+  color: var(--cream);
+}
+.g-fig-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.g-fig-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.g-fig.is-lead .g-fig-value {
+  font-size: 1.25rem;
+  color: var(--wheat);
+}
+.g-fig.is-grant {
+  cursor: pointer;
+  min-height: 36px;
+  justify-content: center;
+}
+.g-fig.is-grant .g-fig-value { color: var(--river); }
+.g-fig.is-debt .g-fig-value { color: var(--danger); }
+
+/* ------------------------------------------------------------ the menu */
+
+.g-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.g-menu-item {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 8px 10px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+  box-shadow: none;
+}
+.g-menu-icon {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.g-menu-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.g-menu-hint {
+  font-size: 0.6rem;
+  color: var(--muted-2);
+}
+.g-menu-item:hover {
+  border-color: var(--wheat-deep);
+  background: var(--ink-3);
+}
+.g-menu-item:hover .g-menu-icon { color: var(--wheat); }
+.g-menu-item.is-risky .g-menu-icon { color: var(--danger); }
+
+/* ------------------------------------------------------- the scoreboard */
+
+.lb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lb-row {
+  width: 100%;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 14px 34px minmax(0, 1fr) 30px 46px;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  text-align: left;
+}
+.lb-row.is-you {
+  background: var(--ink-2);
+  border-left-color: var(--party, var(--wheat));
+}
+.lb-row:hover { background: var(--ink-2); }
+
+.lb-rank {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.lb-party {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--party, var(--cream));
+}
+.lb-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.lb-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--party, var(--muted));
+  transition: width 0.5s ease;
+}
+.lb-seats {
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.lb-tag {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  text-align: right;
+}
+.lb-tag.is-leading { color: var(--wheat); }
+
+.lb-shares {
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.63rem;
+  font-variant-numeric: tabular-nums;
+}
+.lb-share { color: var(--party, var(--muted-2)); }
+
+/* -------------------------------------------------------- the majority */
+
+.g-majority {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.g-majority-text {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------- blocks, quiet */
+
+.g-block {
+  border: 0;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.g-block-title {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+.g-block-note {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted-2);
+  margin: 0;
+}
+
+/* ---------------------------------------------------------- end round */
+
+.btn-end {
+  border-color: var(--line);
+  background: var(--ink-2);
+  padding: 12px 16px;
+  box-shadow: none;
+}
+.btn-end-title {
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+}
+.btn-end-note { font-size: 0.62rem; }

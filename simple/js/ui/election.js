@@ -42,17 +42,24 @@ CMP.ui.election = (function () {
    * candidate's own seats, and the spending decision happens two taps later at
    * a named constituency, never from this menu.
    */
+  /*
+   * The menu: ten destinations, two columns, one word under each.
+   *
+   * A sentence under every item reads as a manual, and a player who has
+   * opened Money twice already does not need to be told it is where the cash
+   * is. One word is enough to disambiguate, which is all a label owes anybody.
+   */
   var SECTIONS = [
-    { id: 'areas', label: 'Campaign', hint: 'Your seats', icon: '◆' },
-    { id: 'money', label: 'Money', hint: 'Cash and debt', icon: '₹' },
-    { id: 'grants', label: 'Grants', hint: 'Districts you hold', icon: '◈' },
-    { id: 'loan', label: 'Loan', hint: 'Borrow at 20%', icon: '◇' },
-    { id: 'corruption', label: 'Corruption', hint: 'High risk', icon: '▲', risky: true },
-    { id: 'bribe', label: 'Bribe', hint: 'Highest risk', icon: '▲', risky: true },
-    { id: 'map', label: 'Map', hint: 'All of Punjab', icon: '◉' },
-    { id: 'seats', label: 'Constituencies', hint: 'All 117', icon: '☰' },
-    { id: 'priorities', label: 'My Areas', hint: 'Districts to fight for', icon: '★' },
-    { id: 'allies', label: 'Alliances', hint: 'Fight together', icon: '⚭' },
+    { id: 'areas', label: 'Campaign', hint: 'Seats', icon: '◆' },
+    { id: 'money', label: 'Money', hint: 'Cash', icon: '₹' },
+    { id: 'grants', label: 'Grants', hint: 'Districts', icon: '◈' },
+    { id: 'loan', label: 'Loan', hint: '20%', icon: '◇' },
+    { id: 'corruption', label: 'Corruption', hint: 'Risk', icon: '▲', risky: true },
+    { id: 'bribe', label: 'Bribe', hint: 'Risk', icon: '▲', risky: true },
+    { id: 'map', label: 'Map', hint: 'Punjab', icon: '◉' },
+    { id: 'priorities', label: 'My Areas', hint: 'Targets', icon: '★' },
+    { id: 'seats', label: 'Constituencies', hint: '117', icon: '☰' },
+    { id: 'allies', label: 'Alliances', hint: 'Partners', icon: '⚭' },
   ];
 
   function sectionById(id) {
@@ -108,6 +115,16 @@ CMP.ui.election = (function () {
 
     // All 117, searchable — the way to reach a seat by name rather than by
     // whose it is. Built once and reused, so the search box keeps its text.
+    var myAreasView = CMP.ui.myAreas.create({
+      onAllocate: function (actionId, seats, amount) {
+        return allocate(actionId, seats, amount);
+      },
+      onChanged: function () {
+        paintPlayer();
+        paintEndRound();
+      },
+    });
+
     var seatBrowser = CMP.ui.seats.browser({
       onOpen: function (number) {
         openSeatDetail(number);
@@ -119,28 +136,48 @@ CMP.ui.election = (function () {
         openSeatDetail(number);
       },
 
-      // One allocation across many seats. Solo resolves it here; multiplayer
-      // asks the server, which rolls every seat itself.
       onAllocate: function (actionId, seats, amount) {
-        if (game.mode === 'multiplayer') {
-          return CMP.net.allocate(actionId, seats, amount).then(function (res) {
-            if (res.ok && res.game && opts.onServerGame) opts.onServerGame(res.game);
-            return res.ok
-              ? { ok: true, seats: (res.game && res.game.lastBulk && res.game.lastBulk.seats) || seats.length,
-                  spent: (res.game && res.game.lastBulk && res.game.lastBulk.spent) || amount, reports: [] }
-              : { ok: false, reason: res.error };
-          });
-        }
-
-        // A fresh roll per seat, from the game's own sequence, so a bulk
-        // allocation is exactly the same dice as playing each seat by hand.
-        var out = CMP.campaign.campaignBulk(game, actionId, seats, amount, function () {
-          return CMP.rng.rollsFor(game);
-        });
-        if (out.ok) CMP.storage.save(game);
-        return out;
+        return allocate(actionId, seats, amount);
       },
 
+      onChanged: function () {
+        paintPlayer();
+        paintBody();
+        paintEndRound();
+      },
+    });
+
+    /**
+     * One allocation across many seats. Solo resolves it here; multiplayer
+     * asks the server, which rolls every seat itself.
+     */
+    function allocate(actionId, seats, amount) {
+      if (game.mode === 'multiplayer') {
+        return CMP.net.allocate(actionId, seats, amount).then(function (res) {
+          if (res.ok && res.game && opts.onServerGame) opts.onServerGame(res.game);
+          var bulk = (res.game && res.game.lastBulk) || {};
+          return res.ok
+            ? { ok: true, seats: bulk.seats || seats.length, spent: bulk.spent || amount, reports: [] }
+            : { ok: false, reason: res.error };
+        });
+      }
+
+      // A fresh roll per seat, from the game's own sequence, so a bulk
+      // allocation is exactly the same dice as playing each seat by hand.
+      var out = CMP.campaign.campaignBulk(game, actionId, seats, amount, function () {
+        return CMP.rng.rollsFor(game);
+      });
+      if (out.ok) CMP.storage.save(game);
+      return out;
+    }
+
+    var areasView = CMP.ui.areas.create({
+      onOpen: function (number) {
+        openSeatDetail(number);
+      },
+      onAllocate: function (actionId, seats, amount) {
+        return allocate(actionId, seats, amount);
+      },
       onChanged: function () {
         paintPlayer();
         paintBody();
@@ -296,14 +333,26 @@ CMP.ui.election = (function () {
 
     /* ---------------------------------------------------------- header */
 
+    /*
+     * The game screen does not repeat its own name.
+     *
+     * A player who is nineteen rounds into an election knows which game they
+     * are in. The two lines that used to sit here — the title and the seat
+     * count — are on the home screen, where somebody deciding whether to play
+     * actually needs them. What is left is a bar: who you are, what you hold,
+     * and the way out.
+     */
     function paintHead() {
+      var party = CMP.getParty(game.partyId);
+
       mount(headNode, [
-        el('div', { class: 'g-head-title' }, [
-          el('h1', { class: 'g-title', text: 'Chief Minister of Punjab' }),
-          el('p', {
-            class: 'g-subtitle',
-            text: CMP.TOTAL_SEATS + ' seats · majority ' + CMP.MAJORITY,
+        el('div', { class: 'g-who' }, [
+          el('span', {
+            class: 'g-who-party',
+            style: { '--party': party.colour },
+            text: party.short,
           }),
+          el('span', { class: 'g-who-you', text: 'You' }),
         ]),
         // Not the game menu — this is everything that is not part of a
         // round: the election history, leaving, declaring early.
@@ -495,36 +544,55 @@ CMP.ui.election = (function () {
 
     /* ----------------------------------------------------- player strip */
 
+    /*
+     * The money, in one line.
+     *
+     * This replaced two things: a card with a portrait, a name, a party and a
+     * seat count, and a separate panel of figures underneath. Between them
+     * they took a third of the screen to say what fits in a strip — and the
+     * portrait and name were the two facts the player is least likely to have
+     * forgotten.
+     *
+     * What is left is what changes: what you can spend, what arrived this
+     * round, and what has gone. Available is the one that matters, so it is
+     * the one that is larger.
+     */
     function paintPlayer() {
-      var party = CMP.getParty(game.partyId);
       var cash = CMP.campaign.remaining(game);
+      var grants = CMP.campaign.grantTotal(game);
       var debt = CMP.campaign.debtOf(game);
-      var seed = mySeed();
+      var income = (CMP.CAMPAIGN.income || {}).perRound || 0;
+
+      function figure(label, value, cls) {
+        return el('div', { class: 'g-fig' + (cls ? ' ' + cls : '') }, [
+          el('span', { class: 'g-fig-label', text: label }),
+          el('strong', { class: 'g-fig-value', text: value }),
+        ]);
+      }
 
       mount(playerNode, [
-        seed
-          ? CMP.ui.portrait.render(seed, 40, game.candidateName)
-          : el('span', { class: 'g-player-flag', text: party.short }),
-        el('div', { class: 'g-player-who' }, [
-          el('strong', { class: 'g-player-name', text: game.candidateName }),
-          el('span', {
-            class: 'g-player-party',
-            style: { color: party.colour },
-            text: party.short,
-          }),
-        ]),
-        el('div', { class: 'g-player-figures' }, [
-          el('span', { class: 'g-player-cash', text: money.words(cash) || '₹0' }),
-          el('span', {
-            class: 'g-player-seats',
-            text: game.seatsWon + (game.seatsWon === 1 ? ' seat' : ' seats'),
-          }),
-        ]),
+        figure('Available', money.words(cash) || '₹0', 'is-lead'),
+        figure('New', '+' + money.words(income)),
+        figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
+        grants
+          ? el('button', {
+              class: 'g-fig is-grant',
+              type: 'button',
+              onclick: function () {
+                setSection('grants');
+              },
+            }, [
+              el('span', { class: 'g-fig-label', text: 'Grants' }),
+              el('strong', { class: 'g-fig-value', text: money.words(grants) }),
+            ])
+          : null,
         debt
-          ? el('span', { class: 'g-player-debt', title: 'Owed to the bank', text: money.words(debt) })
+          ? el('div', { class: 'g-fig is-debt' }, [
+              el('span', { class: 'g-fig-label', text: 'Owed' }),
+              el('strong', { class: 'g-fig-value', text: money.words(debt) }),
+            ])
           : null,
       ]);
-      playerNode.style.setProperty('--party', party.colour);
     }
 
     /* -------------------------------------------------------------- nav */
@@ -764,78 +832,10 @@ CMP.ui.election = (function () {
       var people = roster();
 
       return [
-        moneyPanel(),
         menuGrid(),
         leaderboardBlock(counts, people),
         majorityLine(counts),
-        el('section', { class: 'g-block' }, [
-          el('h2', { class: 'g-block-title', text: 'Leading from' }),
-          CMP.ui.seats.leadingFrom(game, people, {
-            onOpen: openSeatDetail,
-            onViewAll: function () {
-              openCandidate(game.partyId);
-            },
-          }),
-        ]),
       ];
-    }
-
-    /*
-     * The four figures that make the economy readable at a glance.
-     *
-     * Available is what can be spent; new this round is where it came from;
-     * spent is what has gone; and the campaign total says how far through the
-     * hundred crore the election is. Keeping "new this round" beside
-     * "available" is the whole point — five crore is income, not a limit, and
-     * one number on its own reads like a limit.
-     */
-    function moneyPanel() {
-      var income = (CMP.CAMPAIGN.income || {}).perRound || 0;
-      var earned = game.incomeTotal || 0;
-      var whole = income * (game.roundsTotal || CMP.ROUNDS.total);
-      var grants = CMP.campaign.grantTotal(game);
-
-      function figure(label, value, cls) {
-        return el('div', { class: 'g-money-fig' + (cls ? ' ' + cls : '') }, [
-          el('span', { class: 'g-money-fig-label', text: label }),
-          el('strong', { class: 'g-money-fig-value', text: value }),
-        ]);
-      }
-
-      return el('section', { class: 'g-block g-money-panel' }, [
-        el('div', { class: 'g-money-row' }, [
-          figure('Available', money.words(CMP.campaign.remaining(game)) || '₹0', 'is-lead'),
-          figure('New this round', '+' + money.words(income)),
-          figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
-        ]),
-
-        grants
-          ? el('button', {
-              class: 'g-money-grants',
-              type: 'button',
-              onclick: function () {
-                setSection('grants');
-              },
-            }, [
-              el('span', { class: 'g-money-fig-label', text: 'Held in region grants' }),
-              el('strong', { class: 'g-money-fig-value', text: money.words(grants) }),
-              el('span', { class: 'g-menu-hint', text: 'Spendable only where it was earned' }),
-            ])
-          : null,
-
-        el('div', { class: 'g-money-progress' }, [
-          el('span', { class: 'g-money-track' }, [
-            el('span', {
-              class: 'g-money-fill',
-              style: { width: Math.min(100, (earned / Math.max(1, whole)) * 100) + '%' },
-            }),
-          ]),
-          el('span', {
-            class: 'g-money-progress-note',
-            text: money.words(earned) + ' of ' + money.words(whole) + ' this campaign',
-          }),
-        ]),
-      ]);
     }
 
     /*
@@ -937,21 +937,16 @@ CMP.ui.election = (function () {
      * Saved to the server as they are picked, because an ally is shown them
      * and a list that only existed in one browser would be no use to anybody.
      */
+    /*
+     * MY AREAS: region, then district, then campaign the lot.
+     *
+     * Built once and reused so the open region and the selection survive a
+     * repaint — a screen that folded itself up every time the clock ticked
+     * would be unusable.
+     */
     function prioritiesSection() {
-      return [
-        el('p', {
-          class: 'g-block-note',
-          text: 'Where you mean to fight. Hold every seat in a district and it ' +
-            'pays you every round — and the money is locked to that district’s ' +
-            'own region.',
-        }),
-        CMP.ui.territory.priorities(game, {
-          onChange: function (ids) {
-            if (game.mode === 'multiplayer') CMP.net.setPriority(ids);
-            else CMP.storage.save(game);
-          },
-        }),
-      ];
+      myAreasView.render(game);
+      return [myAreasView.root];
     }
 
     function alliesSection() {
@@ -978,6 +973,16 @@ CMP.ui.election = (function () {
     }
 
     /** WHO'S LEADING — the centrepiece. */
+    /*
+     * Who is leading, as a scoreboard rather than four cards.
+     *
+     * A row is a rank, a party, a seat count and a bar as long as that count.
+     * The bar is the chart the brief asks for — reading four numbers takes
+     * longer than seeing four bars, and it costs no extra height at all.
+     *
+     * Faces and full candidate names moved to the player's own page, one tap
+     * away, which is where somebody who wants them is going anyway.
+     */
     function leaderboardBlock(counts, people) {
       var rows = CMP.PLAYABLE_PARTIES.map(function (p) {
         var who = people.filter(function (r) {
@@ -987,14 +992,14 @@ CMP.ui.election = (function () {
           party: p,
           seats: counts[p.id] || 0,
           candidate: who ? who.candidateName : null,
-          seed: who ? who.portraitSeed : null,
           isYou: p.id === game.partyId,
         };
       }).sort(function (a, b) {
         return b.seats - a.seats;
       });
 
-      var PLACE = ['1st', '2nd', '3rd', '4th'];
+      var most = Math.max(1, rows[0].seats);
+      var total = CMP.TOTAL_SEATS || 117;
 
       return el('section', { class: 'g-block' }, [
         el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
@@ -1002,31 +1007,35 @@ CMP.ui.election = (function () {
           return el('li', {}, [el('button', {
             class: 'lb-row' + (i === 0 ? ' is-leading' : '') + (row.isYou ? ' is-you' : ''),
             type: 'button',
-            style: { '--party': row.party.colour, '--party-ink': row.party.ink || '#fff' },
+            style: { '--party': row.party.colour },
+            title: row.candidate || row.party.name,
             onclick: function () {
               openCandidate(row.party.id);
             },
           }, [
             el('span', { class: 'lb-rank', text: String(i + 1) }),
-            row.seed
-              ? CMP.ui.portrait.render(row.seed, 32, row.candidate)
-              : el('span', { class: 'lb-flag', text: row.party.short }),
-            el('span', { class: 'lb-who' }, [
-              el('strong', { class: 'lb-name', text: row.candidate || row.party.name }),
-              el('span', { class: 'lb-party' }, [
-                row.party.short,
-                // With four faces on screen, finding your own should take no
-                // effort at all.
-                row.isYou ? el('span', { class: 'board-tag is-you', text: 'you' }) : null,
-              ]),
+            el('span', { class: 'lb-party', text: row.party.short }),
+            el('span', { class: 'lb-bar' }, [
+              el('span', {
+                class: 'lb-bar-fill',
+                style: { width: Math.round((row.seats / most) * 100) + '%' },
+              }),
             ]),
-            el('span', { class: 'lb-seats', text: String(row.seats) }),
+            el('strong', { class: 'lb-seats', text: String(row.seats) }),
             el('span', {
-              class: 'lb-status' + (i === 0 ? ' is-leading' : ''),
-              text: i === 0 ? 'Leading' : PLACE[i],
+              class: 'lb-tag' + (i === 0 ? ' is-leading' : ''),
+              text: row.isYou ? 'You' : i === 0 ? 'Leading' : '',
             }),
-            el('span', { class: 'lb-chev', 'aria-hidden': 'true', text: '›' }),
           ])]);
+        })),
+
+        // The same standings as a share, which is the other way people read a
+        // result. Small, and only worth a line.
+        el('p', { class: 'lb-shares' }, rows.map(function (row, i) {
+          return el('span', { class: 'lb-share', style: { '--party': row.party.colour } }, [
+            row.party.short + ' ' + Math.round((row.seats / total) * 1000) / 10 + '%',
+            i < rows.length - 1 ? '  ' : '',
+          ]);
         })),
       ]);
     }

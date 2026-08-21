@@ -43,40 +43,54 @@ CMP.ui.home = (function () {
       el('div', { class: 'h-inner' }, [
         /* ---- the title ---- */
         el('header', { class: 'h-hero' }, [
-          el('h1', { class: 'h-title' }, [
-            el('span', { class: 'h-title-top', text: 'Chief Minister' }),
-            el('span', { class: 'h-title-of', text: 'of' }),
-            el('span', { class: 'h-title-bottom', text: 'Punjab' }),
+          el('h1', { class: 'h-title', text: 'Election Time' }),
+          el('p', { class: 'h-sub', text: 'Punjab Assembly' }),
+
+          // The three facts that define the game, as figures rather than a
+          // sentence. Somebody deciding whether to play needs the shape of it,
+          // not a paragraph about it.
+          el('div', { class: 'h-facts' }, [
+            fact('117', 'Seats'),
+            fact('59', 'Majority'),
+            fact(String(CMP.ROUNDS.total), 'Rounds'),
           ]),
-          el('p', {
-            class: 'h-tagline',
-            text: CMP.ROUNDS.total + ' rounds · 117 Assembly Seats · 59 for a majority',
-          }),
-          me
-            ? el('p', { class: 'h-welcome' }, [
-                'Welcome back, ',
-                el('strong', { text: me.name }),
-              ])
-            : el('p', { class: 'h-welcome', text: 'Can you win 59 seats and become Chief Minister?' }),
+
+          me ? el('p', { class: 'h-welcome' }, ['Welcome back, ', el('strong', { text: me.name })]) : null,
         ]),
 
-        /* ---- the two things to do ---- */
+        /*
+         * What there is to do.
+         *
+         * "Election Time" is the way in, whether the other three parties are
+         * people or not — a player choosing a game should be choosing an
+         * election, not a mode. The distinction lives in the setup that
+         * follows, where it is a fact about who else is playing rather than a
+         * label on a button.
+         */
         el('div', { class: 'h-play' }, [
           el('button', {
-            class: 'h-play-btn is-solo',
+            class: 'h-play-btn is-primary',
             type: 'button',
             onclick: opts.onSolo,
           }, [
-            el('span', { class: 'h-play-label', text: 'Play solo' }),
-            el('span', { class: 'h-play-sub', text: 'Against three opponents' }),
+            el('span', { class: 'h-play-label', text: 'Election Time' }),
+            el('span', { class: 'h-play-sub', text: 'Choose a party and contest all 117' }),
           ]),
           el('button', {
-            class: 'h-play-btn is-friends',
+            class: 'h-play-btn',
             type: 'button',
             onclick: opts.onMultiplayer,
           }, [
             el('span', { class: 'h-play-label', text: 'Play with friends' }),
-            el('span', { class: 'h-play-sub', text: 'Up to four, one party each' }),
+            el('span', { class: 'h-play-sub', text: 'Create an election, share the code' }),
+          ]),
+          el('button', {
+            class: 'h-play-btn is-quiet',
+            type: 'button',
+            onclick: opts.onJoin || opts.onMultiplayer,
+          }, [
+            el('span', { class: 'h-play-label', text: 'Join election' }),
+            el('span', { class: 'h-play-sub', text: 'Enter a code from a friend' }),
           ]),
         ]),
 
@@ -141,6 +155,14 @@ CMP.ui.home = (function () {
     }
 
     /* ------------------------------------------------------- painting */
+
+    /** One of the three facts under the title. */
+    function fact(value, label) {
+      return el('div', { class: 'h-fact' }, [
+        el('strong', { class: 'h-fact-value', text: value }),
+        el('span', { class: 'h-fact-label', text: label }),
+      ]);
+    }
 
     function figure(value, label) {
       return el('div', { class: 'h-figure' }, [

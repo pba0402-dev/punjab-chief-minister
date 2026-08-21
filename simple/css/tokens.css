@@ -1,0 +1,116 @@
+/* ------------------------------------------------------------------
+   The visual system, restated.
+
+   The game had grown a warm brown ground with gold on almost everything,
+   which reads as a financial dashboard rather than a strategy game and is
+   tiring over a long session on a phone.
+
+   This is the same identity, disciplined:
+
+     - the ground is a near-black charcoal with a faint blue cast, not brown
+     - text is off-white, never pure white, on soft rather than hard contrast
+     - gold is an accent and nothing else: the action you should take, the
+       thing you have selected, the majority line. It is not a card colour
+     - party colours appear on borders, badges, bars and indicators only
+
+   Loaded straight after styles.css, so it redefines those tokens for every
+   sheet that follows without any of them needing to know.
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Grounds. Charcoal with a trace of blue, which reads as neutral beside
+     warm text and stops the whole screen looking like old paper. */
+  --ink: #0e0f12;
+  --ink-2: #16181d;
+  --ink-3: #1d2026;
+
+  --line: #2a2e36;
+  --line-soft: #1e2128;
+
+  /* Text. Off-white rather than white: the difference is invisible in a
+     screenshot and considerable at midnight. */
+  --cream: #ecebe8;
+  --muted: #9ba1ab;
+  --muted-2: #6b7280;
+
+  /* The one accent. Softer and less saturated than the old gold, because it
+     now appears only where it means something. */
+  --wheat: #d8a94a;
+  --wheat-deep: #b0842c;
+
+  /* A cool second voice for information rather than action. */
+  --river: #6aa9c4;
+  --danger: #d9614f;
+  --good: #6fbf8e;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  /* Shadows do the work borders used to. */
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* A quieter ground: one soft pool of light, not two competing washes. */
+body {
+  background:
+    radial-gradient(1100px 620px at 50% -10%, #1a1d24 0%, transparent 62%),
+    var(--ink);
+  color: var(--cream);
+}
+
+/*
+ * Typography, brought down a step.
+ *
+ * The old scale shouted: 4.4rem titles and 1.9rem figures on a phone. Weight
+ * and colour carry the hierarchy now, so the sizes can be the ones the brief
+ * asks for — a 32-36px title at the very top, and numbers that read as
+ * numbers rather than headlines.
+ */
+.title {
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
+  letter-spacing: -0.02em;
+}
+.title-sm { font-size: clamp(1.15rem, 4vw, 1.4rem); }
+
+.eyebrow {
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+/* Touch targets. Anything a finger is meant to find is at least 44px. */
+button,
+.btn,
+[role='button'] {
+  min-height: 44px;
+}
+
+/* Small controls opt out deliberately, and stay comfortable by padding. */
+.btn-small,
+.seat-filter,
+.al-quick-btn,
+.h-more {
+  min-height: 36px;
+}
+
+/* Gold is for the action worth taking. Everything else is a quiet surface. */
+.btn-primary {
+  background: linear-gradient(170deg, var(--wheat) 0%, var(--wheat-deep) 100%);
+  border-color: var(--wheat-deep);
+  color: #17130a;
+}
+
+.btn-quiet {
+  background: var(--ink-2);
+  border-color: var(--line);
+  color: var(--cream);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -106,6 +106,7 @@ const text = (d) => d.window.document.body.textContent;
 const settle = () => new Promise((r) => setTimeout(r, 10));
 const modeCard = (d, label) =>
   qq(d, '.h-play-btn').find((b) => new RegExp(label, 'i').test(b.textContent));
+const playButton = (d) => qq(d, '.h-play-btn')[0];
 const actionCard = (d, label) =>
   qq(d, '.act').find((c) => {
     const n = c.querySelector('.act-name');
@@ -208,13 +209,22 @@ const playCard = async (d, label, amount) => {
 section('1-3. First screen');
 let dom = await openPage();
 check('1. first screen loads', !!q(dom, '.screen-home'));
-check('2. "Chief Minister of Punjab" is displayed',
-  /Chief Minister\s*of\s*Punjab/.test(text(dom)));
-check('3. "117 Assembly Seats" is displayed', /117 Assembly Seats/i.test(text(dom)));
-check('   PLAY SOLO is offered', !!modeCard(dom, 'Play solo'));
-check('   PLAY WITH FRIENDS is offered', !!modeCard(dom, 'Play with friends'));
-check('   the two ways to play are the only big buttons',
-  qq(dom, '.h-play-btn').length === 2);
+check('13. the title is Election Time',
+  q(dom, '.h-title').textContent === 'Election Time', q(dom, '.h-title').textContent);
+check('13. under Punjab Assembly',
+  q(dom, '.h-sub').textContent === 'Punjab Assembly', q(dom, '.h-sub').textContent);
+check('13. with the three facts that define it',
+  qq(dom, '.h-fact').length === 3 &&
+  /117/.test(text(dom)) && /59/.test(text(dom)) && /20/.test(text(dom)),
+  qq(dom, '.h-fact').map((f) => f.textContent).join('/'));
+check('46. "Play solo" appears nowhere', !/play solo/i.test(text(dom)));
+check('14. Election Time is the first and strongest action',
+  /Election Time/.test(playButton(dom).textContent) &&
+  playButton(dom).className.indexOf('is-primary') !== -1,
+  playButton(dom).className);
+check('14. with play with friends and join underneath',
+  qq(dom, '.h-play-btn').length === 3 &&
+  /Play with friends/i.test(text(dom)) && /Join election/i.test(text(dom)));
 check('   statistics are never invented when there is no server',
   !/[1-9]\d*\s*(players|elections|governments)/i.test(text(dom)),
   text(dom).slice(0, 160));
@@ -238,7 +248,7 @@ check('   corruption and bribe are separate menus',
 /* ---------------------------------------------------------------- setup */
 
 section('Setup: no budget is asked for');
-clickIt(dom, modeCard(dom, 'Play solo'));
+clickIt(dom, playButton(dom));
 await dom.window.CMP.data.ensure();
 await settle();
 check('42. the board arrives when the player starts', CMP.CONSTITUENCIES.length === 117,
@@ -249,9 +259,15 @@ check('   four parties offered', qq(dom, '.party-card').length === 4);
 check('1. the budget is granted, not entered', !q(dom, '.field-money'));
 check('7. the round allowance is stated on the setup screen',
   /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
-check('1. no slogan is asked for',
-  qq(dom, '.screen-setup .field-input').length === 1,
+check('16. setup asks for a name and an optional slogan',
+  qq(dom, '.screen-setup .field-input').length === 2,
   qq(dom, '.screen-setup .field-input').length + ' fields');
+check('10. and offers faces to choose from',
+  qq(dom, '.av-option').length >= 8, qq(dom, '.av-option').length + ' avatars');
+check('16. and the round length',
+  qq(dom, '.screen-setup .clock-option').length === 3);
+check('16. two minutes by default',
+  /2 min/.test(q(dom, '.screen-setup .clock-option.is-active').textContent));
 
 clickIt(dom, qq(dom, '.party-card').find((c) => c.textContent.includes('INC')));
 const inputs = qq(dom, '.screen-setup .field-input');
@@ -287,20 +303,43 @@ function moneyLine(d, label) {
   return row ? row.querySelector('.sum-line-value').textContent : null;
 }
 
-// The point of the redesign: the first screen answers who is winning, not
-// how much cash everyone has. The money lives one tap away.
-check('   the header names the game', /Chief Minister of Punjab/.test(q(dom, '.g-title').textContent));
-check('   and states the stakes once',
-  /117 seats · majority 59/.test(q(dom, '.g-subtitle').textContent),
-  q(dom, '.g-subtitle').textContent);
-check('   the round and clock are shown', !!q(dom, '.round-bar') && !!q(dom, '.round-clock'));
+/*
+ * The active screen is a heads-up display, not a page. It does not repeat
+ * the game's own name at somebody nineteen rounds into playing it.
+ */
+check('1. the game screen carries no title',
+  !q(dom, '.g-title') && !/Chief Minister of Punjab/.test(text(dom)));
+check('1. and no seat-count subtitle', !q(dom, '.g-subtitle'));
+check('64. it opens with the round timer',
+  !!q(dom, '.round-bar') && !!q(dom, '.round-timer'));
+check('2. the ring shows the round, not a countdown',
+  /^R\d+$/.test(q(dom, '.round-clock').textContent),
+  q(dom, '.round-clock').textContent);
+check('2. no numerical countdown anywhere on the screen',
+  !/\d:\d\d/.test(q(dom, '.round-bar').textContent),
+  q(dom, '.round-bar').textContent);
+check('3. with the round out of twenty beside it',
+  /Round 1 \/ 20/.test(q(dom, '.round-of').textContent),
+  q(dom, '.round-of').textContent);
 
-check('   one compact player strip, not four cards', qq(dom, '.g-player').length === 1);
-check('   it shows the candidate', /Simran Kaur Gill/.test(q(dom, '.g-player').textContent));
-check('   their party', /INC/.test(q(dom, '.g-player-party').textContent));
-check('   their cash', /₹5 crore/.test(q(dom, '.g-player-cash').textContent),
-  q(dom, '.g-player-cash').textContent);
-check('   and their seats', /seats?$/.test(q(dom, '.g-player-seats').textContent.trim()));
+/*
+ * The player card is gone. A portrait, a name and a party took a third of a
+ * phone screen to say three things the player already knew; what replaced it
+ * is the money, which is the part that changes.
+ */
+check('4. no large player card', !q(dom, '.g-player-name') && !q(dom, '.g-player-who'));
+check('5. money is a compact strip of figures',
+  qq(dom, '.g-fig').length >= 3, qq(dom, '.g-fig').length + ' figures');
+check('5. available, new this round and spent',
+  /Available/i.test(q(dom, '.g-player').textContent) &&
+  /New/i.test(q(dom, '.g-player').textContent) &&
+  /Spent/i.test(q(dom, '.g-player').textContent),
+  q(dom, '.g-player').textContent);
+check('5. available is the figure that leads',
+  /₹5 crore/.test(q(dom, '.g-fig.is-lead').textContent),
+  q(dom, '.g-fig.is-lead').textContent);
+check('4. and the party still shows, quietly',
+  /INC/.test(q(dom, '.g-who').textContent), q(dom, '.g-who').textContent);
 check('   no large stat cards remain', qq(dom, '.stat').length === 0);
 
 const menuLabels = () =>
@@ -324,20 +363,20 @@ check('1. the menu opens on the game home screen',
 
 check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
 check('   it ranks all four candidates', qq(dom, '.lb-row').length === 4);
-check('   each with a portrait', qq(dom, '.lb .portrait').length === 4);
+check('27. as a live bar chart rather than four cards',
+  qq(dom, '.lb-bar-fill').length === 4);
 check('   the leader is marked', !!q(dom, '.lb-row.is-leading'));
-check('   and the rest are placed', /2nd/i.test(text(dom)) && /4th/i.test(text(dom)));
+check('   and you are marked', !!q(dom, '.lb-row.is-you'));
+check('57. with the seat share as a percentage',
+  qq(dom, '.lb-share').length === 4 && /%/.test(q(dom, '.lb-shares').textContent),
+  q(dom, '.lb-shares').textContent);
 check('8. the majority is one line, not a chart',
   qq(dom, '.g-majority').length === 1 &&
-  /of 59|majority of 59/.test(q(dom, '.g-majority-text').textContent),
+  /of 59|majority of 59|past the majority/.test(q(dom, '.g-majority-text').textContent),
   q(dom, '.g-majority-text').textContent);
 
-check('9. leading-from lists constituencies by party', qq(dom, '.lf-group').length >= 1);
-check('   the seats are named', qq(dom, '.seat-row').length > 0);
-check('10. and every one is clickable',
-  qq(dom, '.seat-row').every((n) => n.tagName.toLowerCase() === 'button'));
-check('   with a way through to all 117',
-  !!qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
+check('8. and no constituency list on the game home screen',
+  !q(dom, '.lf-group') && !q(dom, '.seat-row'));
 
 check('1. no campaign actions on the home screen', qq(dom, '.act').length === 0,
   qq(dom, '.act').length + ' actions');
@@ -392,10 +431,11 @@ check('12. the player is left on the constituency', !!q(dom, '.seat-detail'));
 
 openSection(dom, 'Home');
 await settle();
-check('   the player strip shows the money going down',
-  q(dom, '.g-player-cash').textContent ===
-    dom.window.CMP.ui.money.words(50000000 - rallyCost),
-  q(dom, '.g-player-cash').textContent);
+check('5. the money strip shows the money going down',
+  q(dom, '.g-fig.is-lead').textContent.indexOf(
+    dom.window.CMP.ui.money.words(50000000 - rallyCost)
+  ) !== -1,
+  q(dom, '.g-fig.is-lead').textContent);
 
 openSection(dom, 'Money');
 check('3. cash in hand drops',
@@ -514,9 +554,11 @@ const resumed = dom.window.CMP.app.getGame();
 check('11. spending survived the reload', resumed.spent === spentBefore, resumed.spent + ' vs ' + spentBefore);
 check('11. heat survived the reload', resumed.heat === saved.heat);
 check('11. support survived the reload', Object.keys(resumed.support).length === 117);
-check('   the panel shows the restored cash',
-  q(dom, '.g-player-cash').textContent === dom.window.CMP.ui.money.words(resumed.cash),
-  q(dom, '.g-player-cash').textContent);
+check('   the strip shows the restored cash',
+  q(dom, '.g-fig.is-lead').textContent.indexOf(
+    dom.window.CMP.ui.money.words(resumed.cash)
+  ) !== -1,
+  q(dom, '.g-fig.is-lead').textContent);
 
 /* ---------------------------------------------------------------- map */
 
@@ -778,7 +820,7 @@ openSection(dom, 'Home');
 section('Fifteen rounds, solo');
 
 dom = await openPage();
-clickIt(dom, modeCard(dom, 'Play solo'));
+clickIt(dom, playButton(dom));
 await dom.window.CMP.data.ensure();
 await settle();
 clickIt(dom, qq(dom, '.party-card')[0]);
@@ -787,10 +829,14 @@ clickIt(dom, dom.window.document.querySelector('.btn-xl'));
 await settle();
 
 check('the round bar is shown', !!q(dom, '.round-bar'));
-check('it opens on round 1 of 20', /Round\s*1\s*of\s*20/.test(q(dom, '.round-bar').textContent),
+check('it opens on round 1 of 20',
+  /Round\s*1\s*\/\s*20/.test(q(dom, '.round-bar').textContent),
   q(dom, '.round-bar').textContent.slice(0, 40));
-check('a countdown is running', /^\d+:\d\d$/.test(q(dom, '.round-clock').textContent),
+check('2. the ring carries the round, not a clock',
+  q(dom, '.round-clock').textContent === 'R1',
   q(dom, '.round-clock').textContent);
+check('2. and the ring itself is what drains',
+  !!q(dom, '.rt-arc') && !!q(dom, '.rt-arc').getAttribute('stroke-dasharray'));
 check('the leaderboard is shown', qq(dom, '.lb-row').length === 4);
 check('and how many more seats are needed',
   /needs \d+ more|past the majority/.test(q(dom, '.g-majority-text').textContent),
@@ -902,8 +948,8 @@ check('cash rose by the amount borrowed',
   solo.cash === cashBeforeBorrowing + solo.loans[0].amount, String(solo.cash));
 check('and the debt is tracked apart from it',
   dom.window.CMP.campaign.debtOf(solo) === solo.loans[0].repay);
-check('the player strip flags the debt', !!q(dom, '.g-player-debt'),
-  q(dom, '.g-player-debt') ? q(dom, '.g-player-debt').textContent : 'no debt shown');
+check('the player strip flags the debt', !!q(dom, '.g-fig.is-debt'),
+  q(dom, '.g-fig.is-debt') ? q(dom, '.g-fig.is-debt').textContent : 'no debt shown');
 
 /* Run out the rest of the campaign. */
 let rounds = 0;

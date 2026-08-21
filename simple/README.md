@@ -177,6 +177,51 @@ across every round played, plus the same figures as a table — deliberately not
 on the game screen, because it is the shape of a whole campaign and a
 distraction during one.
 
+## The look, and why it is quiet
+
+The ground is a near-black charcoal with a trace of blue. Text is off-white,
+never pure white, on soft rather than hard contrast — the difference is
+invisible in a screenshot and considerable at midnight.
+
+Gold is an accent and nothing else: the action worth taking, the thing you
+have selected, the majority line. It is not a card colour. Party colours
+appear on borders, badges, bars and indicators, so the interface stays neutral
+and the parties stay legible.
+
+Hierarchy is carried by weight and colour rather than size, which is why the
+title is 32-36px rather than 70 and a seat count reads as a number rather than
+a headline.
+
+## The active screen is a heads-up display
+
+It does not repeat the game's own name at somebody nineteen rounds into
+playing it, and it does not show a portrait of the player to the player.
+
+In the corner, a ring that drains as the round runs with **R3** in the middle
+— no numerals counting down, because a ticking 1:47 pulls the eye every second
+and says nothing anybody can act on. Beside it, `Round 3 / 20`.
+
+Then one strip: available, new this round, spent. Then the menu. Then who is
+leading, as four bars. Then END ROUND.
+
+## Analytics, and what is not collected
+
+`simple/admin.html` answers one question: are people actually playing this.
+Visits, unique visitors, games started, games completed, average length, and
+the funnel from arriving to finishing — which is the only figure worth acting
+on, because visits alone say almost nothing.
+
+A visitor is a salted daily hash of address and agent, kept so that one person
+refreshing five times counts once. The salt rotates daily and is never stored
+alongside the data, so yesterday's hashes cannot be matched to today's: the
+store can answer *how many people came* and cannot answer *did this person
+come back*. No addresses, no agent strings, no profile ids, no third party.
+
+The dashboard is closed unless somebody deliberately opens it — it needs an
+owner key in `api/data/admin.key`, and with no key file present the route
+returns the same answer it gives a wrong key, so a guess never confirms that a
+right answer exists.
+
 ## Built for a phone held upright
 
 The layout is designed for portrait, not shrunk into it. Type is fluid through

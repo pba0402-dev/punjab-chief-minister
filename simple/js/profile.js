@@ -69,12 +69,20 @@ CMP.profile = (function () {
    * yours. Making one from the other would put every player's id on the
    * leaderboard for anybody to read.
    */
-  function create(name) {
+  function create(name, portraitSeed) {
     write({
       id: newId(),
       name: String(name || '').trim().slice(0, 32) || 'Player',
-      portraitSeed: newId(),
+      portraitSeed: portraitSeed || newId(),
     });
+    return local;
+  }
+
+  /** Change the face, keeping everything else. */
+  function setAvatar(seed) {
+    var p = read();
+    if (!p || !seed) return p;
+    write({ id: p.id, name: p.name, portraitSeed: String(seed) });
     return local;
   }
 
@@ -192,6 +200,7 @@ CMP.profile = (function () {
     forget: forget,
     has: has,
     create: create,
+    setAvatar: setAvatar,
     rename: rename,
     stats: stats,
     refresh: refresh,

@@ -38,6 +38,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
+require __DIR__ . '/lib/Analytics.php';
 require __DIR__ . '/lib/Territory.php';
 require __DIR__ . '/lib/Alliances.php';
 require __DIR__ . '/lib/Campaign.php';
@@ -95,6 +96,16 @@ $election = new Election($campaign);
 $coalitionRules = new Coalition($campaign);
 $profiles = new Profiles($dataDir, $campaign->config());
 $territory = $campaign->territory();
+$analytics = new Analytics($dataDir);
+
+/** This visitor, as a daily hash. Never stored in any other form. */
+function visitorId(Analytics $analytics): string
+{
+    return $analytics->visitorHash(
+        (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+        (string) ($_SERVER['HTTP_USER_AGENT'] ?? '')
+    );
+}
 
 /* The seat list the board is dealt from. Read once from the generated data
    file so the server and browser always agree on which seats exist. */
@@ -360,6 +371,13 @@ function recordFinishedGame(array $game, Profiles $profiles): array
         $inGovernment !== []
     );
 
+    // How long an election actually took, which is the figure that says
+    // whether twenty rounds is the right number.
+    $started = (int) ($game['startedAt'] ?? 0);
+    $GLOBALS['analytics']->record('game_completed', '', [
+        'seconds' => $started > 0 ? max(0, time() - $started) : 0,
+    ]);
+
     return $game;
 }
 
@@ -406,6 +424,7 @@ try {
 switch (route()) {
     /* ------------------------------------------------------------ create */
     case 'create': {
+        $analytics->record('game_created', visitorId($analytics));
         if ($store->activeGameCount() >= MAX_ACTIVE_GAMES) {
             $store->pruneOlderThan(3600);
             if ($store->activeGameCount() >= MAX_ACTIVE_GAMES) {
@@ -431,6 +450,7 @@ switch (route()) {
 
     /* -------------------------------------------------------------- join */
     case 'join': {
+        $analytics->record('game_joined', visitorId($analytics));
         $code = Code::normalise((string) input('code', ''));
         if (!Code::isWellFormed($code)) {
             fail('That game code does not look right.', 400, 'bad_code');
@@ -751,6 +771,10 @@ switch (route()) {
                 : (int) $engineCfg['seconds'];
 
             $g['phase'] = 'election';
+            $g['startedAt'] = time();
+            $GLOBALS['analytics']->record('game_started', '', [
+                'party' => (string) ($g['players'][$playerId]['partyId'] ?? ''),
+            ]);
 
             // Deal the opening map once. Everyone campaigns on this same
             // board, so a rally in Moga shows up on all four screens rather
@@ -1115,6 +1139,60 @@ switch (route()) {
         }
 
         send(['ok' => true, 'games' => array_slice($open, 0, 3)]);
+    }
+
+    /* --------------------------------------------------------- analytics */
+    case 'track': {
+        /*
+         * One event, counted.
+         *
+         * Deliberately unauthenticated and deliberately narrow: the event
+         * name has to be one of a known list, everything else is discarded,
+         * and the worst a bad actor can do is inflate a number on a
+         * dashboard only the owner sees.
+         */
+        $analytics->record(
+            (string) input('event', ''),
+            visitorId($analytics),
+            [
+                'party' => (string) input('party', ''),
+                'region' => (string) input('region', ''),
+                'district' => (string) input('district', ''),
+                'seconds' => (int) input('seconds', 0),
+            ]
+        );
+        send(['ok' => true]);
+    }
+
+    case 'analytics': {
+        /*
+         * The owner's dashboard.
+         *
+         * Behind a key held in the data directory rather than in the code or
+         * the repository. With no key file present the route is closed
+         * entirely, which is the right default for a fresh install.
+         */
+        $keyFile = $dataDir . '/admin.key';
+        $expected = trim((string) @file_get_contents($keyFile));
+        $given = trim((string) input('key', ''));
+
+        if ($expected === '' || strlen($expected) < 16) {
+            fail('Analytics are not enabled on this installation.', 404, 'no_admin');
+        }
+        if (!hash_equals($expected, $given)) {
+            // Deliberately the same answer as a missing key: a wrong password
+            // should not confirm that the right one exists.
+            fail('Analytics are not enabled on this installation.', 404, 'no_admin');
+        }
+
+        $days = (int) input('days', 7);
+        send([
+            'ok' => true,
+            'today' => $analytics->day(gmdate('Y-m-d')),
+            'range' => $analytics->range($days),
+            'players' => $profiles->summary(),
+            'activeGames' => $store->activeGameCount(),
+        ]);
     }
 
     /* ------------------------------------------------------------- stats */

@@ -201,6 +201,24 @@ CMP.net = (function () {
    * performance. All counted from games that actually finished — a new
    * installation answers zero, and the screen says zero.
    */
+  /**
+   * Count one thing that happened.
+   *
+   * Fire and forget: a failed count must never interrupt play, and nothing
+   * downstream waits on the answer.
+   */
+  function track(event, extra) {
+    var payload = { event: event };
+    Object.keys(extra || {}).forEach(function (k) {
+      payload[k] = extra[k];
+    });
+    try {
+      request('track', payload).catch(function () {});
+    } catch (e) {
+      /* analytics are never worth an exception */
+    }
+  }
+
   function stats() {
     return request('stats', {}, 'GET');
   }
@@ -367,6 +385,7 @@ CMP.net = (function () {
     takeLoan: takeLoan,
     seatHistory: seatHistory,
     stats: stats,
+    track: track,
     profile: profile,
     recordSolo: recordSolo,
     report: report,

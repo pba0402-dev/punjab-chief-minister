@@ -176,7 +176,7 @@ function menuItem(c, label) {
 
 section('Host creates a game');
 const host = await openClient('host');
-check('home shows both ways to play', /Play solo/i.test(host.text()) && /Play with friends/i.test(host.text()));
+check('home offers the ways in', /Election Time/i.test(host.text()) && /Play with friends/i.test(host.text()));
 
 host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 check('multiplayer screen opens', !!host.q('.screen-multiplayer'));
@@ -321,8 +321,11 @@ host.click(startBtn());
 const hostStarted = await host.until('election', () => !!host.q('.screen-election'));
 check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
-check("the host's own party is shown", /AAP/.test(host.q('.g-player-party').textContent));
-check('the host sees their candidate', /Simran Kaur Gill/.test(host.q('.g-player').textContent));
+check("the host's own party is shown", /AAP/.test(host.q('.g-who-party').textContent));
+check('4. the host sees their money, not a card about themselves',
+  /Available/.test(host.q('.g-player').textContent) &&
+  !/Simran Kaur Gill/.test(host.q('.g-player').textContent),
+  host.q('.g-player').textContent);
 check('the home screen carries no campaign actions', host.qq('.act').length === 0,
   host.qq('.act').length + ' actions');
 goHome(host);
@@ -336,7 +339,7 @@ check('2. corruption and bribe are separate items',
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
-check('it opens on round 1 of 20', /Round\s*1\s*of\s*20/.test(host.q('.round-bar').textContent),
+check('it opens on round 1 of 20', /Round\s*1\s*\/\s*20/.test(host.q('.round-bar').textContent),
   host.q('.round-bar').textContent.slice(0, 40));
 check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
 check('and the majority line says how many more are needed',
@@ -346,9 +349,9 @@ check('and the majority line says how many more are needed',
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);
 check('player 2 sees their own party',
-  /INC/.test(players[1].q('.g-player-party').textContent));
-check('player 2 sees their own candidate',
-  /Ravinder Singh Bajwa/.test(players[1].q('.g-player').textContent));
+  /INC/.test(players[1].q('.g-who-party').textContent));
+check('player 2 sees their own money',
+  /Available/.test(players[1].q('.g-player').textContent));
 check(
   'player 2 does not see the host as their own candidate',
   !/Simran Kaur Gill/.test(players[1].q('.g-player').textContent)
@@ -357,15 +360,17 @@ check(
 const p4Started = await players[3].until('election', () => !!players[3].q('.screen-election'));
 check('player 4 is taken along too', p4Started);
 check('player 4 sees their own party',
-  /SAD/.test(players[3].q('.g-player-party').textContent));
+  /SAD/.test(players[3].q('.g-who-party').textContent));
 
 /* ------------------------------------------------- independent budgets */
 
 section('Every player has their own ₹5 crore');
 
 /** The cash a client is showing, from its player strip. */
-const cashOf = (client) =>
-  client.q('.g-player-cash') ? client.q('.g-player-cash').textContent : null;
+const cashOf = (client) => {
+  var node = client.q('.g-fig.is-lead .g-fig-value');
+  return node ? node.textContent : null;
+};
 
 /** Open a menu section on one client. */
 function openSection(client, label) {
@@ -404,7 +409,7 @@ function heatOf(client) {
 
 for (const c of players) {
   check(c.label + ' starts on ₹5 crore', cashOf(c) === '₹5 crore', cashOf(c));
-  check(c.label + ' starts with no debt', !c.q('.g-player-debt'));
+  check(c.label + ' starts with no debt', !c.q('.g-fig.is-debt'));
 }
 check('2. corruption stands on its own', (function () {
   openSection(host, 'Corruption');
@@ -836,7 +841,7 @@ check('10. and labels party performance as game statistics',
 
 section('Solo mode still needs no server');
 const solo = await openClient('solo');
-solo.click(solo.qq('.h-play-btn').find((b) => /Play solo/i.test(b.textContent)));
+solo.click(solo.qq('.h-play-btn')[0]);
 await solo.dom.window.CMP.data.ensure();
 await sleep(60);
 check('solo setup opens', !!solo.q('.screen-setup'));

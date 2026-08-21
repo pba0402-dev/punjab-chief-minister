@@ -1,0 +1,197 @@
+/* ------------------------------------------------------------------
+   The home screen, and the setup that follows it.
+
+   A landing page for a strategy game: a title, three facts, three ways in,
+   and then the numbers — in that order, at sizes a phone can hold.
+   ------------------------------------------------------------------ */
+
+.h-hero {
+  gap: 8px;
+  padding: 0;
+}
+
+.h-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 8.5vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--cream);
+  margin: 0;
+  display: block;
+  text-align: center;
+}
+
+.h-sub {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--wheat);
+  text-align: center;
+}
+
+/* The three facts that define the game. */
+.h-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.h-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.h-fact-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.h-fact-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.h-welcome {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ------------------------------------------------------- the ways in */
+
+.h-play { gap: 8px; }
+
+.h-play-btn {
+  min-height: 56px;
+  padding: 11px 16px;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  box-shadow: none;
+}
+.h-play-label {
+  font-family: var(--font);
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.h-play-sub {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted-2);
+}
+
+/* One gold button on the screen: the thing to do. */
+.h-play-btn.is-primary {
+  background: linear-gradient(168deg, var(--wheat) 0%, var(--wheat-deep) 100%);
+  border-color: var(--wheat-deep);
+  color: #17130a;
+  box-shadow: 0 10px 26px rgba(216, 169, 74, 0.14);
+}
+.h-play-btn.is-primary .h-play-label { font-size: 1.08rem; }
+.h-play-btn.is-primary .h-play-sub { color: rgba(23, 19, 10, 0.66); }
+
+.h-play-btn.is-quiet { background: none; }
+.h-play-btn.is-quiet .h-play-label { font-weight: 600; }
+
+/* ------------------------------------------------- statistics, quieter */
+
+.h-block-title {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+.h-figure-value { font-size: 1.25rem; }
+.h-figure-label { font-size: 0.53rem; }
+.h-board-score { color: var(--wheat); font-size: 0.78rem; }
+.h-note { font-size: 0.76rem; }
+
+/* ----------------------------------------------------- choosing a face */
+
+.av-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.av-option {
+  appearance: none;
+  min-height: 0;
+  aspect-ratio: 1;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.av-option .portrait {
+  width: 100%;
+  height: auto;
+  border-radius: 50%;
+  display: block;
+}
+.av-option.is-on {
+  border-color: var(--wheat);
+  transform: scale(1.06);
+}
+.av-option:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------- setup form */
+
+.screen-setup .block-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+.field-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.granted-note {
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--muted-2);
+}
+.party-card { min-height: 56px; }
+
+@media (max-width: 560px) {
+  .h-title { font-size: clamp(1.7rem, 8vw, 2rem); }
+  .h-sub { font-size: 0.62rem; letter-spacing: 0.2em; }
+  .h-facts { padding: 8px 0; }
+  .h-fact-value { font-size: 1.05rem; }
+  .h-play-btn { min-height: 52px; padding: 10px 14px; }
+  .h-play-label { font-size: 0.92rem; }
+  .h-play-btn.is-primary .h-play-label { font-size: 1rem; }
+  .av-picker { grid-template-columns: repeat(6, 1fr); gap: 5px; }
+}
+
+@media (max-width: 349px) {
+  .av-picker { grid-template-columns: repeat(4, 1fr); }
+}

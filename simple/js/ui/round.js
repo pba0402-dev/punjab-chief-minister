@@ -171,7 +171,7 @@ CMP.ui.round = (function () {
       // the player to act on, so it says what is happening instead of showing
       // a frozen 0:00 they might read as a bug.
       if (game && game.stage === 'results') {
-        clockNode.textContent = '···';
+        clockNode.textContent = 'R' + ((game && game.round) || 1);
         clockNode.classList.remove('is-low', 'is-out');
         clockNode.classList.add('is-counting');
         ringArc.setAttribute('stroke-dasharray', RING_C + ' ' + RING_C);
@@ -183,9 +183,16 @@ CMP.ui.round = (function () {
 
       var left = secondsLeft();
       var total = (game && game.roundSeconds) || CMP.ROUNDS.seconds;
-      var mins = Math.floor(left / 60);
-      var secs = left % 60;
-      clockNode.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+      /*
+       * No numerals. The ring is the clock.
+       *
+       * A ticking 1:47 pulls the eye every second and tells a player nothing
+       * they can act on — what matters is roughly how much round is left, and
+       * a draining circle says that at a glance. What goes in the middle is
+       * the one number that does not change: which round this is.
+       */
+      clockNode.textContent = 'R' + ((game && game.round) || 1);
 
       // The last ten seconds are worth noticing without being shouted at.
       var low = left <= 10 && left > 0;
@@ -224,10 +231,11 @@ CMP.ui.round = (function () {
       var total = game.roundsTotal || CMP.ROUNDS.total;
 
       mount(labelNode, [
-        'Round ',
-        el('strong', { text: String(round) }),
-        ' of ' + total,
-        round >= total ? el('span', { class: 'round-final', text: 'Final round' }) : null,
+        el('span', { class: 'round-of', text: 'Round ' + round + ' / ' + total }),
+        round >= total ? el('span', { class: 'round-final', text: 'Final' }) : null,
+        game.stage === 'results'
+          ? el('span', { class: 'round-final is-quiet', text: 'Round complete' })
+          : null,
       ]);
 
       if (round !== lastRound) {
@@ -251,11 +259,10 @@ CMP.ui.round = (function () {
           el('span', { class: 'round-moves-label is-ready', text: "You're ready" }),
         ]);
       } else {
-        var money = CMP.ui.money;
-        mount(movesNode, [
-          el('span', { class: 'round-spend', text: money.words(CMP.campaign.remaining(game)) }),
-          el('span', { class: 'round-moves-label', text: 'to spend' }),
-        ]);
+        // The money strip below already says what there is to spend. Saying
+        // it twice, six millimetres apart, is how a screen starts to feel
+        // like a form.
+        mount(movesNode, []);
       }
 
       /*

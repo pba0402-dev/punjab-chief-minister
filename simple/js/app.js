@@ -478,9 +478,13 @@ CMP.app = (function () {
       view = CMP.ui.home.render({
         onSolo: function () {
           game = null;
+          CMP.net.track('game_setup_started');
           goTo('setup');
         },
         onMultiplayer: function () {
+          goTo('multiplayer');
+        },
+        onJoin: function () {
           goTo('multiplayer');
         },
         onProfile: function () {
@@ -659,6 +663,16 @@ CMP.app = (function () {
 
 (function boot() {
   'use strict';
+
+  // One landing view per load. Refreshes are counted as visits, but the same
+  // person refreshing is one unique visitor for the day — see
+  // api/lib/Analytics.php for why that distinction is the whole point.
+  try {
+    CMP.net.track('landing_page_view');
+  } catch (e) {
+    /* never worth failing a boot over */
+  }
+
 
   function start() {
     var node = document.getElementById('app');

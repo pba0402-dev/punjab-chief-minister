@@ -1,0 +1,243 @@
+/* ------------------------------------------------------------------
+   MY AREAS: region, district, and the one button that campaigns across
+   everything selected.
+   ------------------------------------------------------------------ */
+
+.ma {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------------------------------------------------- what is selected */
+
+.ma-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px 18px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.ma-head-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.ma-head-fig.is-money { text-align: right; }
+.ma-head-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.ma-head-fig.is-money .ma-head-value { color: var(--wheat); }
+.ma-head-label {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* ------------------------------------------------------- the next move */
+
+.ma-target {
+  appearance: none;
+  width: 100%;
+  border: 1px solid rgba(216, 169, 74, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(216, 169, 74, 0.08);
+  padding: 10px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+}
+.ma-target-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+.ma-target-name { font-size: 0.95rem; font-weight: 700; }
+.ma-target-note { font-size: 0.68rem; color: var(--muted); }
+
+/* ---------------------------------------------------------- regions */
+
+.ma-regions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ma-region {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 9px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  min-width: 0;
+}
+.ma-region.is-open {
+  border-color: var(--wheat);
+  background: rgba(216, 169, 74, 0.1);
+}
+.ma-region-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.ma-region-note {
+  font-size: 0.56rem;
+  color: var(--muted-2);
+  text-align: center;
+}
+.ma-region-purse {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--river);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------- districts */
+
+.ma-open {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ma-districts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ma-district {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.ma-district.is-on { border-color: var(--wheat); }
+.ma-district.is-held { border-left: 3px solid var(--river); }
+
+.ma-d-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ma-d-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.ma-d-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ma-d-seats {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.ma-d-select {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: none;
+  font-family: var(--font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ma-d-select.is-on {
+  border-color: var(--wheat);
+  background: var(--wheat);
+  color: #17130a;
+}
+
+/* Who holds what, as one bar. */
+.ma-d-split {
+  display: flex;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--line-soft);
+}
+.ma-d-slice { display: block; height: 100%; }
+
+.ma-d-parties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.ma-d-party {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--party, var(--muted));
+  font-variant-numeric: tabular-nums;
+}
+.ma-d-party.is-you { font-weight: 700; }
+
+.ma-d-goal {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
+.ma-d-goal.is-close { color: var(--wheat); font-weight: 600; }
+.ma-d-goal.is-held { color: var(--river); font-weight: 600; }
+
+/* ----------------------------------------------------------- commit */
+
+.ma-commit {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 4px;
+}
+
+@media (max-width: 560px) {
+  .ma { gap: 10px; }
+  .ma-district { padding: 9px 10px; }
+  .ma-d-name { font-size: 0.86rem; }
+  .ma-region-name { font-size: 0.74rem; }
+  .ma-head-value { font-size: 0.95rem; }
+}
+
+@media (max-width: 349px) {
+  .ma-head { grid-template-columns: auto auto; }
+  .ma-head-fig.is-money { grid-column: 1 / -1; text-align: left; }
+}
