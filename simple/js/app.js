@@ -77,7 +77,9 @@ CMP.app = (function () {
         return;
       }
 
-      if (CMP.campaign.secondsLeft(game) > 0) return;
+      // A solo round ends when the clock runs out, or the moment the player
+      // says they are finished — there is nobody else to wait for.
+      if (CMP.campaign.secondsLeft(game) > 0 && !game.roundReady) return;
 
       // The round settles and the scoreboard goes up. The player's own
       // summary appears alongside it, because that is the moment they are
@@ -388,6 +390,12 @@ CMP.app = (function () {
         electionView = CMP.ui.election.create({
           // Stepping away keeps the seat: the session is cleared here, the
           // game carries on there, and the home screen offers it back.
+          // Solo has nobody to wait for, so the clock settles it on its next
+          // tick rather than the button doing the work itself.
+          onEndRoundSolo: function () {
+            CMP.storage.save(game);
+          },
+
           onMenu: function () {
             if (game && game.mode === 'multiplayer') {
               CMP.net.leave(false).then(function () {

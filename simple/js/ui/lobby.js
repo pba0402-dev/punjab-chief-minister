@@ -249,9 +249,9 @@ CMP.ui.lobby = (function () {
       var isHost = !!(mine && mine.isHost);
 
       if (!isHost) {
-        mount(clockNode, game && game.roundSeconds
+        mount(clockNode, view && view.roundSeconds
           ? [el('p', { class: 'lobby-note', text: 'Rounds run ' +
-              Math.round(game.roundSeconds / 60) + ' minutes.' })]
+              Math.round(view.roundSeconds / 60) + ' minutes.' })]
           : []);
         return;
       }

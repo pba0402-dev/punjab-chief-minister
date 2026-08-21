@@ -164,6 +164,88 @@ across every round played, plus the same figures as a table — deliberately not
 on the game screen, because it is the shape of a whole campaign and a
 distraction during one.
 
+## Twenty rounds, and where the money comes from
+
+An election runs twenty rounds. One to fifteen are the campaign, fifteen is a
+checkpoint, and sixteen to twenty are the run to government. Alliances close at
+the end of round ten.
+
+The host picks the round length before the election starts: two, three or five
+minutes, two being the default and the floor. A round also ends the moment
+every player still in it has pressed END ROUND — waiting out a clock nobody is
+using is the fastest way to make twenty rounds feel like a chore.
+
+### The allowance is income, not a limit
+
+Nobody starts with money. **₹5 crore arrives at the start of every round**, and
+whatever is not spent stays. Over twenty rounds that is ₹100 crore a campaign
+and ₹400 crore across four players — but only ever ₹5 crore at a time, so
+saving for a big move is a real decision.
+
+| | |
+| --- | --- |
+| Round 1 | +₹5 Cr, spend ₹1 Cr, ₹4 Cr left |
+| Round 2 | +₹5 Cr on top of the ₹4 Cr → ₹9 Cr |
+| Round 3 | spend ₹6 Cr of it, ₹3 Cr carries on |
+
+A rally costs ₹1 crore, so "spend ₹1 crore" is exactly one move.
+
+Nothing is ever wiped at a round boundary. The allowance is keyed by round
+number, so a refresh, a reconnection, or the same round being settled twice by
+two requests arriving together cannot pay anybody twice — which is the one
+accounting failure this economy would never recover from.
+
+### Spending a saved balance
+
+A single move is capped at a multiple of its own cost: a rally is still a rally
+however rich the campaign. So a large balance is spent **broadly**, through a
+bulk allocation across a district or across the closest races — one decision,
+many seats, every one of them resolved individually with its own roll, its own
+heat and its own chance of a consequence.
+
+What will not fit is reported rather than quietly kept or quietly spent.
+
+## Territory: districts, regions and grants
+
+Punjab has three regions and the game uses the real ones, split by the rivers:
+
+| | | |
+| --- | --- | --- |
+| **Majha** | between the Ravi and the Beas | 4 districts, 25 seats |
+| **Doaba** | the Bist Doab | 4 districts, 23 seats |
+| **Malwa** | south of the Sutlej | 15 districts, 69 seats |
+
+Hold **every** seat in a district and it pays its grant every round for as long
+as the hold lasts. Leading eight of nine pays nothing, which is what makes the
+last seat in a district worth more than the first seat in the next one. Grants
+scale with district size, from ₹2 crore for a two-seat district to ₹30 crore
+for Ludhiana's fourteen.
+
+**The money is locked to its own region.** A Malwa grant fights Malwa seats and
+nothing else, so the map is worth reading rather than merely winning.
+
+### A grant is for a district taken, not one inherited
+
+The opening board is dealt from the sitting MLAs, and it hands one party six
+districts on average — eighteen on some seeds, worth ₹136 crore a round.
+Paying for those would settle the election before anybody campaigned. So the
+districts a party opens holding are its starting position and pay nothing,
+until it loses one and takes it back, which is a thing it did.
+
+## Alliances, and the checkpoint
+
+Two players may agree to fight the election together. Offers close at the end
+of round ten and an accepted alliance is locked until the result — you cannot
+shop for a better partner at round nineteen, which is what makes agreeing early
+a commitment rather than a free option. Allies see each other's priority
+districts and nothing else: not each other's cash, not their heat, not what
+either of them did quietly.
+
+At the end of round fifteen the weakest campaign may be put out — but only one
+that is genuinely beyond saving. A player still within reach of the majority,
+or still close to the leader, survives, because a comeback is the best thing
+that can happen in a game like this. It never applies to a field of two.
+
 ## How much to spend
 
 An action's cost is the **middle of a range**, not a price. What you put behind
@@ -191,7 +273,7 @@ play: **+0.1 seats**. Aim still matters most, at **+3.6 seats**.
 The server clamps the amount to what the action allows, so a client cannot
 spend outside the range by asking nicely.
 
-## The campaign: fifteen rounds of sixty seconds
+## The campaign: twenty rounds
 
 A campaign is **15 rounds**, each **60 seconds**, and each round gives every
 player **3 moves**. Forty-five moves a campaign, for everybody.

@@ -252,6 +252,18 @@ CMP.net = (function () {
     return request('endround', authed());
   }
 
+  /**
+   * One sum across many seats. The server resolves each seat itself, so this
+   * is not a way round the rules — only a way round fifteen separate taps.
+   */
+  function allocate(actionId, seats, amount) {
+    return request('allocate', authed({
+      actionId: actionId,
+      seats: seats || [],
+      amount: amount || 0,
+    }));
+  }
+
   /** Name the districts this campaign is prioritising. */
   function setPriority(districts) {
     return request('priority', authed({ districts: districts || [] }));
@@ -365,6 +377,7 @@ CMP.net = (function () {
     resumable: resumable,
     adopt: adopt,
     endRound: endRound,
+    allocate: allocate,
     setPriority: setPriority,
     ally: ally,
     leave: leave,

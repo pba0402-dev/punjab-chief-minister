@@ -248,7 +248,6 @@ for (let i = 0; i < clients.length; i++) {
 
   const inputs = c.qq('.field-input');
   c.type(inputs[0], NAMES[i]);
-  c.type(inputs[1], 'A slogan for ' + NAMES[i]);
   await sleep(900); // the details field debounces before it posts
   c.click(c.button('READY'));
   await sleep(250);
@@ -283,8 +282,9 @@ check(
   clients.map((c) => c.game().round).join('/')
 );
 check(
-  'every client agrees the campaign is 15 rounds',
-  clients.every((c) => c.game().roundsTotal === 15)
+  'every client agrees the campaign is 20 rounds',
+  clients.every((c) => c.game().roundsTotal === 20),
+  clients.map((c) => c.game().roundsTotal).join('/')
 );
 check(
   'the campaign opens in play, not on a scoreboard',
@@ -397,7 +397,7 @@ const roundLog = [];
 
 let movesPlayed = 0;
 
-for (let round = 1; round <= 15; round++) {
+for (let round = 1; round <= 20; round++) {
   // Everybody campaigns, through the real drill-down.
   for (let i = 0; i < clients.length; i++) {
     if (await act(clients[i], ACTIONS[(round + i) % ACTIONS.length])) movesPlayed++;

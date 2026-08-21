@@ -1,0 +1,416 @@
+/* ------------------------------------------------------------------
+   The twenty-round game: the circular timer, the round money panel,
+   districts and grants, END ROUND, and the lobby's round clock.
+
+   Loaded after menu.css, so it wins where the two overlap.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------- the circular timer */
+
+.round-bar-main {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.round-timer {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+}
+.rt-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.rt-track { stroke: var(--line-soft); }
+.rt-arc {
+  stroke: var(--wheat);
+  transition: stroke-dasharray 0.25s linear;
+}
+.round-timer.is-low .rt-arc { stroke: var(--danger); }
+.round-timer.is-out .rt-arc,
+.round-timer.is-counting .rt-arc { stroke: var(--river); }
+
+.rt-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.round-clock {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.round-clock.is-low { color: var(--danger); }
+.round-clock.is-counting { color: var(--river); letter-spacing: 0.1em; }
+
+.round-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.round-spend {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+.round-moves-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.round-moves-label.is-ready { color: var(--river); }
+
+.round-ready {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.round-ready:empty { display: none; }
+.round-ready-count {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.round-ready-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.round-ready.is-all .round-ready-count,
+.round-ready.is-all .round-ready-label { color: var(--river); }
+
+/* ---------------------------------------------- the round money panel */
+
+.g-money-panel { gap: 12px; }
+
+.g-money-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.g-money-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.g-money-fig-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.g-money-fig-value {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.g-money-fig.is-lead .g-money-fig-value {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  color: var(--wheat);
+}
+
+.g-money-grants {
+  appearance: none;
+  border: 1px solid rgba(88, 168, 184, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(88, 168, 184, 0.09);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+}
+.g-money-grants .g-money-fig-value { color: var(--river); }
+
+.g-money-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.g-money-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ink-3);
+  overflow: hidden;
+}
+.g-money-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--wheat-deep);
+}
+.g-money-progress-note {
+  font-size: 0.64rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------- districts, grants */
+
+.g-grant-balance {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--river);
+  font-variant-numeric: tabular-nums;
+}
+
+.g-districts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.g-district {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0 8px 10px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 2px solid var(--line);
+}
+.g-district:first-child { border-top: 0; }
+.g-district.is-held { border-left-color: var(--wheat); }
+.g-district-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-district-seats {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.g-district-grant {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+.g-district-grant.is-quiet {
+  color: var(--muted-2);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------ end round */
+
+.g-end { padding: 6px 0 4px; }
+.g-end:empty { display: none; }
+
+.btn-end {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  padding: 13px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.btn-end:hover {
+  border-color: var(--wheat-deep);
+  background: var(--ink-3);
+}
+.btn-end:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 2px;
+}
+.btn-end-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.btn-end-note {
+  font-size: 0.66rem;
+  color: var(--muted-2);
+}
+
+.g-ready {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid rgba(88, 168, 184, 0.4);
+  border-radius: var(--radius);
+  background: rgba(88, 168, 184, 0.1);
+}
+.g-ready-tick {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--river);
+}
+.g-ready-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.g-ready-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.g-ready-note {
+  font-size: 0.7rem;
+  color: var(--muted-2);
+}
+
+/* ------------------------------------------------ the lobby round clock */
+
+.lobby-clock:empty { display: none; }
+
+.clock-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.clock-option {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 11px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+}
+.clock-option.is-active {
+  border-color: var(--wheat);
+  background: rgba(232, 185, 60, 0.12);
+}
+.clock-option-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.clock-option-note {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.lobby-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* --------------------------------------------------------- rejoining */
+
+.resume-link {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  text-align: left;
+}
+.resume-link.is-rejoin {
+  border-color: rgba(88, 168, 184, 0.45);
+  background: rgba(88, 168, 184, 0.1);
+}
+.resume-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.resume-note {
+  font-size: 0.68rem;
+  color: var(--muted-2);
+}
+
+/* -------------------------------------------------- sheet item detail */
+
+.sheet-item-title { display: block; font-size: 0.9rem; font-weight: 600; }
+.sheet-item-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
+.sheet-text.is-quiet { color: var(--muted-2); font-size: 0.8rem; }
+
+/* --------------------------------------------------------- what a move
+   might do to you — kept from the corruption/bribe detail block */
+
+.act.has-detail {
+  grid-template-areas:
+    'icon body use'
+    'detail detail detail';
+  row-gap: 10px;
+}
+.act.has-detail .act-icon { grid-area: icon; }
+.act.has-detail .act-body { grid-area: body; }
+.act.has-detail .act-use { grid-area: use; }
+
+.act-detail {
+  grid-area: detail;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+}
+.act-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.act-line-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  flex: 0 0 auto;
+}
+.act-line-value {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--cream);
+}

@@ -112,7 +112,15 @@ final class AI
         // freely in round five would have nothing left when the bill arrived.
         $reserve = $engine->debtOf($player);
 
-        $allowed = (int) ($engine->rounds()['actionsPerRound'] ?? 3);
+        /*
+         * A round is bounded by money now, not by a move counter.
+         *
+         * An opponent plays until it runs out of things it can afford or
+         * decides it would rather save — chooseAction returns null for both.
+         * The ceiling is a runaway backstop, not a rule: without it a bad
+         * config could spin here forever inside a request holding the lock.
+         */
+        $allowed = 24;
         $player['roundActions'] = 0;
 
         for ($move = 0; $move < $allowed; $move++) {
@@ -175,9 +183,18 @@ final class AI
         if (empty($action['allowsAmount'])) {
             return null;
         }
+        /*
+         * How much to put behind one move.
+         *
+         * Money carries forward now, so an opponent that spent everything the
+         * moment it arrived would never mount the big push that the economy
+         * is built around. It plans against the rounds it has left rather
+         * than the moves, holding back roughly half of what it could spend so
+         * something accumulates.
+         */
         $rounds = $engine->rounds();
-        $movesLeft = max(1, ((int) $rounds['total'] - $round + 1) * (int) $rounds['actionsPerRound']);
-        $budget = (int) floor($engine->remaining($player) / $movesLeft);
+        $roundsLeft = max(1, (int) $rounds['total'] - $round + 1);
+        $budget = (int) floor($engine->remaining($player) / max(2, min(6, $roundsLeft)));
 
         $range = $engine->amountRange($action);
         return (int) max($range['min'], min($range['max'], $budget));

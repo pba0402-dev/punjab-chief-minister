@@ -220,10 +220,10 @@ await p4.details('Jaspreet Kaur Dhillon', 'Sadda Punjab', 70000000);
 const withDetails = await p1.state();
 const me = withDetails.game.players.find((s) => s.isYou);
 check('details are stored', me.candidateName === 'Simran Kaur Gill');
-check('slogan is stored', me.slogan === 'Naya Punjab, Sacha Punjab');
-check('every player is granted ₹5 crore', me.budget === 50000000, 'got ' + me.budget);
+check('15. nobody is granted a purse up front', me.budget === 0, 'got ' + me.budget);
 check('nothing is spent yet', me.spent === 0);
-check('remaining equals the full purse', me.remaining === 50000000);
+check('and nothing has been paid before the election starts',
+  me.remaining === 0, String(me.remaining));
 check('political heat starts at zero', me.heat === 0);
 check('player reads as complete', me.complete === true);
 
@@ -233,7 +233,7 @@ const capped = tooLong.game.players.find((s) => s.isYou);
 check('long name is truncated', capped.candidateName.length <= 60, 'len ' + capped.candidateName.length);
 check(
   'a client cannot set its own budget',
-  capped.budget === 50000000,
+  capped.budget === 0,
   'got ' + capped.budget
 );
 await p1.details('Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', 100000000);
@@ -300,7 +300,7 @@ const reconnected = await h.state();
 check('the original host reconnects with the same code', reconnected.ok === true);
 check('they are connected again', reconnected.game.players[0].connected === true);
 check('their details survived', reconnected.game.players[0].candidateName === 'Host Candidate');
-check('their budget survived', reconnected.game.players[0].budget === 50000000);
+check('their money survived', typeof reconnected.game.players[0].cash === 'number');
 
 /* ---------------------------------------------------------------- leave */
 

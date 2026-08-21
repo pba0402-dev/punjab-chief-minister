@@ -315,6 +315,85 @@ CMP.ui.areas = (function () {
       ]);
     }
 
+    /**
+     * Spend across many seats at once.
+     *
+     * Money now carries forward, so a campaign that has saved for four rounds
+     * is holding more than any single move can absorb. Without a way to
+     * commit it broadly, saving would be a trap. Two shapes cover almost
+     * every real decision: press where the races are close, or take a
+     * district whole.
+     */
+    function bulkBlock(rows, closest) {
+      var available = CMP.campaign.remaining(game) + CMP.campaign.grantTotal(game);
+      var leaders = CMP.campaign.currentLeaders(game.support);
+
+      // Districts worth finishing: ones where a couple of seats would
+      // complete the set and start the grant.
+      var nearly = (CMP.DISTRICTS || []).map(function (d) {
+        var mine = d.seats.filter(function (n) {
+          return leaders[n] === partyId;
+        }).length;
+        return { d: d, mine: mine, short: d.seats.length - mine };
+      }).filter(function (row) {
+        return row.short > 0 && row.short <= 3;
+      }).sort(function (a, b) {
+        return a.short - b.short || b.d.grant - a.d.grant;
+      }).slice(0, 3);
+
+      function bulkButton(label, note, seats, title) {
+        return el('button', {
+          class: 'ar-bulk',
+          type: 'button',
+          disabled: !seats.length,
+          onclick: function () {
+            CMP.ui.allocate.open({
+              game: game,
+              seats: seats,
+              title: title,
+              onPlay: opts.onAllocate,
+              onClose: function () {
+                if (opts.onChanged) opts.onChanged();
+              },
+            });
+          },
+        }, [
+          el('span', { class: 'ar-bulk-label', text: label }),
+          el('span', { class: 'ar-bulk-note', text: note }),
+        ]);
+      }
+
+      var closeSeats = closest.slice(0, 12).map(function (r) {
+        return r.number;
+      });
+
+      return el('section', { class: 'ar-block' }, [
+        el('h3', { class: 'ar-block-title', text: 'Campaign in bulk' }),
+        el('p', {
+          class: 'ar-block-note',
+          text: money.words(available) + ' to put to work. One decision, many seats.',
+        }),
+        el('div', { class: 'ar-bulks' }, [
+          closeSeats.length
+            ? bulkButton(
+                'The closest ' + closeSeats.length + ' races',
+                'Where a move changes a seat',
+                closeSeats,
+                'the closest races'
+              )
+            : null,
+        ].concat(nearly.map(function (row) {
+          return bulkButton(
+            row.d.name,
+            row.short + ' more seat' + (row.short === 1 ? '' : 's') + ' to hold it · ' +
+              money.words(row.d.grant) + ' a round',
+            row.d.seats,
+            row.d.name
+          );
+        }))),
+      ]);
+    }
+
     /** Five rows under a heading — the top of a sorted survey. */
     function topFive(title, note, rows) {
       if (!rows.length) return null;
@@ -363,6 +442,8 @@ CMP.ui.areas = (function () {
           }),
           statewideSupport(game),
         ]),
+
+        isYou ? bulkBlock(rows, closest) : null,
 
         topFive('Top 5 strongest seats', null, strongest),
         topFive('Closest 5 races', 'Where one move could change a seat.', closest),

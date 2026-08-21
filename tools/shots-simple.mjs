@@ -74,8 +74,7 @@ const SCENES = {
     "var cards=document.querySelectorAll('.party-card');cards[0].click();" +
     "var f=document.querySelectorAll('.field-input');" +
     "function type(n,v){n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));}" +
-    "type(f[0],'Simran Kaur Gill');type(f[1],'Naya Punjab, Sacha Punjab');" +
-    "type(document.querySelector('.field-money'),'100000000');",
+    "type(f[0],'Simran Kaur Gill');",
   election:
     "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
     "candidateName:'Gurpreet Singh',slogan:'Naya Punjab, Sacha Punjab'}));" +
@@ -230,6 +229,7 @@ const CASES = [
   { w: 1400, h: 950 },
   { w: 768, h: 900 },
   { w: 430, h: 932 },
+  { w: 414, h: 896 },
   { w: 390, h: 844 },
   { w: 375, h: 812 },
   { w: 320, h: 700 },
@@ -274,6 +274,8 @@ function auditScript(setup) {
     'd.textContent="clientW="+W+"  scrollW="+document.documentElement.scrollWidth',
     '  +"  overflowing="+bad.length+(bad.length?NL+bad.slice(0,8).join(NL):"");',
     'document.body.appendChild(d);',
+    'try{window.top.document.title="AUDIT "+W+" "+bad.length+" "+bad.slice(0,3).join(" | ");}',
+    'catch(e){document.title="AUDIT "+W+" "+bad.length;}',
     '});</script>',
   ].join(NL);
 }
@@ -325,6 +327,8 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const BASE = 'http://127.0.0.1:' + server.address().port;
 
+const overflows = [];
+
 for (const scene of Object.keys(SCENES)) {
   for (const c of CASES) {
     const png = path.join(OUT, scene + '-' + c.w + '.png');
@@ -345,9 +349,34 @@ for (const scene of Object.keys(SCENES)) {
     ).catch((e) => {
       console.log('  ! ' + scene + '-' + c.w + ': ' + e.message.split(NL)[0]);
     });
-    console.log('shot: ' + path.basename(png));
+    // A second, cheap pass: --dump-dom hands back the title the audit
+    // wrote, so a run reports overflow instead of hiding it in an image.
+    const dumped = await run(
+      CHROME,
+      [
+        '--headless=new', '--disable-gpu', '--virtual-time-budget=6000',
+        '--window-size=' + (c.w + 100) + ',' + (c.h + 16),
+        '--dump-dom',
+        BASE + '/__wrap/' + scene + '/' + c.w + '/' + c.h,
+      ],
+      { timeout: 90000, maxBuffer: 64 * 1024 * 1024 }
+    ).catch(() => ({ stdout: '' }));
+
+    const seen = (dumped.stdout || '').match(/<title>AUDIT (\d+) (\d+)([^<]*)<\/title>/);
+    if (seen && Number(seen[2]) > 0) {
+      overflows.push(scene + '@' + c.w + ': ' + seen[2] + seen[3]);
+    }
+    console.log('shot: ' + path.basename(png) + (seen ? '  overflow ' + seen[2] : ''));
   }
 }
 
 server.close();
+
+if (overflows.length) {
+  console.log(NL + 'HORIZONTAL OVERFLOW:');
+  overflows.forEach((o) => console.log('  ' + o));
+  process.exitCode = 1;
+} else {
+  console.log(NL + 'no horizontal overflow at any width');
+}
 console.log(NL + 'wrote to ' + OUT);

@@ -247,17 +247,15 @@ check('   majority is 59', CMP.MAJORITY === 59);
 check('   setup screen opens', !!q(dom, '.screen-setup'));
 check('   four parties offered', qq(dom, '.party-card').length === 4);
 check('1. the budget is granted, not entered', !q(dom, '.field-money'));
-check(
-  '1. the granted amount is stated as ₹5,00,00,000',
-  /₹5,00,00,000/.test(text(dom)),
-  text(dom).slice(0, 60)
-);
-check('   only two text fields remain', qq(dom, '.screen-setup .field-input').length === 2);
+check('7. the round allowance is stated on the setup screen',
+  /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
+check('1. no slogan is asked for',
+  qq(dom, '.screen-setup .field-input').length === 1,
+  qq(dom, '.screen-setup .field-input').length + ' fields');
 
 clickIt(dom, qq(dom, '.party-card').find((c) => c.textContent.includes('INC')));
 const inputs = qq(dom, '.screen-setup .field-input');
 typeInto(dom, inputs[0], 'Simran Kaur Gill');
-typeInto(dom, inputs[1], 'Naya Punjab, Sacha Punjab');
 clickIt(dom, q(dom, '.btn-start'));
 
 /* ---------------------------------------------------------------- panel */
@@ -376,7 +374,10 @@ check('   money is not repeated on the home screen',
 
 section('3-5. Spending');
 let game = dom.window.CMP.app.getGame();
-check('   game starts on the full purse', game.budget === 50000000 && game.spent === 0);
+check('7. a campaign opens on one round allowance, not a lump sum',
+  CMP.campaign.remaining(game) === CMP.CAMPAIGN.income.perRound && game.spent === 0,
+  String(CMP.campaign.remaining(game)));
+check('15. and nothing was granted up front', game.budget === 0, String(game.budget));
 
 const rallyCost = CMP.getAction('rally').cost;
 await playCard(dom, 'Public Rally');
@@ -446,7 +447,7 @@ await openCampaignSheet(dom);
 const dear = actionCard(dom, 'Last-Minute Push');
 check('4. an unaffordable action is disabled',
   dear.querySelector('.act-use').disabled === true);
-check('4. it says Insufficient Budget', /Insufficient Budget/.test(dear.textContent),
+check('4. it says what is wrong', /More than you can spend/.test(dear.textContent),
   dear.textContent.slice(0, 80));
 
 // Dispatching a click straight at a disabled button would still run the
@@ -473,7 +474,10 @@ await settle();
 section('11. Saving');
 const saved = dom.window.CMP.storage.load();
 check('11. the game is saved', !!saved);
-check('11. budget saved', saved.budget === 50000000);
+check('11. the balance is saved', typeof saved.cash === 'number');
+check('63. and so is what each round has already paid',
+  saved.incomeCredited && Object.keys(saved.incomeCredited).length > 0,
+  JSON.stringify(saved.incomeCredited));
 check('11. spending saved', saved.spent === spentBefore);
 check('11. heat saved', typeof saved.heat === 'number');
 check('11. constituency support saved', Object.keys(saved.support).length === 117);
@@ -481,7 +485,7 @@ check('11. actions taken saved', saved.actions.length >= 2);
 check('11. turn saved', typeof saved.turn === 'number');
 check('11. party saved', saved.partyId === 'inc');
 check('11. candidate saved', saved.candidateName === 'Simran Kaur Gill');
-check('11. slogan saved', saved.slogan === 'Naya Punjab, Sacha Punjab');
+check('1. no slogan is stored any more', !saved.slogan);
 check('11. marked as a solo game', saved.mode === 'solo');
 
 const rawSave = dom.window.localStorage.getItem(dom.window.CMP.storage.KEY);
@@ -497,8 +501,10 @@ dom = await openPage([
 check('36. a returning player is welcomed back by name',
   /Welcome back/.test(text(dom)), text(dom).slice(0, 120));
 check('36. and offered the election they are in the middle of',
-  /Continue election/.test(text(dom)), text(dom).slice(0, 200));
-clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue election/.test(b.textContent)));
+  /Continue solo election/.test(text(dom)), text(dom).slice(0, 220));
+check('4. the offer names the round they left it on',
+  /Round \d+ of 20/.test(text(dom)), text(dom).slice(0, 220));
+clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue solo/.test(b.textContent)));
 // Resuming pulls the board in on the way, so give it a moment.
 await dom.window.CMP.data.ensure();
 await settle();
@@ -706,6 +712,9 @@ check('10. high-risk moves are not, until asked',
   !/Undisclosed Deal|Political Influence/.test(q(dom, '.campaign-sheet').textContent) &&
   !!qq(dom, 'button').find((b) => /High-risk options/.test(b.textContent)));
 
+// Several rounds' worth of allowance, because this is testing the sheet
+// rather than what happens when a campaign is broke.
+dom.window.CMP.app.getGame().cash = 20 * 10000000;
 clickIt(dom, actionCard(dom, 'Public Rally').querySelector('.act-use'));
 await settle();
 check('11. it then asks how much to spend', !!q(dom, '.cs-question'));
@@ -720,9 +729,13 @@ check('11. with an estimated impact and a risk',
   /Estimated impact/.test(q(dom, '.dialog-lines').textContent) &&
   /Risk/.test(q(dom, '.dialog-lines').textContent));
 
-const twentyFive = qq(dom, '.cs-amount').find((b) => b.textContent === '₹25 lakh');
+// Whichever amount the sheet offers second — the figures move with the
+// config, so pinning one by name would break every time prices are tuned.
+const offered = qq(dom, '.cs-amount');
+const pick = offered[1] || offered[0];
+const chosenAmount = Number(pick.dataset.amount);
 const cashBeforeCampaign = dom.window.CMP.app.getGame().cash;
-if (twentyFive) clickIt(dom, twentyFive);
+clickIt(dom, pick);
 await settle();
 clickIt(dom, qq(dom, 'button').find((b) => /Confirm campaign/.test(b.textContent)));
 await settle();
@@ -732,8 +745,9 @@ check('12. it names the seat', new RegExp(pickedName).test(q(dom, '.result-sheet
 check('12. shows the support moving', qq(dom, '.rs-move').length >= 3);
 check('12. and what it cost', /Money spent/.test(q(dom, '.rs-spent').textContent));
 check('11. the chosen amount is what was actually charged',
-  cashBeforeCampaign - dom.window.CMP.app.getGame().cash === 2500000,
-  'spent ' + (cashBeforeCampaign - dom.window.CMP.app.getGame().cash));
+  cashBeforeCampaign - dom.window.CMP.app.getGame().cash === chosenAmount,
+  'spent ' + (cashBeforeCampaign - dom.window.CMP.app.getGame().cash) +
+    ', chose ' + chosenAmount);
 check('13. it offers the next closest seat',
   !!qq(dom, '.rs-next button').find((b) => /Next closest seat/.test(b.textContent)));
 check('13. and a way back to my areas',
@@ -768,12 +782,11 @@ await dom.window.CMP.data.ensure();
 await settle();
 clickIt(dom, qq(dom, '.party-card')[0]);
 typeInto(dom, qq(dom, '.field-input')[0], 'Round Runner');
-typeInto(dom, qq(dom, '.field-input')[1], 'One round at a time');
 clickIt(dom, dom.window.document.querySelector('.btn-xl'));
 await settle();
 
 check('the round bar is shown', !!q(dom, '.round-bar'));
-check('it opens on round 1 of 15', /Round\s*1\s*of\s*15/.test(q(dom, '.round-bar').textContent),
+check('it opens on round 1 of 20', /Round\s*1\s*of\s*20/.test(q(dom, '.round-bar').textContent),
   q(dom, '.round-bar').textContent.slice(0, 40));
 check('a countdown is running', /^\d+:\d\d$/.test(q(dom, '.round-clock').textContent),
   q(dom, '.round-clock').textContent);
@@ -855,7 +868,7 @@ await settle();
 check('17. a loan section is offered', !!q(dom, '.loan-offers'));
 check('17. the interest is stated', /20%/.test(q(dom, '.sum-lines').textContent));
 check('17. and when it falls due',
-  /2 rounds later/.test(q(dom, '.sum-lines').textContent));
+  /4 rounds later/.test(q(dom, '.sum-lines').textContent));
 check('17. a few amounts are offered, not every increment',
   qq(dom, '.loan-offer').length >= 3 && qq(dom, '.loan-offer').length <= 5,
   qq(dom, '.loan-offer').length + ' offers');
@@ -893,18 +906,18 @@ check('the player strip flags the debt', !!q(dom, '.g-player-debt'),
 
 /* Run out the rest of the campaign. */
 let rounds = 0;
-while (dom.window.CMP.app.getScreen() === 'election' && rounds++ < 20) {
+while (dom.window.CMP.app.getScreen() === 'election' && rounds++ < 26) {
   await endRound(dom);
 }
 
-check('the campaign ends after fifteen rounds', rounds <= 15, String(rounds));
+check('the campaign ends after twenty rounds', rounds <= 21, String(rounds));
 check('the result screen opens on its own', dom.window.CMP.app.getScreen() === 'result');
 check('the loan was settled during the campaign',
   dom.window.CMP.app.getGame().loans.every((l) => l.settled));
 check('cash never went negative', dom.window.CMP.app.getGame().cash >= 0,
   String(dom.window.CMP.app.getGame().cash));
-check('all fifteen rounds are in the history',
-  dom.window.CMP.app.getGame().history.length === 15,
+check('all twenty rounds are in the history',
+  dom.window.CMP.app.getGame().history.length === 20,
   String(dom.window.CMP.app.getGame().history.length));
 
 /* The count. */

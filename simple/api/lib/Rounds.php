@@ -38,7 +38,16 @@ final class Rounds
 
         // The host chose the round length before the game started; fall back
         // to the configured default for a game created before they could.
+        //
+        // CMP_ROUND_SECONDS wins over both. It exists so a suite can play
+        // twenty rounds in under a minute, and a test override that the
+        // host's own choice could silently defeat would be no override at
+        // all. Nothing sets it in production.
         $seconds = (int) ($game['roundSeconds'] ?? $cfg['seconds']);
+        $override = getenv('CMP_ROUND_SECONDS');
+        if ($override !== false && (int) $override > 0) {
+            $seconds = (int) $override;
+        }
 
         $game['round'] = $round;
         $game['stage'] = 'playing';

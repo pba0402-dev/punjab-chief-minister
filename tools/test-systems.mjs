@@ -287,8 +287,11 @@ while (spendGuard++ < capPerRound + 2) {
   }
 }
 const before = (await G('state', poor)).game.players.find((p) => p.isYou);
-check('a round allows only so many moves', /No moves left this round/.test(refusal || ''), refusal);
-check('spending it moved real money', before.cash < before.budget, '₹' + before.cash);
+// A round is bounded by money now, not by a move counter: what stops a
+// player is running out, and the refusal says so.
+check('a round ends when the money does',
+  /More than you can spend/.test(refusal || ''), refusal);
+check('spending it moved real money', before.spent > 0, '₹' + before.spent);
 
 await J('report', { ...gf.creds[0], accusedId: poorId, reason: 'spending' });
 await J('report', { ...gf.creds[1], accusedId: poorId, reason: 'rules' });
@@ -297,8 +300,9 @@ check('cash never goes negative', after.cash >= 0, String(after.cash));
 check('a fine is taken from cash in hand', after.finesPaid <= before.cash,
   after.finesPaid + ' fined against ' + before.cash + ' held');
 check('spending never exceeds what came in',
-  after.spent <= after.budget + after.borrowed + after.granted + after.raised,
-  after.spent + ' of ' + after.budget);
+  after.spent <= (after.incomeTotal || 0) + (after.grantTotalEarned || 0)
+    + after.borrowed + after.granted + after.raised,
+  after.spent + ' spent against ' + (after.incomeTotal || 0) + ' of income');
 
 /* --------------------------------------------------- restriction */
 

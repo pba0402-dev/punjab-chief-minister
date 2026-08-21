@@ -372,6 +372,8 @@ final class Lobby
                 'repaid' => (int) ($p['repaid'] ?? 0),
                 'interestPaid' => (int) ($p['interestPaid'] ?? 0),
                 'granted' => (int) ($p['granted'] ?? 0),
+                'incomeTotal' => (int) ($p['incomeTotal'] ?? 0),
+                'grantTotalEarned' => (int) ($p['grantTotalEarned'] ?? 0),
                 'raised' => (int) ($p['raised'] ?? 0),
                 'finesPaid' => (int) ($p['finesPaid'] ?? 0),
                 'debt' => self::debtOf($p),

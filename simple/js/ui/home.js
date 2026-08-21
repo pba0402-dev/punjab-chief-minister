@@ -48,7 +48,10 @@ CMP.ui.home = (function () {
             el('span', { class: 'h-title-of', text: 'of' }),
             el('span', { class: 'h-title-bottom', text: 'Punjab' }),
           ]),
-          el('p', { class: 'h-tagline', text: '117 Assembly Seats · 59 for a majority' }),
+          el('p', {
+            class: 'h-tagline',
+            text: CMP.ROUNDS.total + ' rounds · 117 Assembly Seats · 59 for a majority',
+          }),
           me
             ? el('p', { class: 'h-welcome' }, [
                 'Welcome back, ',

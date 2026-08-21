@@ -192,7 +192,6 @@ for (let i = 0; i < humans.length; i++) {
   await sleep(250);
   const inputs = c.qq('.field-input');
   c.type(inputs[0], NAMES[i]);
-  c.type(inputs[1], 'A slogan for ' + NAMES[i]);
   await sleep(900);
   c.click(c.button('READY'));
   await sleep(250);
@@ -297,8 +296,17 @@ const aiRows = state.game.players.filter((p) => !p.empty && p.isAI);
 check('the server seated two opponents', aiRows.length === 2, aiRows.length + ' seated');
 check('they campaigned with their own money',
   aiRows.every((p) => p.spent > 0), aiRows.map((p) => p.spent).join('/'));
-check('their cash fell as they spent it',
-  aiRows.every((p) => p.cash < p.budget || p.borrowed > 0));
+// Grant money is held in region purses rather than in cash, so the useful
+// identity is that nothing was spent that never came in, and no purse went
+// negative on the way.
+check('they never spent money that did not come in',
+  aiRows.every((p) => p.spent <= (p.incomeTotal || 0) + (p.grantTotalEarned || 0)
+    + p.borrowed + p.granted + p.raised),
+  aiRows.map((p) => p.spent + ' out against ' +
+    ((p.incomeTotal || 0) + (p.grantTotalEarned || 0) + p.borrowed + p.granted + p.raised) +
+    ' in').join(' | '));
+check('and their cash never went below zero',
+  aiRows.every((p) => p.cash >= 0), aiRows.map((p) => p.cash).join('/'));
 check('they show as connected, being always at their desk',
   aiRows.every((p) => p.connected));
 check('nothing can authenticate as an opponent',

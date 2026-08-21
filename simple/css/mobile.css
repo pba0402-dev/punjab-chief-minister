@@ -1,0 +1,290 @@
+/* ------------------------------------------------------------------
+   Portrait phones.
+
+   The rest of the sheets lay the game out for a comfortable column and let
+   it breathe. On a phone held upright that reads as a desktop page shrunk
+   down: the title takes two thirds of the screen, the two things you came to
+   press sit below the fold, and everything after them is a scroll away.
+
+   This is the same game designed for the shape it is actually played in.
+   Nothing here changes what is on the screen — only how much room it takes.
+   Sizes are fluid rather than fixed, so a 320px phone and a 430px one each
+   get a layout that fits rather than the same layout clipped.
+
+   Loaded last, so it wins.
+   ------------------------------------------------------------------ */
+
+/* Everything below the largest phone in portrait. Tablets and desktops keep
+   the roomier layout entirely. */
+@media (max-width: 560px) {
+
+  /* ------------------------------------------------------------ the page */
+
+  body {
+    /* Fixed backgrounds cost a repaint on every scroll on mobile Safari and
+       buy nothing on a screen this size. */
+    background-attachment: scroll;
+  }
+
+  /* Room for the home indicator, and never a clipped last row. */
+  .h-inner,
+  .g-inner,
+  .pf-inner {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* --------------------------------------------------------- home screen */
+
+  /*
+   * The opening screen is centred in the viewport on a desktop, which is
+   * right there and wrong on a phone: with a short page it leaves two
+   * hundred pixels of nothing above the title, and with a long one it
+   * clips. Portrait starts at the top and flows down.
+   *
+   * 100dvh rather than 100vh because mobile browser chrome slides in and
+   * out — 100vh is the *largest* viewport, so a page sized to it hides its
+   * last rows behind the address bar.
+   */
+  .screen-home {
+    min-height: 100dvh;
+    align-content: start;
+    padding: 0;
+  }
+
+  .h-inner {
+    padding-top: 14px;
+    padding-left: 14px;
+    padding-right: 14px;
+    gap: 16px;
+  }
+
+  .h-hero {
+    gap: 5px;
+    padding: 0;
+  }
+
+  /* Fluid, so the title fills the width it has on any phone rather than
+     being sized for one of them. */
+  .h-title-top { font-size: clamp(1.5rem, 7.6vw, 2.2rem); }
+  .h-title-bottom { font-size: clamp(2.1rem, 11.5vw, 3.1rem); }
+  .h-title-of {
+    font-size: 0.6rem;
+    letter-spacing: 0.32em;
+    margin: 3px 0 2px;
+  }
+
+  .h-tagline {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+  }
+  .h-welcome {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+
+  /* The two things to press. Shorter, still a comfortable target. */
+  .h-play { gap: 9px; }
+  .h-play-btn {
+    padding: 12px 16px;
+    gap: 1px;
+    min-height: 60px;
+    justify-content: center;
+  }
+  .h-play-label { font-size: 1.18rem; }
+  .h-play-sub {
+    font-size: 0.64rem;
+    letter-spacing: 0.09em;
+  }
+
+  .h-resume { margin-top: -6px; gap: 7px; }
+  .h-resume .resume-link { width: 100%; padding: 9px 12px; }
+
+  /* Statistics: three across, compact, never wrapped to three rows. */
+  .h-figures { gap: 6px; }
+  .h-figure { padding: 8px 2px; }
+  .h-figure-value { font-size: 1.32rem; }
+  .h-figure-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.09em;
+  }
+
+  .h-block-title {
+    margin-bottom: 7px;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+  }
+  .h-note { font-size: 0.76rem; }
+  .h-kicker { font-size: 0.65rem; margin-bottom: 7px; }
+
+  .h-board-row { padding: 6px 0; gap: 8px; }
+  .h-board-name { font-size: 0.84rem; }
+  .h-board-score { font-size: 0.8rem; }
+
+  .h-profile { gap: 10px; padding-top: 6px; }
+  .h-profile-figures { gap: 6px; }
+  .h-profile-name { font-size: 0.92rem; }
+
+  .h-parties { gap: 6px; }
+  .h-party { grid-template-columns: 44px minmax(0, 1fr) 36px; gap: 8px; }
+  .h-party-name { font-size: 0.66rem; }
+  .h-party-share { font-size: 0.7rem; }
+
+  .h-recent-row,
+  .pf-history-row { padding: 7px 0 7px 8px; gap: 8px; }
+
+  /* --------------------------------------------------------- game screen */
+
+  .g-inner {
+    padding-top: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    gap: 10px;
+  }
+
+  .g-title { font-size: 0.95rem; }
+  .g-subtitle { font-size: 0.62rem; }
+
+  /* The clock stays legible but gives the board its room back. */
+  .round-bar-main { grid-template-columns: 46px minmax(0, 1fr); gap: 10px; }
+  .round-timer { width: 46px; height: 46px; }
+  .round-clock { font-size: 0.74rem; }
+
+  .g-money-row { gap: 7px; }
+  .g-money-fig-label {
+    font-size: 0.53rem;
+    letter-spacing: 0.1em;
+  }
+  .g-money-fig-value { font-size: 0.84rem; }
+  .g-money-fig.is-lead .g-money-fig-value { font-size: 1.15rem; }
+  .g-money-progress-note { font-size: 0.6rem; }
+
+  .g-menu { gap: 7px; }
+  .g-menu-item {
+    padding: 10px 10px 9px;
+    grid-template-columns: 15px minmax(0, 1fr);
+    column-gap: 8px;
+  }
+  .g-menu-label {
+    font-size: 0.71rem;
+    letter-spacing: 0.06em;
+  }
+  .g-menu-hint { font-size: 0.6rem; }
+
+  .g-block-title { font-size: 0.63rem; }
+  .g-block-note { font-size: 0.72rem; }
+
+  .btn-end { padding: 11px 14px; }
+  .btn-end-title { font-size: 0.76rem; letter-spacing: 0.13em; }
+  .btn-end-note { font-size: 0.62rem; }
+  .g-ready { padding: 11px 14px; }
+
+  .g-district { gap: 8px; padding-left: 8px; }
+  .g-district-name { font-size: 0.8rem; }
+  .g-district-seats { font-size: 0.7rem; }
+  .g-district-grant { font-size: 0.65rem; }
+
+  .g-txn { gap: 8px; padding: 7px 0; }
+  .g-txn-label { font-size: 0.78rem; }
+  .g-txn-note { font-size: 0.64rem; }
+  .g-txn-amount { font-size: 0.78rem; }
+
+  /* --------------------------------------------------- candidate summary */
+
+  .ar-summary { gap: 15px; }
+  .ar-block { gap: 7px; }
+  .ar-block-title { font-size: 0.62rem; letter-spacing: 0.14em; }
+  .ar-block-note { font-size: 0.67rem; }
+
+  .ar-ring-block {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 13px;
+  }
+  .ar-ring-wrap { width: 92px; height: 92px; }
+  .ar-ring-value { font-size: 1.5rem; }
+  .ar-ring-key { gap: 5px; }
+  .ar-key-label { font-size: 0.68rem; }
+
+  .ar-support { gap: 6px; }
+  .ar-support-row { grid-template-columns: 44px minmax(0, 1fr) 42px; gap: 8px; }
+  .ar-support-name { font-size: 0.66rem; }
+  .ar-support-share { font-size: 0.7rem; }
+
+  .ar-bulks { gap: 7px; }
+  .ar-bulk { padding: 10px 12px; }
+
+  /* -------------------------------------------------------- sheets */
+
+  /* A sheet on a phone is the screen, not a dialog floating on it. */
+  .sheet { align-items: flex-end; padding: 0; }
+  .sheet-panel {
+    width: 100%;
+    max-width: none;
+    max-height: 92vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+  }
+  .sheet-title { font-size: 1.05rem; }
+  .sheet-text { font-size: 0.8rem; }
+
+  /* ------------------------------------------------------ profile */
+
+  .pf-inner { padding-top: 10px; gap: 16px; }
+  .pf-card { grid-template-columns: 54px minmax(0, 1fr); gap: 11px; }
+  .pf-name { font-size: 1.15rem; }
+  .pf-figures { gap: 6px; }
+  .pf-figure { padding: 8px 2px; }
+  .pf-figure-value { font-size: 1.3rem; }
+  .pf-achievement { gap: 10px; padding: 8px 0; }
+  .pf-achievement-name { font-size: 0.8rem; }
+  .pf-achievement-blurb { font-size: 0.67rem; }
+
+  .lbd-row { gap: 10px; padding: 8px 0; }
+  .lbd-name { font-size: 0.88rem; }
+
+  /* -------------------------------------------------------- setup */
+
+  .screen-setup .inner,
+  .screen-multiplayer .inner,
+  .screen-lobby .inner {
+    padding-top: 12px;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  .title-sm { font-size: clamp(1.15rem, 5.5vw, 1.6rem); }
+  .party-grid { gap: 7px; }
+  .clock-options { gap: 6px; }
+  .clock-option { padding: 9px 4px; }
+}
+
+/* The smallest phones still in use. Everything above holds; these are the
+   few places where one more step down is needed to stop a wrap. */
+@media (max-width: 349px) {
+  .h-inner { padding-left: 11px; padding-right: 11px; }
+  .h-play-btn { padding: 11px 13px; min-height: 56px; }
+  .h-play-label { font-size: 1.06rem; }
+  .h-figure-value { font-size: 1.18rem; }
+  .h-figure-label { font-size: 0.5rem; letter-spacing: 0.06em; }
+
+  .g-inner { padding-left: 10px; padding-right: 10px; }
+  .g-menu-item { padding: 9px 8px; column-gap: 6px; }
+  .g-menu-label { font-size: 0.66rem; letter-spacing: 0.03em; }
+  .g-menu-hint { font-size: 0.56rem; }
+  .g-money-fig-value { font-size: 0.78rem; }
+  .g-money-fig.is-lead .g-money-fig-value { font-size: 1.05rem; }
+
+  .ar-ring-block { grid-template-columns: 80px minmax(0, 1fr); gap: 10px; }
+  .ar-ring-wrap { width: 80px; height: 80px; }
+  .ar-ring-value { font-size: 1.32rem; }
+}
+
+/* Landscape on a phone: the height is the scarce thing, so the hero gives
+   way rather than pushing the buttons off the bottom. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .h-inner { padding-top: 10px; gap: 12px; }
+  .h-title-top { font-size: 1.4rem; }
+  .h-title-bottom { font-size: 1.9rem; }
+  .h-title-of { margin: 1px 0; }
+  .h-play { flex-direction: row; }
+  .h-play-btn { flex: 1 1 0; min-height: 52px; }
+}

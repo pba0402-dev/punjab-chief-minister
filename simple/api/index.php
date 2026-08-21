@@ -606,6 +606,91 @@ switch (route()) {
         });
     }
 
+    /* ------------------------------------------------------------- bulk */
+    case 'allocate': {
+        /*
+         * One sum across many seats.
+         *
+         * Resolved seat by seat on the server, exactly as single moves are,
+         * so nothing here is a shortcut around the rules: every seat costs,
+         * scales, raises heat and can bring a consequence of its own. What
+         * bulk saves is taps, not dice.
+         */
+        [$game, $playerId] = authenticate($store);
+
+        $actionId = preg_replace('/[^a-z]/', '', strtolower((string) input('actionId', '')));
+        $amount = max(0, (int) input('amount', 0));
+        $seats = input('seats', []);
+        if (!is_array($seats)) {
+            $seats = [];
+        }
+        $seats = array_values(array_unique(array_map('intval', $seats)));
+        if (count($seats) > 130) {
+            $seats = array_slice($seats, 0, 130);
+        }
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $actionId, $seats, $amount) {
+            $engine = $GLOBALS['campaign'];
+            $player = $g['players'][$playerId];
+
+            if (($g['phase'] ?? '') !== 'election' || ($g['stage'] ?? '') !== 'playing') {
+                throw new LobbyError('That round has closed.');
+            }
+            if (!empty($player['roundReady'])) {
+                throw new LobbyError('You have ended your round.');
+            }
+
+            $board = Rounds::boardOf($g);
+            $action = $engine->action($actionId);
+            if ($action === null) {
+                throw new LobbyError('Unknown action.');
+            }
+
+            // Split it the same way the browser previews it, then play each.
+            $range = $engine->amountRange($action);
+            $each = intdiv($amount, max(1, count($seats)));
+            $remainder = $amount - $each * count($seats);
+
+            $reports = [];
+            $spent = 0;
+            $index = 0;
+            foreach ($seats as $seat) {
+                $share = $each + ($index < $remainder ? 1 : 0);
+                $index++;
+                if ($share < $range['min'] || !isset($board[(string) $seat])) {
+                    continue;
+                }
+                $want = min($share, $range['max']);
+                if ($engine->blockedReason($player, $board, $actionId, $seat, $want) !== null) {
+                    continue;
+                }
+                // A roll per seat, seeded from the game, the player, the round
+                // and the seat — so the same allocation always resolves the
+                // same way and a retried request cannot re-roll a better one.
+                $rolls = Campaign::rollsFor(
+                    $g['id'] . ':bulk:' . $playerId . ':' . ($g['round'] ?? 1),
+                    $seat
+                );
+                [$player, $board, $report] = $engine->play($player, $board, $actionId, $seat, $rolls, $want);
+                $reports[] = $report;
+                $spent += (int) ($report['cost'] ?? 0);
+            }
+
+            if (!$reports) {
+                throw new LobbyError('Nothing could be played with that amount.');
+            }
+
+            $g['players'][$playerId] = $player;
+            $g['board'] = $board;
+            $g['lastBulk'] = [
+                'playerId' => $playerId,
+                'seats' => count($reports),
+                'spent' => $spent,
+            ];
+            return $g;
+        });
+    }
+
     /* --------------------------------------------------------- alliances */
     case 'ally': {
         [$game, $playerId] = authenticate($store);

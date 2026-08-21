@@ -101,6 +101,7 @@ CMP.ui.round = (function () {
   'use strict';
 
   var el = CMP.ui.dom.el;
+  var svg = CMP.ui.dom.svg;
   var mount = CMP.ui.dom.mount;
   var money = CMP.ui.money;
 
@@ -118,12 +119,46 @@ CMP.ui.round = (function () {
     var labelNode = el('span', { class: 'round-label' });
     var movesNode = el('span', { class: 'round-moves' });
     var clockNode = el('span', { class: 'round-clock', text: '--:--' });
-    var fillNode = el('span', { class: 'round-fill' });
     var stepsNode = el('div', { class: 'round-steps' });
+    var readyNode = el('div', { class: 'round-ready' });
+
+    /*
+     * The clock is a ring that drains, not a bar that shrinks.
+     *
+     * A full circle at the start, gone at zero. It sits in the corner at about
+     * the size of a coin, which is as much room as a countdown deserves on a
+     * phone — the board is what people came to look at.
+     *
+     * Drawn with a dash pattern on a stroked circle: no path arithmetic, and
+     * the arc is exact at any size.
+     */
+    var RING_R = 42;
+    var RING_C = 2 * Math.PI * RING_R;
+
+    var ringArc = svg('circle', {
+      class: 'rt-arc',
+      cx: '50', cy: '50', r: String(RING_R),
+      fill: 'none', 'stroke-width': '9', 'stroke-linecap': 'round',
+      'stroke-dasharray': RING_C + ' ' + RING_C,
+    });
+
+    var ringNode = el('div', { class: 'round-timer' }, [
+      svg('svg', { class: 'rt-ring', viewBox: '0 0 100 100', 'aria-hidden': 'true' }, [
+        svg('circle', {
+          class: 'rt-track',
+          cx: '50', cy: '50', r: String(RING_R),
+          fill: 'none', 'stroke-width': '9',
+        }),
+        ringArc,
+      ]),
+      el('div', { class: 'rt-face' }, [clockNode]),
+    ]);
 
     var root = el('div', { class: 'round-bar' }, [
-      el('div', { class: 'round-bar-top' }, [labelNode, movesNode, clockNode]),
-      el('div', { class: 'round-track' }, [fillNode]),
+      el('div', { class: 'round-bar-main' }, [
+        ringNode,
+        el('div', { class: 'round-bar-text' }, [labelNode, movesNode, readyNode]),
+      ]),
       stepsNode,
     ]);
 
@@ -136,13 +171,15 @@ CMP.ui.round = (function () {
       // the player to act on, so it says what is happening instead of showing
       // a frozen 0:00 they might read as a bug.
       if (game && game.stage === 'results') {
-        clockNode.textContent = 'Counting';
-        clockNode.classList.remove('is-low');
+        clockNode.textContent = '···';
+        clockNode.classList.remove('is-low', 'is-out');
         clockNode.classList.add('is-counting');
-        fillNode.style.width = '100%';
+        ringArc.setAttribute('stroke-dasharray', RING_C + ' ' + RING_C);
+        ringNode.classList.add('is-counting');
         return;
       }
       clockNode.classList.remove('is-counting');
+      ringNode.classList.remove('is-counting');
 
       var left = secondsLeft();
       var total = (game && game.roundSeconds) || CMP.ROUNDS.seconds;
@@ -151,9 +188,14 @@ CMP.ui.round = (function () {
       clockNode.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
 
       // The last ten seconds are worth noticing without being shouted at.
-      clockNode.classList.toggle('is-low', left <= 10 && left > 0);
+      var low = left <= 10 && left > 0;
+      clockNode.classList.toggle('is-low', low);
       clockNode.classList.toggle('is-out', left === 0);
-      fillNode.style.width = Math.max(0, Math.min(100, (left / total) * 100)) + '%';
+      ringNode.classList.toggle('is-low', low);
+      ringNode.classList.toggle('is-out', left === 0);
+
+      var shown = Math.max(0, Math.min(1, left / total));
+      ringArc.setAttribute('stroke-dasharray', (RING_C * shown) + ' ' + RING_C);
 
       if (left === 0 && opts.onExpired) opts.onExpired();
     }
@@ -193,28 +235,46 @@ CMP.ui.round = (function () {
         paintSteps();
       }
 
-      // Moves are the real currency of a round: three of them, however deep
-      // the purse, so the choice is which three rather than how many.
-      var cap = CMP.ROUNDS.actionsPerRound || 0;
+      /*
+       * What a round is bounded by, now that it is not bounded by moves.
+       *
+       * Two things: what the campaign has left to spend, and who else is
+       * still deciding. Both change while the player watches, so both live
+       * beside the clock rather than a screen away.
+       */
       if (game.stage === 'results') {
         mount(movesNode, [
           el('span', { class: 'round-moves-label', text: 'Round closed' }),
         ]);
-      } else if (cap > 0) {
-        var used = Math.min(cap, game.roundActions || 0);
+      } else if (game.roundReady) {
         mount(movesNode, [
-          el(
-            'span',
-            { class: 'round-pips', title: used + ' of ' + cap + ' moves used' },
-            Array.apply(null, { length: cap }).map(function (x, i) {
-              return el('span', { class: 'move-pip' + (i < used ? ' is-used' : '') });
-            })
-          ),
+          el('span', { class: 'round-moves-label is-ready', text: "You're ready" }),
+        ]);
+      } else {
+        var money = CMP.ui.money;
+        mount(movesNode, [
+          el('span', { class: 'round-spend', text: money.words(CMP.campaign.remaining(game)) }),
+          el('span', { class: 'round-moves-label', text: 'to spend' }),
+        ]);
+      }
+
+      /*
+       * The ready count. Only worth showing when somebody could be waited
+       * for — a solo game has nobody to wait for, and a line saying "1 / 1
+       * ready" is noise.
+       */
+      var ready = opts.readyCount && opts.readyCount();
+      if (ready && ready.of > 1) {
+        mount(readyNode, [
+          el('span', { class: 'round-ready-count', text: ready.count + ' / ' + ready.of }),
           el('span', {
-            class: 'round-moves-label',
-            text: used >= cap ? 'no moves left' : cap - used + ' move' + (cap - used === 1 ? '' : 's') + ' left',
+            class: 'round-ready-label',
+            text: ready.count >= ready.of ? 'ready — round ending' : 'ready',
           }),
         ]);
+        readyNode.classList.toggle('is-all', ready.count >= ready.of);
+      } else {
+        mount(readyNode, []);
       }
 
       // Multiplayer is told the seconds left; solo keeps its own deadline.

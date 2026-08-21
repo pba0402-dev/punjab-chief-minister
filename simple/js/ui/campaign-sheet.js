@@ -164,7 +164,11 @@ CMP.ui.campaignSheet = (function () {
         }
 
         var range = CMP.campaign.amountRange(chosen);
-        var cash = CMP.campaign.remaining(game);
+        // What can go behind a move here: general cash plus this seat's own
+        // region purse. Capping on cash alone would hide grant money the
+        // player has earned and can legitimately spend right here.
+        var pot = CMP.campaign.spendableOn(game, seat);
+        var cash = pot.total;
         var cap = Math.min(range.max, cash);
         amount = Math.max(range.min, Math.min(amount || chosen.cost, cap));
 
@@ -173,6 +177,7 @@ CMP.ui.campaignSheet = (function () {
         });
         if (quick.indexOf(cap) === -1 && cap > range.min) quick.push(cap);
 
+        var affordable = cap >= range.min;
         var scale = CMP.campaign.scaleFor(chosen, amount);
         var impact = scale >= 1.6 ? 'Large' : scale >= 1.1 ? 'Strong' : scale >= 0.8 ? 'Medium' : 'Small';
 
@@ -201,6 +206,9 @@ CMP.ui.campaignSheet = (function () {
             return el('button', {
               class: 'cs-amount' + (v === amount ? ' is-active' : ''),
               type: 'button',
+              // The exact figure, so a label like "₹1.65 crore" does not have
+              // to be parsed back into rupees by anything reading this.
+              dataset: { amount: String(v) },
               text: money.words(v),
               onclick: function () {
                 amount = v;
@@ -234,13 +242,22 @@ CMP.ui.campaignSheet = (function () {
             line('Risk', chosen.riskLabel),
           ]),
 
-          el('button', {
-            class: 'btn btn-primary btn-wide',
-            type: 'button',
-            text: busy ? 'Campaigning…' : 'Confirm campaign',
-            disabled: busy,
-            onclick: confirmAndPlay,
-          }),
+          // A campaign nobody can pay for is not offered. Saying so here is
+          // better than a confirm button that only fails once pressed.
+          affordable
+            ? el('button', {
+                class: 'btn btn-primary btn-wide',
+                type: 'button',
+                text: busy ? 'Campaigning…' : 'Confirm campaign',
+                disabled: busy,
+                onclick: confirmAndPlay,
+              })
+            : el('p', {
+                class: 'cs-cannot',
+                text: 'Not enough to campaign here. The smallest move costs ' +
+                  money.words(range.min) + ', and you can spend ' +
+                  (money.words(pot.total) || '₹0') + ' in this seat.',
+              }),
           el('button', {
             class: 'btn btn-quiet btn-wide',
             type: 'button',

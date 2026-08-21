@@ -273,10 +273,22 @@ const CANDIDATES = [
 players.forEach((c, i) => {
   const fields = c.qq('.screen-lobby .field-input');
   c.type(fields[0], CANDIDATES[i][0]);
-  c.type(fields[1], CANDIDATES[i][1]);
 });
 check('the lobby asks for no budget', !host.q('.screen-lobby .field-money'));
-check('the granted purse is stated in the lobby', /₹5,00,00,000/.test(host.text()));
+check('1. and no slogan',
+  host.qq('.screen-lobby .field-input').length === 1,
+  host.qq('.screen-lobby .field-input').length + ' fields');
+check('7. the round allowance is stated in the lobby',
+  /5 crore a round/i.test(host.text()), host.text().slice(0, 200));
+check('4. the host picks the round length',
+  host.qq('.clock-option').length === 3,
+  host.qq('.clock-option').length + ' options');
+check('4. two minutes is the default',
+  !!host.q('.clock-option.is-active') &&
+  /2 min/.test(host.q('.clock-option.is-active').textContent),
+  host.q('.clock-option.is-active') ? host.q('.clock-option.is-active').textContent : 'none');
+check('4. and a guest is told rather than asked',
+  players[1].qq('.clock-option').length === 0);
 
 await sleep(1200); // let the debounced save fire
 
@@ -324,7 +336,7 @@ check('2. corruption and bribe are separate items',
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
-check('it opens on round 1 of 15', /Round\s*1\s*of\s*15/.test(host.q('.round-bar').textContent),
+check('it opens on round 1 of 20', /Round\s*1\s*of\s*20/.test(host.q('.round-bar').textContent),
   host.q('.round-bar').textContent.slice(0, 40));
 check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
 check('and the majority line says how many more are needed',
@@ -831,15 +843,15 @@ check('solo setup opens', !!solo.q('.screen-setup'));
 solo.click(solo.qq('.party-card').find((c) => c.textContent.includes('BJP')));
 const soloFields = solo.qq('.field-input');
 solo.type(soloFields[0], 'Solo Candidate');
-solo.type(soloFields[1], 'Solo slogan');
 check('solo asks for no budget either', !solo.q('.field-money'));
 solo.click(solo.q('.btn-start'));
 check('solo election starts', !!solo.q('.screen-election'));
 check('solo game is saved locally', !!solo.dom.window.CMP.storage.load());
 check('solo save is marked solo', solo.dom.window.CMP.storage.load().mode === 'solo');
-check('solo is granted the same ₹5 crore',
-  solo.dom.window.CMP.storage.load().budget === 50000000,
-  String(solo.dom.window.CMP.storage.load().budget));
+check('7. solo runs on the same round allowance',
+  solo.dom.window.CMP.campaign.remaining(solo.dom.window.CMP.storage.load())
+    === solo.dom.window.CMP.CAMPAIGN.income.perRound,
+  String(solo.dom.window.CMP.campaign.remaining(solo.dom.window.CMP.storage.load())));
 
 /* ---------------------------------------------------------------- console */
 

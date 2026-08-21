@@ -45,7 +45,7 @@ CMP.ui.election = (function () {
   var SECTIONS = [
     { id: 'areas', label: 'Campaign', hint: 'Your seats', icon: '◆' },
     { id: 'money', label: 'Money', hint: 'Cash and debt', icon: '₹' },
-    { id: 'grants', label: 'Grants', hint: 'Apply for funds', icon: '◈' },
+    { id: 'grants', label: 'Grants', hint: 'Districts you hold', icon: '◈' },
     { id: 'loan', label: 'Loan', hint: 'Borrow at 20%', icon: '◇' },
     { id: 'corruption', label: 'Corruption', hint: 'High risk', icon: '▲', risky: true },
     { id: 'bribe', label: 'Bribe', hint: 'Highest risk', icon: '▲', risky: true },
@@ -82,9 +82,18 @@ CMP.ui.election = (function () {
     var noticeNode = el('div', { class: 'g-notice' });
     var bodyNode = el('div', { class: 'g-body' });
     var resultsNode = el('div', { class: 'g-results' });
+    var endNode = el('div', { class: 'g-end' });
     var summaryNode = el('div', { class: 'summary-slot' });
 
-    var roundView = CMP.ui.round.create({});
+    var roundView = CMP.ui.round.create({
+      readyCount: function () {
+        var view = opts.getServerView && opts.getServerView();
+        if (view && typeof view.readyOf === 'number') {
+          return { count: view.readyCount || 0, of: view.readyOf || 0 };
+        }
+        return null;
+      },
+    });
     var resultsView = CMP.ui.scoreboard.create({
       you: function () {
         return game ? game.partyId : null;
@@ -107,6 +116,34 @@ CMP.ui.election = (function () {
       onOpen: function (number) {
         openSeatDetail(number);
       },
+
+      // One allocation across many seats. Solo resolves it here; multiplayer
+      // asks the server, which rolls every seat itself.
+      onAllocate: function (actionId, seats, amount) {
+        if (game.mode === 'multiplayer') {
+          return CMP.net.allocate(actionId, seats, amount).then(function (res) {
+            if (res.ok && res.game && opts.onServerGame) opts.onServerGame(res.game);
+            return res.ok
+              ? { ok: true, seats: (res.game && res.game.lastBulk && res.game.lastBulk.seats) || seats.length,
+                  spent: (res.game && res.game.lastBulk && res.game.lastBulk.spent) || amount, reports: [] }
+              : { ok: false, reason: res.error };
+          });
+        }
+
+        // A fresh roll per seat, from the game's own sequence, so a bulk
+        // allocation is exactly the same dice as playing each seat by hand.
+        var out = CMP.campaign.campaignBulk(game, actionId, seats, amount, function () {
+          return CMP.rng.rollsFor(game);
+        });
+        if (out.ok) CMP.storage.save(game);
+        return out;
+      },
+
+      onChanged: function () {
+        paintPlayer();
+        paintBody();
+        paintEndRound();
+      },
       onBack: function () {
         openParty = null;
         setSection('home');
@@ -126,6 +163,7 @@ CMP.ui.election = (function () {
         summaryNode,
         resultsNode,
         bodyNode,
+        endNode,
       ]),
     ]);
 
@@ -489,6 +527,146 @@ CMP.ui.election = (function () {
 
     /* -------------------------------------------------------------- nav */
 
+    /*
+     * END ROUND.
+     *
+     * Sits at the foot of the screen, under everything a player might still
+     * want to do, so it is reached by finishing rather than by accident. It
+     * only locks the player who pressed it: everybody else plays on until they
+     * say the same or the clock runs out.
+     */
+    function paintEndRound() {
+      if (!game || isCounting() || !CMP.campaign.roundIsLive(game)) {
+        mount(endNode, []);
+        return;
+      }
+
+      if (game.roundReady) {
+        var view = opts.getServerView && opts.getServerView();
+        var waiting = view && typeof view.readyOf === 'number'
+          ? Math.max(0, view.readyOf - (view.readyCount || 0))
+          : 0;
+
+        mount(endNode, [
+          el('div', { class: 'g-ready' }, [
+            el('span', { class: 'g-ready-tick', 'aria-hidden': 'true', text: '✓' }),
+            el('div', { class: 'g-ready-text' }, [
+              el('strong', { class: 'g-ready-title', text: "You're ready" }),
+              el('span', {
+                class: 'g-ready-note',
+                text: waiting > 0
+                  ? 'Waiting for ' + waiting + ' more player' + (waiting === 1 ? '' : 's')
+                  : 'The round is closing.',
+              }),
+            ]),
+          ]),
+        ]);
+        return;
+      }
+
+      mount(endNode, [
+        el('button', {
+          class: 'btn btn-end',
+          type: 'button',
+          onclick: confirmEndRound,
+        }, [
+          el('span', { class: 'btn-end-title', text: 'End round' }),
+          el('span', {
+            class: 'btn-end-note',
+            text: 'When you have finished spending',
+          }),
+        ]),
+      ]);
+    }
+
+    /**
+     * Ending a round cannot be undone within that round, so it says what has
+     * been spent and what is left before asking.
+     */
+    function confirmEndRound() {
+      var spentThisRound = game.roundSpent || 0;
+      var left = CMP.campaign.remaining(game);
+      var grants = CMP.campaign.grantTotal(game);
+
+      var sheet = el('div', { class: 'sheet' }, [
+        el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('h2', { class: 'sheet-title', text: 'Finish this round?' }),
+
+          el('div', { class: 'sum-lines' }, [
+            el('div', { class: 'sum-line' }, [
+              el('span', { class: 'sum-line-label', text: 'Spent this round' }),
+              el('strong', { class: 'sum-line-value', text: money.words(spentThisRound) || '₹0' }),
+            ]),
+            el('div', { class: 'sum-line' }, [
+              el('span', { class: 'sum-line-label', text: 'Left to carry forward' }),
+              el('strong', { class: 'sum-line-value', text: money.words(left) || '₹0' }),
+            ]),
+            grants
+              ? el('div', { class: 'sum-line' }, [
+                  el('span', { class: 'sum-line-label', text: 'Held in region grants' }),
+                  el('strong', { class: 'sum-line-value', text: money.words(grants) }),
+                ])
+              : null,
+          ]),
+
+          el('p', {
+            class: 'sheet-text',
+            text: 'You will not be able to spend, campaign or change anything ' +
+              'else until the next round. Whatever you have not spent stays ' +
+              'with you.',
+          }),
+
+          el('button', {
+            class: 'btn btn-quiet btn-wide',
+            type: 'button',
+            text: 'Continue playing',
+            onclick: function () {
+              close();
+            },
+          }),
+          el('button', {
+            class: 'btn btn-primary btn-wide',
+            type: 'button',
+            text: 'End round',
+            onclick: function () {
+              close();
+              endRound();
+            },
+          }),
+        ]),
+      ]);
+
+      function close() {
+        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+      }
+      sheet.addEventListener('click', function (e) {
+        if (e.target === sheet) close();
+      });
+      document.body.appendChild(sheet);
+    }
+
+    function endRound() {
+      // Locally first, so the button responds at once; the server is the
+      // authority and its answer overwrites this on the next poll.
+      game.roundReady = true;
+      paintEndRound();
+      paintBody();
+
+      if (game.mode === 'multiplayer') {
+        CMP.net.endRound().then(function (res) {
+          if (!res.ok && !res.offline) {
+            game.roundReady = false;
+            setNotice(res.error, 'bad');
+          }
+          paintEndRound();
+        });
+        return;
+      }
+
+      // Solo: nobody to wait for, so the round settles immediately.
+      if (opts.onEndRoundSolo) opts.onEndRoundSolo();
+    }
+
     /** The two-column menu. Lives on the home screen, not above every screen. */
     function menuGrid() {
       return el('nav', { class: 'g-menu', 'aria-label': 'Menu' }, SECTIONS.map(function (s) {
@@ -553,10 +731,8 @@ CMP.ui.election = (function () {
       var body;
       if (section === 'areas') body = [areasSection()];
       else if (section === 'money') body = moneySection();
-      else if (section === 'grants') {
-        body = actionsSection('grants', 'Grants',
-          'Fund visible work and apply for support. No heat, and the money is never certain.');
-      } else if (section === 'loan') body = loanSection();
+      else if (section === 'grants') body = grantsSection();
+      else if (section === 'loan') body = loanSection();
       else if (section === 'corruption') body = riskSection('corruption');
       else if (section === 'bribe') body = riskSection('bribe');
       else if (section === 'map') body = [mapSection()];
@@ -584,6 +760,7 @@ CMP.ui.election = (function () {
       var people = roster();
 
       return [
+        moneyPanel(),
         menuGrid(),
         leaderboardBlock(counts, people),
         majorityLine(counts),
@@ -597,6 +774,157 @@ CMP.ui.election = (function () {
           }),
         ]),
       ];
+    }
+
+    /*
+     * The four figures that make the economy readable at a glance.
+     *
+     * Available is what can be spent; new this round is where it came from;
+     * spent is what has gone; and the campaign total says how far through the
+     * hundred crore the election is. Keeping "new this round" beside
+     * "available" is the whole point — five crore is income, not a limit, and
+     * one number on its own reads like a limit.
+     */
+    function moneyPanel() {
+      var income = (CMP.CAMPAIGN.income || {}).perRound || 0;
+      var earned = game.incomeTotal || 0;
+      var whole = income * (game.roundsTotal || CMP.ROUNDS.total);
+      var grants = CMP.campaign.grantTotal(game);
+
+      function figure(label, value, cls) {
+        return el('div', { class: 'g-money-fig' + (cls ? ' ' + cls : '') }, [
+          el('span', { class: 'g-money-fig-label', text: label }),
+          el('strong', { class: 'g-money-fig-value', text: value }),
+        ]);
+      }
+
+      return el('section', { class: 'g-block g-money-panel' }, [
+        el('div', { class: 'g-money-row' }, [
+          figure('Available', money.words(CMP.campaign.remaining(game)) || '₹0', 'is-lead'),
+          figure('New this round', '+' + money.words(income)),
+          figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
+        ]),
+
+        grants
+          ? el('button', {
+              class: 'g-money-grants',
+              type: 'button',
+              onclick: function () {
+                setSection('grants');
+              },
+            }, [
+              el('span', { class: 'g-money-fig-label', text: 'Held in region grants' }),
+              el('strong', { class: 'g-money-fig-value', text: money.words(grants) }),
+              el('span', { class: 'g-menu-hint', text: 'Spendable only where it was earned' }),
+            ])
+          : null,
+
+        el('div', { class: 'g-money-progress' }, [
+          el('span', { class: 'g-money-track' }, [
+            el('span', {
+              class: 'g-money-fill',
+              style: { width: Math.min(100, (earned / Math.max(1, whole)) * 100) + '%' },
+            }),
+          ]),
+          el('span', {
+            class: 'g-money-progress-note',
+            text: money.words(earned) + ' of ' + money.words(whole) + ' this campaign',
+          }),
+        ]),
+      ]);
+    }
+
+    /*
+     * Where grant money lives, and where it can go.
+     *
+     * A purse per region, and under each the districts that are paying into
+     * it — because a player looking at fifteen crore of Majha money mostly
+     * wants to know which districts are keeping it coming and what happens if
+     * they lose one.
+     */
+    function grantsSection() {
+      var leaders = CMP.campaign.currentLeaders(game.support);
+      var opening = game.openingDistricts || [];
+
+      var blocks = CMP.REGIONS.map(function (region) {
+        var held = [];
+        var close = [];
+
+        CMP.districtsInRegion(region.id).forEach(function (d) {
+          var mine = d.seats.filter(function (n) {
+            return leaders[n] === game.partyId;
+          }).length;
+          if (mine === d.seats.length) held.push({ d: d, mine: mine });
+          else if (mine >= d.seats.length - 2) close.push({ d: d, mine: mine });
+        });
+
+        var paying = held.filter(function (row) {
+          return opening.indexOf(row.d.id) === -1;
+        });
+        var perRound = paying.reduce(function (t, row) {
+          return t + row.d.grant;
+        }, 0);
+
+        return el('section', { class: 'g-block' }, [
+          el('div', { class: 'g-block-head' }, [
+            el('h2', { class: 'g-block-title', text: region.name }),
+            el('strong', {
+              class: 'g-grant-balance',
+              text: money.words(CMP.campaign.grantIn(game, region.id)) || '₹0',
+            }),
+          ]),
+          el('p', {
+            class: 'g-block-note',
+            text: perRound
+              ? money.words(perRound) + ' a round from ' + paying.length +
+                ' district' + (paying.length === 1 ? '' : 's') + ' you took.'
+              : 'No districts here are paying yet.',
+          }),
+
+          held.length
+            ? el('div', { class: 'g-districts' }, held.map(function (row) {
+                var inherited = opening.indexOf(row.d.id) !== -1;
+                return el('div', { class: 'g-district is-held' }, [
+                  el('span', { class: 'g-district-name', text: row.d.name }),
+                  el('span', {
+                    class: 'g-district-seats',
+                    text: row.mine + ' / ' + row.d.seats.length,
+                  }),
+                  el('span', {
+                    class: 'g-district-grant' + (inherited ? ' is-quiet' : ''),
+                    text: inherited ? 'inherited' : money.words(row.d.grant) + ' a round',
+                  }),
+                ]);
+              }))
+            : null,
+
+          close.length
+            ? el('div', { class: 'g-districts' }, close.map(function (row) {
+                return el('div', { class: 'g-district' }, [
+                  el('span', { class: 'g-district-name', text: row.d.name }),
+                  el('span', {
+                    class: 'g-district-seats',
+                    text: row.mine + ' / ' + row.d.seats.length,
+                  }),
+                  el('span', {
+                    class: 'g-district-grant is-quiet',
+                    text: (row.d.seats.length - row.mine) + ' more for ' +
+                      money.words(row.d.grant),
+                  }),
+                ]);
+              }))
+            : null,
+        ]);
+      });
+
+      return [
+        el('p', {
+          class: 'g-block-note',
+          text: 'Hold every seat in a district and it pays you every round. ' +
+            'The money is locked to its own region — Malwa money fights Malwa ' +
+            'seats and nothing else.',
+        }),
+      ].concat(blocks);
     }
 
     function areasSection() {
@@ -876,6 +1204,9 @@ CMP.ui.election = (function () {
               '. Heat falls a little every round on its own.',
           }),
         ]),
+
+        actionsSection('grants', 'Apply for funding',
+          'Public money for visible work. No heat, and never certain.')[0],
 
         el('div', { class: 'g-actions-row' }, [
           el('button', {
@@ -1431,6 +1762,7 @@ CMP.ui.election = (function () {
 
       paintNotice();
       paintBody();
+      paintEndRound();
     }
 
     return {
