@@ -22,6 +22,7 @@ CMP.ui.scoreboard = (function () {
   'use strict';
 
   var el = CMP.ui.dom.el;
+  var svg = CMP.ui.dom.svg;
   var mount = CMP.ui.dom.mount;
 
   function partyOf(id) {
@@ -267,6 +268,124 @@ CMP.ui.scoreboard = (function () {
   /* ------------------------------------------------------------ history */
 
   /**
+   * All four parties across every round played, as four lines.
+   *
+   * This does not go on the game screen. It is the shape of a whole campaign,
+   * which is worth looking at between rounds and a distraction during one — so
+   * it lives behind ELECTION HISTORY and nowhere else.
+   */
+  function historyChart(trend) {
+    if (!trend || trend.length < 2) return null;
+
+    var parties = CMP.PARTIES.filter(function (p) {
+      return p.playable;
+    });
+
+    var W = 320;
+    var H = 150;
+    var PAD_L = 26;
+    var PAD_R = 8;
+    var PAD_T = 10;
+    var PAD_B = 20;
+
+    var total = CMP.CONSTITUENCIES.length;
+    var majority = Math.floor(total / 2) + 1;
+    var lastRound = trend[trend.length - 1].round;
+    var firstRound = trend[0].round;
+    var span = Math.max(1, lastRound - firstRound);
+
+    // The vertical scale runs to a round number above the highest line, so a
+    // close campaign is not drawn as four lines squashed along the bottom.
+    var peak = 0;
+    trend.forEach(function (row) {
+      parties.forEach(function (p) {
+        peak = Math.max(peak, row.seats[p.id] || 0);
+      });
+    });
+    var top = Math.max(majority + 10, Math.ceil((peak + 8) / 10) * 10);
+
+    function x(round) {
+      return PAD_L + ((round - firstRound) / span) * (W - PAD_L - PAD_R);
+    }
+    function y(seats) {
+      return H - PAD_B - (seats / top) * (H - PAD_T - PAD_B);
+    }
+
+    var majorityY = y(majority);
+
+    var lines = parties.map(function (p) {
+      var d = trend.map(function (row, i) {
+        return (i ? 'L' : 'M') + x(row.round).toFixed(1) + ' ' + y(row.seats[p.id] || 0).toFixed(1);
+      }).join(' ');
+      return svg('path', {
+        class: 'hc-line',
+        d: d,
+        fill: 'none',
+        stroke: p.colour,
+        'stroke-width': '2',
+        'stroke-linejoin': 'round',
+        'stroke-linecap': 'round',
+      });
+    });
+
+    // A dot on each party's last round, so the end of the story is readable
+    // where four lines are close together.
+    var last = trend[trend.length - 1];
+    var dots = parties.map(function (p) {
+      return svg('circle', {
+        class: 'hc-dot',
+        cx: x(last.round).toFixed(1),
+        cy: y(last.seats[p.id] || 0).toFixed(1),
+        r: '3',
+        fill: p.colour,
+      });
+    });
+
+    var chart = svg('svg', {
+      class: 'history-chart',
+      viewBox: '0 0 ' + W + ' ' + H,
+      role: 'img',
+      'aria-label': 'Seats held by each party from round ' + firstRound + ' to round ' + lastRound,
+    }, [
+      svg('line', {
+        class: 'hc-axis',
+        x1: String(PAD_L), y1: String(H - PAD_B), x2: String(W - PAD_R), y2: String(H - PAD_B),
+      }),
+      svg('line', {
+        class: 'hc-majority',
+        x1: String(PAD_L), y1: majorityY.toFixed(1), x2: String(W - PAD_R), y2: majorityY.toFixed(1),
+      }),
+      svg('text', {
+        class: 'hc-tick', x: String(PAD_L - 4), y: (majorityY + 3).toFixed(1),
+        'text-anchor': 'end', text: String(majority),
+      }),
+      svg('text', {
+        class: 'hc-tick', x: String(PAD_L - 4), y: String(H - PAD_B + 3),
+        'text-anchor': 'end', text: '0',
+      }),
+      svg('text', {
+        class: 'hc-tick', x: String(PAD_L), y: String(H - 5), text: 'R' + firstRound,
+      }),
+      svg('text', {
+        class: 'hc-tick', x: String(W - PAD_R), y: String(H - 5),
+        'text-anchor': 'end', text: 'R' + lastRound,
+      }),
+    ].concat(lines).concat(dots));
+
+    return el('div', { class: 'history-chart-block' }, [
+      chart,
+      el('ul', { class: 'hc-key' }, parties.map(function (p) {
+        return el('li', { class: 'hc-key-row' }, [
+          el('span', { class: 'hc-key-dot', style: { background: p.colour } }),
+          el('span', { class: 'hc-key-label', text: p.short }),
+          el('strong', { class: 'hc-key-value', text: String(last.seats[p.id] || 0) }),
+        ]);
+      })),
+      el('p', { class: 'hc-note', text: String(majority) + ' seats is a majority.' }),
+    ]);
+  }
+
+  /**
    * The whole campaign as a table, round by round. Offered rather than shown —
    * fifteen rows of five numbers is reference material, not headline news.
    */
@@ -380,6 +499,7 @@ CMP.ui.scoreboard = (function () {
     seatChanges: seatChanges,
     movements: movements,
     position: position,
+    historyChart: historyChart,
     historyTable: historyTable,
   };
 })();

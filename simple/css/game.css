@@ -42,7 +42,7 @@
   color: var(--muted-2);
 }
 
-.g-menu {
+.g-more {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -59,16 +59,16 @@
   cursor: pointer;
   flex: none;
 }
-.g-menu:hover { border-color: var(--wheat-deep); color: var(--cream); }
-.g-menu:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
-.g-menu-bars {
+.g-more:hover { border-color: var(--wheat-deep); color: var(--cream); }
+.g-more:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+.g-more-bars {
   position: relative;
   width: 13px;
   height: 9px;
   border-top: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
 }
-.g-menu-bars::after {
+.g-more-bars::after {
   content: '';
   position: absolute;
   left: 0;

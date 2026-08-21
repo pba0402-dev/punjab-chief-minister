@@ -110,6 +110,11 @@ final class Lobby
             'portraitSeed' => bin2hex(random_bytes(6)),
             'isAI' => false,
 
+            // Linked to a lasting profile when the browser carries one, so a
+            // finished election can be credited afterwards.
+            'profileId' => null,
+            'profileName' => null,
+
             'ready' => false,
             'joinedAt' => $now,
             'lastSeen' => $now,
@@ -317,6 +322,7 @@ final class Lobby
                 'connected' => self::isConnected($p, $now),
                 'isAI' => !empty($p['isAI']),
                 'portraitSeed' => $p['portraitSeed'] ?? null,
+                'profileName' => $p['profileName'] ?? null,
                 'partyId' => $p['partyId'],
                 'candidateName' => $p['candidateName'],
                 'slogan' => $p['slogan'],

@@ -68,13 +68,15 @@ async function openPage(seedStorage) {
     pretendToBeVisual: true,
     virtualConsole: vc,
     beforeParse(window) {
-      if (seedStorage) {
+      // One entry or several — a returning player has both a save and a
+      // profile, and the home screen behaves differently for each.
+      [].concat(seedStorage || []).forEach((entry) => {
         try {
-          window.localStorage.setItem(seedStorage.key, seedStorage.value);
+          window.localStorage.setItem(entry.key, entry.value);
         } catch (e) {
           /* ignore */
         }
-      }
+      });
       window.addEventListener('error', (e) => consoleErrors.push('window.error: ' + e.message));
     },
   });
@@ -103,16 +105,37 @@ const text = (d) => d.window.document.body.textContent;
 // so let the microtask queue drain before asserting on the repainted UI.
 const settle = () => new Promise((r) => setTimeout(r, 10));
 const modeCard = (d, label) =>
-  qq(d, '.mode-card').find((b) => b.textContent.indexOf(label) === 0);
+  qq(d, '.h-play-btn').find((b) => new RegExp(label, 'i').test(b.textContent));
 const actionCard = (d, label) =>
   qq(d, '.act').find((c) => {
     const n = c.querySelector('.act-name');
     return n && n.textContent === label;
   });
 
-/** Open a menu section by its label. */
+/**
+ * Open a menu section by its label.
+ *
+ * The menu lives on the game's home screen rather than above every screen, so
+ * getting anywhere means going back to home first. That is the navigation the
+ * redesign asks for — click, open, decide, back — and driving the test the
+ * same way is what proves the way back actually exists.
+ */
+function goHome(d) {
+  for (let i = 0; i < 4 && !q(d, '.g-menu'); i++) {
+    const back = q(d, '.g-section-head .sd-back') || q(d, '.areas .sd-back') || q(d, '.sd-back');
+    if (!back) break;
+    clickIt(d, back);
+  }
+  if (!q(d, '.g-menu')) throw new Error('could not get back to the game menu');
+}
+
 function openSection(d, label) {
-  const tab = qq(d, '.g-nav-item').find((n) => n.textContent === label);
+  goHome(d);
+  if (label === 'Home') return;
+  const tab = qq(d, '.g-menu-item').find((n) => {
+    const name = n.querySelector('.g-menu-label');
+    return name && name.textContent === label;
+  });
   if (!tab) throw new Error('no section called ' + label);
   clickIt(d, tab);
 }
@@ -147,7 +170,7 @@ const playCard = async (d, label, amount) => {
 
   if (!q(d, '.campaign-sheet')) await openCampaignSheet(d);
 
-  if (action.menu === 'corruption') {
+  if (action.menu === 'corruption' || action.menu === 'bribe') {
     const reveal = qq(d, 'button').find((b) => /High-risk options/.test(b.textContent));
     if (reveal) {
       clickIt(d, reveal);
@@ -185,24 +208,42 @@ const playCard = async (d, label, amount) => {
 section('1-3. First screen');
 let dom = await openPage();
 check('1. first screen loads', !!q(dom, '.screen-home'));
-check('2. "Chief Minister of Punjab" is displayed', /Chief Minister of Punjab/.test(text(dom)));
-check('3. "117 Assembly Constituencies" is displayed', /117 Assembly Constituencies/.test(text(dom)));
-check('   PLAY SOLO is offered', !!modeCard(dom, 'PLAY SOLO'));
-check('   PLAY WITH FRIENDS is offered', !!modeCard(dom, 'PLAY WITH FRIENDS'));
+check('2. "Chief Minister of Punjab" is displayed',
+  /Chief Minister\s*of\s*Punjab/.test(text(dom)));
+check('3. "117 Assembly Seats" is displayed', /117 Assembly Seats/i.test(text(dom)));
+check('   PLAY SOLO is offered', !!modeCard(dom, 'Play solo'));
+check('   PLAY WITH FRIENDS is offered', !!modeCard(dom, 'Play with friends'));
+check('   the two ways to play are the only big buttons',
+  qq(dom, '.h-play-btn').length === 2);
+check('   statistics are never invented when there is no server',
+  !/[1-9]\d*\s*(players|elections|governments)/i.test(text(dom)),
+  text(dom).slice(0, 160));
+check('   the home screen does not wait on constituency data',
+  !q(dom, '.area-row') && !q(dom, '.seat-row'));
 
 const CMP = dom.window.CMP;
-check('   constituency data loaded', CMP.CONSTITUENCIES.length === 117);
-check('   majority is 59', CMP.MAJORITY === 59);
-check('   campaign config loaded', !!CMP.CAMPAIGN && CMP.ACTIONS.length === 10,
+check('42. the 117 constituency records are not loaded before a game starts',
+  !CMP.data.ready() && !CMP.CONSTITUENCIES,
+  CMP.CONSTITUENCIES ? CMP.CONSTITUENCIES.length + ' records' : 'none');
+check('42. and neither are the sitting MLAs or the map',
+  !CMP.INCUMBENTS && !CMP.GEOMETRY);
+check('   campaign config loaded', !!CMP.CAMPAIGN && CMP.ACTIONS.length === 13,
   CMP.ACTIONS.length + ' actions');
-check('   eight campaign actions plus two ways of raising money',
-  CMP.actionsByGroup('safe').length === 4 && CMP.actionsByGroup('risky').length === 4 &&
+check('   eleven campaign actions plus two ways of raising money',
+  CMP.actionsByGroup('safe').length === 4 && CMP.actionsByGroup('risky').length === 7 &&
   CMP.actionsByGroup('funding').length === 2);
+check('   corruption and bribe are separate menus',
+  CMP.actionsByMenu('corruption').length === 3 && CMP.actionsByMenu('bribe').length === 3);
 
 /* ---------------------------------------------------------------- setup */
 
 section('Setup: no budget is asked for');
-clickIt(dom, modeCard(dom, 'PLAY SOLO'));
+clickIt(dom, modeCard(dom, 'Play solo'));
+await dom.window.CMP.data.ensure();
+await settle();
+check('42. the board arrives when the player starts', CMP.CONSTITUENCIES.length === 117,
+  String(CMP.CONSTITUENCIES && CMP.CONSTITUENCIES.length));
+check('   majority is 59', CMP.MAJORITY === 59);
 check('   setup screen opens', !!q(dom, '.screen-setup'));
 check('   four parties offered', qq(dom, '.party-card').length === 4);
 check('1. the budget is granted, not entered', !q(dom, '.field-money'));
@@ -225,6 +266,21 @@ section('2. The game screen');
 check('   election screen opens', !!q(dom, '.screen-election'));
 
 /** A labelled figure inside the money section. */
+/** The one big figure at the top of the money screen. */
+function cashInHand(d) {
+  const node = q(d, '.g-money-value');
+  return node ? node.textContent : null;
+}
+
+/** One item in the game's menu grid, by its label. */
+function menuItem(d, label) {
+  goHome(d);
+  return qq(d, '.g-menu-item').find((n) => {
+    const name = n.querySelector('.g-menu-label');
+    return name && name.textContent === label;
+  });
+}
+
 function moneyLine(d, label) {
   const row = qq(d, '.sum-line').find((n) => {
     const l = n.querySelector('.sum-line-label');
@@ -249,13 +305,23 @@ check('   their cash', /₹5 crore/.test(q(dom, '.g-player-cash').textContent),
 check('   and their seats', /seats?$/.test(q(dom, '.g-player-seats').textContent.trim()));
 check('   no large stat cards remain', qq(dom, '.stat').length === 0);
 
-check('17. a compact section menu is offered', qq(dom, '.g-nav-item').length === 7,
-  qq(dom, '.g-nav-item').length + ' items');
-check('17. and campaigning is not one of its items',
-  !qq(dom, '.g-nav-item').some((n) => /^Campaign$/.test(n.textContent)),
-  qq(dom, '.g-nav-item').map((n) => n.textContent).join('/'));
-check('1. home is the section it opens on',
-  q(dom, '.g-nav-item.is-active').textContent === 'Home');
+const menuLabels = () =>
+  qq(dom, '.g-menu-item .g-menu-label').map((n) => n.textContent);
+
+check('1. a compact menu grid replaces the scrolling strip',
+  qq(dom, '.g-menu').length === 1 && !q(dom, '.g-nav'),
+  menuLabels().join('/'));
+check('1. eight destinations, two columns', qq(dom, '.g-menu-item').length === 8,
+  menuLabels().length + ' items');
+check('1. every item the brief asks for is there',
+  ['Campaign', 'Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'Map', 'Constituencies']
+    .every((l) => menuLabels().indexOf(l) !== -1),
+  menuLabels().join('/'));
+check('2. "High Risk" is gone, replaced by Corruption and Bribe',
+  menuLabels().indexOf('High Risk') === -1 &&
+  menuLabels().indexOf('Corruption') !== -1 && menuLabels().indexOf('Bribe') !== -1);
+check('1. the menu opens on the game home screen',
+  !!q(dom, '.g-menu') && !!q(dom, '.lb'));
 
 check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
 check('   it ranks all four candidates', qq(dom, '.lb-row').length === 4);
@@ -285,14 +351,22 @@ check('   exact probabilities are never shown', !shownProbabilities);
 /* ------------------------------------------------------- the money tab */
 
 openSection(dom, 'Money');
-check('15. money opens on its own',
-  moneyLine(dom, 'Cash') === '₹5 crore', 'got ' + moneyLine(dom, 'Cash'));
-check('15. spent starts at nothing', moneyLine(dom, 'Spent') === '₹0', moneyLine(dom, 'Spent'));
-check('15. debt starts at nothing', moneyLine(dom, 'Debt') === '₹0', moneyLine(dom, 'Debt'));
-check('15. political heat is here, and only here',
-  /0 \/ 100/.test(moneyLine(dom, 'Political heat') || ''), moneyLine(dom, 'Political heat'));
+check('23. money opens on its own with cash in hand largest',
+  cashInHand(dom) === '₹5 crore', 'got ' + cashInHand(dom));
+check('23. spent starts at nothing',
+  moneyLine(dom, 'Spent on the campaign') === '₹0', moneyLine(dom, 'Spent on the campaign'));
+check('23. debt starts at nothing',
+  moneyLine(dom, 'Debt outstanding') === '₹0', moneyLine(dom, 'Debt outstanding'));
+check('23. grants received has a line of its own',
+  moneyLine(dom, 'Grants received') === '₹0', moneyLine(dom, 'Grants received'));
+check('23. so do fines paid',
+  moneyLine(dom, 'Fines paid') === '₹0', moneyLine(dom, 'Fines paid'));
+check('23. transactions are listed', /Transactions/.test(text(dom)));
+check('   political heat is here, and only here',
+  /0 of 100/.test(text(dom)) && !!q(dom, '.g-heat-fill'));
 check('   with a way to borrow',
   !!qq(dom, 'button').find((b) => /Borrow money/.test(b.textContent)));
+check('45. and a way back without scrolling', !!q(dom, '.g-section-head .sd-back'));
 
 openSection(dom, 'Home');
 check('   money is not repeated on the home screen',
@@ -323,15 +397,18 @@ check('   the player strip shows the money going down',
 
 openSection(dom, 'Money');
 check('3. cash in hand drops',
-  moneyLine(dom, 'Cash') === dom.window.CMP.ui.money.words(50000000 - rallyCost),
-  moneyLine(dom, 'Cash'));
+  cashInHand(dom) === dom.window.CMP.ui.money.words(50000000 - rallyCost),
+  cashInHand(dom));
 check('3. spent is displayed',
-  moneyLine(dom, 'Spent') === dom.window.CMP.ui.money.words(rallyCost),
-  moneyLine(dom, 'Spent'));
+  moneyLine(dom, 'Spent on the campaign') === dom.window.CMP.ui.money.words(rallyCost),
+  moneyLine(dom, 'Spent on the campaign'));
+check('23. and the spending shows up as a transaction',
+  qq(dom, '.g-txn').length === 1 && /Public Rally/.test(q(dom, '.g-txn').textContent),
+  q(dom, '.g-txn') ? q(dom, '.g-txn').textContent : 'none');
 openSection(dom, 'Home');
 
 const heatBefore = game.heat;
-await playCard(dom, 'Underground Deal');
+await playCard(dom, 'Undisclosed Deal');
 game = dom.window.CMP.app.getGame();
 check('6. a risky action works', game.spent === rallyCost + CMP.getAction('deal').cost);
 check('8. risky play raises Political Heat', game.heat > heatBefore, 'heat ' + game.heat);
@@ -342,8 +419,8 @@ if (q(dom, '.report-sheet')) {
 }
 openSection(dom, 'Money');
 check('8. the heat meter reflects it',
-  new RegExp(Math.round(game.heat) + ' / 100').test(moneyLine(dom, 'Political heat') || ''),
-  moneyLine(dom, 'Political heat'));
+  new RegExp(Math.round(game.heat) + ' of 100').test(text(dom)),
+  String(Math.round(game.heat)));
 check('8. and a bar shows it', !!q(dom, '.g-heat-fill'));
 openSection(dom, 'Home');
 
@@ -408,11 +485,23 @@ check('11. slogan saved', saved.slogan === 'Naya Punjab, Sacha Punjab');
 check('11. marked as a solo game', saved.mode === 'solo');
 
 const rawSave = dom.window.localStorage.getItem(dom.window.CMP.storage.KEY);
+const rawProfile = dom.window.localStorage.getItem('cmp.punjab.profile.v1');
+check('5. playing created a profile without anybody being asked to sign up',
+  !!rawProfile && /Simran Kaur Gill/.test(rawProfile), String(rawProfile));
 dom.window.close();
-dom = await openPage({ key: 'cmp.punjab.save.v1', value: rawSave });
+dom = await openPage([
+  { key: 'cmp.punjab.save.v1', value: rawSave },
+  { key: 'cmp.punjab.profile.v1', value: rawProfile },
+]);
 
-check('   a saved solo game is offered on return', /Continue solo campaign/.test(text(dom)));
-clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue solo/.test(b.textContent)));
+check('36. a returning player is welcomed back by name',
+  /Welcome back/.test(text(dom)), text(dom).slice(0, 120));
+check('36. and offered the election they are in the middle of',
+  /Continue election/.test(text(dom)), text(dom).slice(0, 200));
+clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue election/.test(b.textContent)));
+// Resuming pulls the board in on the way, so give it a moment.
+await dom.window.CMP.data.ensure();
+await settle();
 check('   it resumes on the campaign panel', !!q(dom, '.screen-election'));
 const resumed = dom.window.CMP.app.getGame();
 check('11. spending survived the reload', resumed.spent === spentBefore, resumed.spent + ' vs ' + spentBefore);
@@ -425,7 +514,7 @@ check('   the panel shows the restored cash',
 /* ---------------------------------------------------------------- map */
 
 section('The constituency map');
-const mapTab = qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map');
+const mapTab = menuItem(dom, 'Map');
 check('a Map section is offered', !!mapTab);
 clickIt(dom, mapTab);
 check('the map opens', !!q(dom, '.punjab-map'));
@@ -468,14 +557,14 @@ check('   with a way to campaign there',
   !!qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
 
 // Colours must follow the game, not a fixed picture.
-clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map'));
+clickIt(dom, menuItem(dom, 'Map'));
 const seat17 = () => qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 const before17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 const g17 = dom.window.CMP.app.getGame();
 // Hand this seat overwhelmingly to the player and check the map follows.
 Object.keys(g17.support[17]).forEach((p2) => { g17.support[17][p2] = p2 === g17.partyId ? 80 : 5; });
 dom.window.CMP.app.goTo('election');
-clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map'));
+clickIt(dom, menuItem(dom, 'Map'));
 const after17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 check('the map repaints when support moves', before17 !== after17, before17 + ' -> ' + after17);
 check('the seat now shows the player colour',
@@ -525,6 +614,36 @@ check('2. with their seats and their money',
   /seats leading/.test(q(dom, '.ar-figures').textContent) &&
   /available/.test(q(dom, '.ar-figures').textContent),
   q(dom, '.ar-figures').textContent.replace(/\s+/g, ' '));
+/* The candidate page opens as a summary. All 117 are one tap further in,
+   which is the whole point of §16-§20: five rows that matter, not a scroll
+   through every seat in Punjab. */
+check('16. it opens as a summary, not as 117 rows',
+  qq(dom, '.area-row').length <= 10 && !q(dom, '.seat-search'),
+  qq(dom, '.area-row').length + ' rows');
+check('17. with a chart of leading, close and behind',
+  qq(dom, '.ring-arc').length === 3 && !!q(dom, '.ar-ring-centre'));
+check('17. the chart is real SVG, not an unknown element',
+  q(dom, '.ring').namespaceURI === 'http://www.w3.org/2000/svg');
+check('18. statewide support is shown for all four parties',
+  qq(dom, '.ar-support-row').length === 4);
+check('18. and is labelled as game data rather than a poll',
+  /not a real-world opinion poll/i.test(q(dom, '.areas').textContent));
+check('19. the five strongest seats are listed', /Top 5 strongest seats/i.test(text(dom)));
+// The closest-five block is offered only when there are close races to
+// list, which on a freshly drawn board is not guaranteed. Asserting it
+// unconditionally is what makes a suite fail once a fortnight for no reason.
+const closeRaces = dom.window.CMP.ui.areas
+  .survey(dom.window.CMP.app.getGame(), dom.window.CMP.app.getGame().partyId)
+  .filter((r) => r.bucket === 'close').length;
+check('19. and the five closest races, when there are any',
+  /Closest 5 races/i.test(text(dom)) === closeRaces > 0,
+  closeRaces + ' close races');
+check('20. with a way to see all of them',
+  !!qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
+
+clickIt(dom, qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
+await settle();
+
 check('2. all 117 are listed', qq(dom, '.area-row').length === 117,
   qq(dom, '.area-row').length + ' rows');
 check('3. each row is compact and clickable',
@@ -580,10 +699,11 @@ check('10. and states cash and the race',
   /Available/.test(q(dom, '.cs-figures').textContent) &&
   /Your support/.test(q(dom, '.cs-figures').textContent));
 check('10. ordinary moves are listed',
-  qq(dom, '.campaign-sheet .act').length === 5,
+  qq(dom, '.campaign-sheet .act').length ===
+    dom.window.CMP.actionsByMenu('campaign').length,
   qq(dom, '.campaign-sheet .act').length + ' moves');
 check('10. high-risk moves are not, until asked',
-  !/Underground Deal|Secret Influence/.test(q(dom, '.campaign-sheet').textContent) &&
+  !/Undisclosed Deal|Political Influence/.test(q(dom, '.campaign-sheet').textContent) &&
   !!qq(dom, 'button').find((b) => /High-risk options/.test(b.textContent)));
 
 clickIt(dom, actionCard(dom, 'Public Rally').querySelector('.act-use'));
@@ -643,7 +763,9 @@ openSection(dom, 'Home');
 section('Fifteen rounds, solo');
 
 dom = await openPage();
-clickIt(dom, modeCard(dom, 'PLAY SOLO'));
+clickIt(dom, modeCard(dom, 'Play solo'));
+await dom.window.CMP.data.ensure();
+await settle();
 clickIt(dom, qq(dom, '.party-card')[0]);
 typeInto(dom, qq(dom, '.field-input')[0], 'Round Runner');
 typeInto(dom, qq(dom, '.field-input')[1], 'One round at a time');
@@ -713,7 +835,8 @@ for (let i = 0; i < 40 && dom.window.CMP.app.getGame().stage !== 'playing'; i++)
 solo = dom.window.CMP.app.getGame();
 check('the break ending opens the next round', solo.round === 2, 'round ' + solo.round);
 check('play is possible again', dom.window.CMP.campaign.roundIsLive(solo));
-check('and the sections are back', qq(dom, '.g-nav-item').length === 7);
+goHome(dom);
+check('and the menu is back', qq(dom, '.g-menu-item').length === 8);
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
@@ -727,7 +850,7 @@ clickIt(dom, q(dom, '.summary-close'));
 check('the summary can be dismissed', !q(dom, '.summary-card'));
 
 /* 17. Borrowing, through the interface. */
-clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Loan'));
+clickIt(dom, menuItem(dom, 'Loan'));
 await settle();
 check('17. a loan section is offered', !!q(dom, '.loan-offers'));
 check('17. the interest is stated', /20%/.test(q(dom, '.sum-lines').textContent));
@@ -751,7 +874,7 @@ await settle();
 
 check('15. the money section separates where it came from',
   (function () {
-    clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Money'));
+    clickIt(dom, menuItem(dom, 'Money'));
     clickIt(dom, qq(dom, 'button').find((b) => /Where it came from/.test(b.textContent)));
     const ok = !!q(dom, '.breakdown') && /Starting budget/.test(q(dom, '.breakdown').textContent);
     const close = qq(dom, '.sheet button').find((b) => b.textContent === 'Close');

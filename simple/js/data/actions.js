@@ -239,7 +239,7 @@ CMP.CAMPAIGN = {
     {
       "id": "deal",
       "group": "risky",
-      "label": "Underground Deal",
+      "label": "Undisclosed Deal",
       "icon": "🤝",
       "blurb": "An arrangement with local powerbrokers, made quietly.",
       "cost": 6000000,
@@ -291,7 +291,7 @@ CMP.CAMPAIGN = {
     {
       "id": "influence",
       "group": "risky",
-      "label": "Secret Influence",
+      "label": "Political Influence",
       "icon": "🌀",
       "blurb": "Quiet pressure applied through intermediaries.",
       "cost": 4000000,
@@ -374,7 +374,7 @@ CMP.CAMPAIGN = {
         "seats": 3,
         "share": 0.5
       },
-      "menu": "corruption",
+      "menu": "campaign",
       "allowsAmount": true
     },
     {
@@ -775,7 +775,7 @@ CMP.CAMPAIGN = {
     },
     "underground": {
       "id": "underground",
-      "label": "Underground Funding",
+      "label": "Secret Funding",
       "icon": "💼",
       "cost": 0,
       "heat": 24,
@@ -1011,6 +1011,221 @@ CMP.CAMPAIGN = {
       5000000,
       10000000
     ]
+  },
+  "bribe": {
+    "actions": [
+      {
+        "id": "voteinfluence",
+        "label": "Risky Vote Influence",
+        "icon": "🎲",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 2000000,
+        "allowsAmount": true,
+        "riskLabel": "Very high risk",
+        "impactLabel": "A swing, or a scandal",
+        "blurb": "An approach nobody will admit to making.",
+        "reach": {
+          "seats": 3,
+          "share": 0.5
+        },
+        "outcomes": [
+          {
+            "id": "swing",
+            "weight": 26,
+            "label": "It moves",
+            "support": 6.5,
+            "heat": 26,
+            "text": "Something shifted. Nobody is saying what."
+          },
+          {
+            "id": "slight",
+            "weight": 30,
+            "label": "A small shift",
+            "support": 2.5,
+            "heat": 24,
+            "text": "A little movement, and a lot of exposure for it."
+          },
+          {
+            "id": "nothing",
+            "weight": 26,
+            "label": "Nothing came of it",
+            "support": 0,
+            "heat": 28,
+            "text": "The money went. The votes did not follow."
+          },
+          {
+            "id": "backfire",
+            "weight": 18,
+            "label": "It got out",
+            "support": -4.5,
+            "seats": 3,
+            "heat": 36,
+            "text": "Word travelled faster than the offer did."
+          }
+        ]
+      },
+      {
+        "id": "hiddenoffer",
+        "label": "Hidden Offer",
+        "icon": "🤫",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 3500000,
+        "allowsAmount": true,
+        "riskLabel": "Very high risk",
+        "impactLabel": "A big swing, or an inquiry",
+        "blurb": "Terms agreed somewhere with no minutes taken.",
+        "reach": {
+          "seats": 4,
+          "share": 0.55
+        },
+        "outcomes": [
+          {
+            "id": "accepted",
+            "weight": 24,
+            "label": "Accepted",
+            "support": 8,
+            "heat": 30,
+            "text": "Whatever was agreed, it is holding."
+          },
+          {
+            "id": "partial",
+            "weight": 28,
+            "label": "Partly honoured",
+            "support": 3.5,
+            "heat": 28,
+            "text": "Half of what was promised, at full price."
+          },
+          {
+            "id": "refused",
+            "weight": 26,
+            "label": "Refused",
+            "support": -1,
+            "heat": 32,
+            "text": "Turned down, and remembered."
+          },
+          {
+            "id": "exposed",
+            "weight": 22,
+            "label": "Exposed",
+            "support": -6,
+            "seats": 4,
+            "heat": 40,
+            "text": "Somebody in the room was taking notes."
+          }
+        ]
+      },
+      {
+        "id": "lastgamble",
+        "label": "Last-Minute Gamble",
+        "icon": "🎰",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 5000000,
+        "allowsAmount": true,
+        "riskLabel": "Extreme risk",
+        "impactLabel": "Everything, or nothing at all",
+        "blurb": "One throw, on the last stretch, for everything.",
+        "reach": {
+          "seats": 5,
+          "share": 0.6
+        },
+        "outcomes": [
+          {
+            "id": "lands",
+            "weight": 22,
+            "label": "It lands",
+            "support": 11,
+            "heat": 34,
+            "text": "It worked. It should not have, but it did."
+          },
+          {
+            "id": "modest",
+            "weight": 24,
+            "label": "Modest return",
+            "support": 3,
+            "heat": 32,
+            "text": "Some of it stuck."
+          },
+          {
+            "id": "wasted",
+            "weight": 26,
+            "label": "Wasted",
+            "support": -1.5,
+            "heat": 36,
+            "text": "A great deal of money for nothing at all."
+          },
+          {
+            "id": "disaster",
+            "weight": 28,
+            "label": "A disaster",
+            "support": -8,
+            "seats": 5,
+            "heat": 45,
+            "text": "It came apart in public, and it came apart badly."
+          }
+        ]
+      }
+    ]
+  },
+  "profiles": {
+    "score": {
+      "perWin": 250,
+      "perSeat": 4,
+      "perCoalitionWin": 150,
+      "perAchievement": 100,
+      "perGamePlayed": 10
+    },
+    "level": {
+      "base": 400,
+      "growth": 1.35,
+      "maxLevel": 50
+    },
+    "achievements": [
+      {
+        "id": "firstwin",
+        "label": "First Win",
+        "blurb": "Win your first Punjab election.",
+        "icon": "🏆"
+      },
+      {
+        "id": "majority",
+        "label": "Majority",
+        "blurb": "Win 59 seats or more.",
+        "icon": "🎯"
+      },
+      {
+        "id": "landslide",
+        "label": "Landslide",
+        "blurb": "Win 75 seats or more.",
+        "icon": "🌊"
+      },
+      {
+        "id": "kingmaker",
+        "label": "Kingmaker",
+        "blurb": "Form a coalition after a hung assembly.",
+        "icon": "🤝"
+      },
+      {
+        "id": "comeback",
+        "label": "Comeback",
+        "blurb": "Win after trailing at round ten.",
+        "icon": "📈"
+      },
+      {
+        "id": "frugal",
+        "label": "Financial Master",
+        "blurb": "Win having spent under ₹3 crore.",
+        "icon": "💎"
+      },
+      {
+        "id": "risktaker",
+        "label": "Risk Taker",
+        "blurb": "Win after using the high-risk mechanics.",
+        "icon": "🔥"
+      }
+    ]
   }
 };
 
@@ -1026,13 +1241,15 @@ CMP.EVENTS = CMP.CAMPAIGN.events;
  * weighted outcome table — so the engine resolves all three the same way and
  * the interface needs no special case for them.
  */
-CMP.ACTIONS = CMP.CAMPAIGN.actions.concat(
-  ['grant', 'underground'].map(function (id) {
-    var entry = JSON.parse(JSON.stringify(CMP.CAMPAIGN.funding[id]));
-    entry.group = 'funding';
-    return entry;
-  })
-);
+CMP.ACTIONS = CMP.CAMPAIGN.actions
+  .concat(CMP.CAMPAIGN.bribe.actions)
+  .concat(
+    ['grant', 'underground'].map(function (id) {
+      var entry = JSON.parse(JSON.stringify(CMP.CAMPAIGN.funding[id]));
+      entry.group = 'funding';
+      return entry;
+    })
+  );
 
 CMP.getAction = function (id) {
   for (var i = 0; i < CMP.ACTIONS.length; i++) {

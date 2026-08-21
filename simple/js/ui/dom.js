@@ -56,7 +56,37 @@ CMP.ui.dom = (function () {
     return node;
   }
 
-  return { el: el, mount: mount, append: append };
+  /**
+   * The same thing for SVG. A separate function because createElement makes an
+   * HTMLUnknownElement for an <svg> tag — it appears in the DOM and renders
+   * nothing at all, which is a hard bug to see.
+   */
+  function svg(tag, attrs, children) {
+    var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        var v = attrs[k];
+        if (v === null || v === undefined || v === false) return;
+        if (k === 'text') node.textContent = v;
+        else if (k === 'style' && typeof v === 'object') {
+          Object.keys(v).forEach(function (p) {
+            if (p.slice(0, 2) === '--') node.style.setProperty(p, v[p]);
+            else node.style[p] = v[p];
+          });
+        } else if (k.slice(0, 2) === 'on' && typeof v === 'function') {
+          node.addEventListener(k.slice(2).toLowerCase(), v);
+        } else {
+          node.setAttribute(k, v === true ? '' : v);
+        }
+      });
+    }
+
+    append(node, children);
+    return node;
+  }
+
+  return { el: el, svg: svg, mount: mount, append: append };
 })();
 
 CMP.ui.money = (function () {

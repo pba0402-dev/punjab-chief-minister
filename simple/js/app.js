@@ -5,7 +5,8 @@
  * localStorage and never touches the network; multiplayer state lives on the
  * server and is polled while the lobby is open.
  *
- * Screens: home | setup | election | multiplayer | lobby
+ * Screens: home | setup | election | multiplayer | lobby | result | profile |
+ * leaderboard
  */
 window.CMP = window.CMP || {};
 
@@ -118,6 +119,11 @@ CMP.app = (function () {
     CMP.storage.save(game);
     stopSoloClock();
 
+    // The server had no part in playing this, so it is recorded as the
+    // player's own account of it: their profile keeps it, the leaderboard
+    // does not.
+    CMP.profile.recordSolo(game, game.result);
+
     serverView = {
       code: null,
       phase: game.result.outcome === 'majority' ? 'government' : 'hung',
@@ -195,6 +201,13 @@ CMP.app = (function () {
     return Promise.resolve({ ok: true, game: game });
   }
 
+  /** Start a profile if there is not one, under the name just given. */
+  function ensureProfile(name) {
+    if (!CMP.profile.has()) CMP.profile.create(name);
+    else if (name) CMP.profile.rename(name);
+    return CMP.profile.get();
+  }
+
   /* ------------------------------------------------------ lobby wiring */
 
   function enterLobby() {
@@ -212,6 +225,13 @@ CMP.app = (function () {
 
   function onLobbyUpdate(res) {
     if (!lobbyView) return;
+
+    // A multiplayer player names their candidate in the lobby, so that is
+    // where their profile starts if they do not already have one.
+    var mine = res.ok ? mineFrom(res.game) : null;
+    if (mine && mine.candidateName && !CMP.profile.has()) {
+      CMP.profile.create(mine.candidateName);
+    }
 
     if (!res.ok) {
       if (res.offline) {
@@ -397,8 +417,24 @@ CMP.app = (function () {
         },
         onStart: function (started) {
           started.mode = 'solo';
+          // A profile starts itself the first time somebody plays, under the
+          // name they just typed. Nobody is asked to make an account before
+          // they can find out whether they enjoy the game.
+          ensureProfile(started.candidateName);
           screen = 'election';
           setGame(started);
+        },
+      });
+    } else if (screen === 'profile') {
+      view = CMP.ui.profile.render({
+        onBack: function () {
+          goTo('home');
+        },
+      });
+    } else if (screen === 'leaderboard') {
+      view = CMP.ui.profile.leaderboard({
+        onBack: function () {
+          goTo('home');
         },
       });
     } else if (screen === 'multiplayer') {
@@ -423,6 +459,12 @@ CMP.app = (function () {
         onMultiplayer: function () {
           goTo('multiplayer');
         },
+        onProfile: function () {
+          goTo('profile');
+        },
+        onLeaderboard: function () {
+          goTo('leaderboard');
+        },
         onRejoin: function () {
           goTo('lobby');
         },
@@ -433,8 +475,9 @@ CMP.app = (function () {
             return;
           }
           game = saved;
-          screen = saved.screen === 'election' ? 'election' : 'setup';
-          paint();
+          // Through goTo, so resuming pulls the board in the same way
+          // starting one does.
+          goTo(saved.screen === 'election' ? 'election' : 'setup');
         },
       });
     }
@@ -451,7 +494,35 @@ CMP.app = (function () {
     }
   }
 
+  /**
+   * Screens that need the board: the 117 seats, the sitting MLAs and the map.
+   * The opening screen, the profile and the leaderboard need none of it, and
+   * making them wait for it would be the slowest thing about the game.
+   */
+  var NEEDS_BOARD = ['setup', 'lobby', 'election', 'result'];
+
   function goTo(name) {
+    // Fetch the board on the way in, once per session. Every other call site
+    // stays as it was: navigation is the one place that knows where it is
+    // going, so it is the one place that has to ask.
+    if (NEEDS_BOARD.indexOf(name) !== -1 && !CMP.data.ready()) {
+      var previous = screen;
+      CMP.data.ensure().then(
+        function () {
+          goTo(name);
+        },
+        function () {
+          screen = previous;
+          paint();
+          window.alert(
+            'The game could not load its map of Punjab. ' +
+            'Check your connection and try again.'
+          );
+        }
+      );
+      return;
+    }
+
     if (name !== 'lobby') stopLobby();
     if (name !== 'election') {
       stopSoloClock();

@@ -1047,7 +1047,16 @@ check('config exposes starting budget', typeof CMP.CAMPAIGN.startingBudget === '
 check('config exposes heat levels', CMP.CAMPAIGN.heat.levels.length === 4);
 check('config exposes consequences', CMP.CAMPAIGN.consequences.length >= 4);
 check('four safe actions', CMP.actionsByGroup('safe').length === 4);
-check('four risky actions', CMP.actionsByGroup('risky').length === 4);
+check('seven risky actions', CMP.actionsByGroup('risky').length === 7);
+check('three of them on the bribe menu', CMP.actionsByMenu('bribe').length === 3);
+check(
+  'every bribe action is risky',
+  CMP.actionsByMenu('bribe').every((a) => a.group === 'risky')
+);
+check(
+  'the corruption menu holds the other three',
+  CMP.actionsByMenu('corruption').length === 3
+);
 check(
   'every action declares a risk and an impact label',
   CMP.ACTIONS.every((a) => a.riskLabel && a.impactLabel)

@@ -119,13 +119,13 @@ final class Campaign
 
     /**
      * Every action a player can take, campaign strategies and the two ways of
-     * raising money alike. Grants and underground funding are shaped like any
-     * other action — a cost, a weighted outcome table — so play() resolves all
-     * three the same way and the UI needs no special case.
+     * raising money alike. The bribe menu, grants and underground funding are
+     * all shaped like any other action — a cost, a weighted outcome table — so
+     * play() resolves them the same way and the UI needs no special case.
      */
     public function actions(): array
     {
-        $all = $this->config['actions'];
+        $all = array_merge($this->config['actions'], $this->config['bribe']['actions'] ?? []);
         foreach (['grant', 'underground'] as $id) {
             $entry = $this->config['funding'][$id];
             $entry['group'] = 'funding';

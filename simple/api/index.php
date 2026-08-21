@@ -22,6 +22,9 @@
  *   GET  ?action=history {constituency}
  *   POST ?action=leave
  *   GET  ?action=health
+ *   GET  ?action=stats             -> counters, leaderboard, party performance
+ *   POST ?action=profile           -> fetch or create a profile
+ *   POST ?action=record            -> a finished solo game, self-reported
  *
  * The round clock runs on this side. Every authenticated request settles any
  * rounds whose time has run out before it does anything else, so a client that
@@ -38,6 +41,7 @@ require __DIR__ . '/lib/Lobby.php';
 require __DIR__ . '/lib/Campaign.php';
 require __DIR__ . '/lib/Rounds.php';
 require __DIR__ . '/lib/AI.php';
+require __DIR__ . '/lib/Profiles.php';
 require __DIR__ . '/lib/Investigation.php';
 require __DIR__ . '/lib/Election.php';
 require __DIR__ . '/lib/Coalition.php';
@@ -87,6 +91,7 @@ $campaign = new Campaign(__DIR__ . '/campaign-config.json');
 $investigation = new Investigation($campaign);
 $election = new Election($campaign);
 $coalitionRules = new Coalition($campaign);
+$profiles = new Profiles($dataDir, $campaign->config());
 
 /* The seat list the board is dealt from. Read once from the generated data
    file so the server and browser always agree on which seats exist. */
@@ -239,6 +244,12 @@ function mutate(FileStore $store, array $game, string $playerId, callable $fn, ?
         // refuse an action for arriving too late.
         $g = Rounds::advanceIfDue($g, $GLOBALS['campaign'], $GLOBALS['election']);
 
+        // Round fifteen ends the election on its own, so the credit is settled
+        // here rather than only where a host closes the polls by hand.
+        if (!empty($g['result'])) {
+            $g = recordFinishedGame($g, $GLOBALS['profiles']);
+        }
+
         try {
             $result = $fn($g);
         } catch (LobbyError $e) {
@@ -270,6 +281,114 @@ function mutate(FileStore $store, array $game, string $playerId, callable $fn, ?
     ));
 }
 
+/**
+ * Link a seat to the profile the browser is carrying, if it has one. The
+ * profile id is generated and kept by the client — a low bar deliberately,
+ * because this is a game — and it is what lets a finished election be
+ * credited to somebody afterwards.
+ */
+function attachProfile(array $player, Profiles $profiles): array
+{
+    $id = Profiles::cleanId((string) input('profileId', ''));
+    if ($id === '') {
+        return $player;
+    }
+    $name = Profiles::cleanName((string) input('profileName', ''));
+    $profile = $profiles->ensure($id, $name, (string) $player['portraitSeed']);
+    if (!$profile) {
+        return $player;
+    }
+    $player['profileId'] = $id;
+    if ($profile['name'] !== '') {
+        $player['profileName'] = $profile['name'];
+    }
+    return $player;
+}
+
+/**
+ * Credit a finished election to everyone who played it. Called once, when the
+ * result is first decided, and guarded so a replayed poll cannot count the
+ * same election twice.
+ */
+function recordFinishedGame(array $game, Profiles $profiles): array
+{
+    if (!empty($game['recorded']) || empty($game['result'])) {
+        return $game;
+    }
+    $game['recorded'] = true;
+
+    $result = $game['result'];
+    $coalition = $game['coalition'] ?? [];
+    $inGovernment = [];
+    if (($coalition['status'] ?? '') === 'formed') {
+        $inGovernment = $coalition['members'] ?? [];
+    }
+
+    foreach ($result['standings'] as $row) {
+        $pid = $row['playerId'] ?? null;
+        if ($pid === null || empty($game['players'][$pid])) {
+            continue;
+        }
+        $player = $game['players'][$pid];
+        if (empty($player['profileId']) || !empty($player['isAI'])) {
+            continue;
+        }
+
+        $viaCoalition = in_array($pid, $inGovernment, true);
+        $won = ($result['winner'] && ($result['winner']['playerId'] ?? null) === $pid) || $viaCoalition;
+
+        $profiles->record($player['profileId'], [
+            'party' => $row['party'],
+            'seats' => (int) $row['seats'],
+            'won' => $won,
+            'coalition' => $viaCoalition,
+            'outcome' => $result['outcome'],
+            'spent' => (int) ($player['spent'] ?? 0),
+            'behindAtTen' => wasBehindAtTen($game, (string) $row['party']),
+            'usedHighRisk' => usedHighRisk($player),
+        ], true);
+    }
+
+    // One election, counted once — whatever the number of people who played
+    // it. A government forms either by winning outright or by a coalition
+    // that actually came together.
+    $profiles->countElection(
+        !empty($result['winner']) || $inGovernment !== [],
+        $inGovernment !== []
+    );
+
+    return $game;
+}
+
+/** Were they behind at round ten? Read from the round history. */
+function wasBehindAtTen(array $game, string $party): bool
+{
+    foreach (($game['history'] ?? []) as $snap) {
+        if ((int) $snap['round'] !== 10) {
+            continue;
+        }
+        $mine = (int) ($snap['seats'][$party] ?? 0);
+        foreach ($snap['seats'] as $other => $seats) {
+            if ($other !== $party && (int) $seats > $mine) {
+                return true;
+            }
+        }
+        return false;
+    }
+    return false;
+}
+
+/** Did they reach for the risky mechanics at any point? */
+function usedHighRisk(array $player): bool
+{
+    foreach (($player['actions'] ?? []) as $a) {
+        if (($a['group'] ?? '') === 'risky') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* ---------------------------------------------------------------- routing */
 
 // Opportunistic cleanup: cheap, and keeps the directory from growing forever.
@@ -293,6 +412,7 @@ switch (route()) {
 
         $game = Lobby::newGame(Code::generateUnique($store));
         $player = Lobby::newPlayer(1, $campaign->startingBudget());
+        $player = attachProfile($player, $profiles);
         $game['players'][$player['id']] = $player;
         $game['hostId'] = $player['id'];
         $store->save($game);
@@ -331,6 +451,7 @@ switch (route()) {
                 return $g;
             }
             $player = Lobby::newPlayer($slot, $GLOBALS['campaign']->startingBudget());
+            $player = attachProfile($player, $GLOBALS['profiles']);
             $g['players'][$player['id']] = $player;
             if ($g['hostId'] === null) {
                 $g['hostId'] = $player['id'];
@@ -392,12 +513,17 @@ switch (route()) {
         $slogan = clean((string) input('slogan', ''), 80);
         // Budget is granted, not submitted — a client cannot set its own purse.
 
-        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan) {
+        // A player's profile is usually started here rather than at create or
+        // join, because this is the first moment they have typed a name to
+        // put on it. Attaching it again is harmless and it is what makes a
+        // finished election creditable.
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan, $profiles) {
             if ($g['phase'] !== 'lobby') {
                 throw new LobbyError('The election has already started.');
             }
             $g['players'][$playerId]['candidateName'] = $name;
             $g['players'][$playerId]['slogan'] = $slogan;
+            $g['players'][$playerId] = attachProfile($g['players'][$playerId], $profiles);
             return $g;
         });
     }
@@ -476,6 +602,7 @@ switch (route()) {
             $g['leaders'] = Rounds::currentLeaders($board);
             $g['leadParty'] = null;
             $g['lastResult'] = null;
+            $GLOBALS['profiles']->countGameStarted();
 
             return Rounds::begin($g, 1, $engine);
         });
@@ -655,7 +782,7 @@ switch (route()) {
             $g['phase'] = $result['outcome'] === 'majority' ? 'government' : 'hung';
             $g['stage'] = 'final';
             $g['possibleCoalitions'] = $GLOBALS['election']->possibleCoalitions($result);
-            return $g;
+            return recordFinishedGame($g, $GLOBALS['profiles']);
         });
     }
 
@@ -686,6 +813,12 @@ switch (route()) {
             if (!$res['ok']) {
                 throw new LobbyError($res['error'], 'coalition_refused');
             }
+            // A coalition changes who took office, so the credit is settled
+            // once it is formed rather than when the seats were counted.
+            if (($g['coalition']['status'] ?? '') === 'formed') {
+                $g['recorded'] = false;
+                $g = recordFinishedGame($g, $GLOBALS['profiles']);
+            }
             return $g;
         });
     }
@@ -702,6 +835,70 @@ switch (route()) {
             $store->delete($updated['id']);
         }
         send(['ok' => true]);
+    }
+
+    /* ------------------------------------------------------------- stats */
+    case 'stats': {
+        // Everything the home screen shows, counted from games that actually
+        // finished. A new installation answers zero, and says so.
+        send([
+            'ok' => true,
+            'summary' => $profiles->summary(),
+            'leaderboard' => $profiles->leaderboard(10),
+        ]);
+    }
+
+    /* ----------------------------------------------------------- profile */
+    case 'profile': {
+        $id = Profiles::cleanId((string) input('profileId', ''));
+        if ($id === '') {
+            fail('No profile id.', 400, 'bad_profile');
+        }
+        $profile = $profiles->ensure(
+            $id,
+            (string) input('name', ''),
+            (string) input('portraitSeed', '')
+        );
+        if (!$profile) {
+            fail('That profile could not be read.', 400, 'bad_profile');
+        }
+        send([
+            'ok' => true,
+            'profile' => $profiles->publicView($profile, $campaign->config()),
+        ]);
+    }
+
+    /* ------------------------------------------------------------ record */
+    case 'record': {
+        // A solo game runs in the browser, so this is the player's own account
+        // of it. It is kept on their profile, where it is their business, and
+        // deliberately never reaches the leaderboard — see lib/Profiles.php.
+        $id = Profiles::cleanId((string) input('profileId', ''));
+        if ($id === '') {
+            fail('No profile id.', 400, 'bad_profile');
+        }
+        $profiles->ensure($id, (string) input('name', ''), (string) input('portraitSeed', ''));
+
+        $party = preg_replace('/[^a-z]/', '', strtolower((string) input('party', '')));
+        if (!in_array($party, Lobby::PARTIES, true)) {
+            fail('Unknown party.', 400, 'bad_party');
+        }
+
+        $profile = $profiles->record($id, [
+            'party' => $party,
+            'seats' => max(0, min(117, (int) input('seats', 0))),
+            'won' => filter_var(input('won', false), FILTER_VALIDATE_BOOLEAN),
+            'coalition' => filter_var(input('coalition', false), FILTER_VALIDATE_BOOLEAN),
+            'outcome' => preg_replace('/[^a-z]/', '', strtolower((string) input('outcome', ''))),
+            'spent' => max(0, (int) input('spent', 0)),
+            'behindAtTen' => filter_var(input('behindAtTen', false), FILTER_VALIDATE_BOOLEAN),
+            'usedHighRisk' => filter_var(input('usedHighRisk', false), FILTER_VALIDATE_BOOLEAN),
+        ], false);
+
+        send([
+            'ok' => true,
+            'profile' => $profile ? $profiles->publicView($profile, $campaign->config()) : null,
+        ]);
     }
 
     /* ------------------------------------------------------------ health */

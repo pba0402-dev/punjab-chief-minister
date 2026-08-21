@@ -242,7 +242,7 @@
     {
       "id": "deal",
       "group": "risky",
-      "label": "Underground Deal",
+      "label": "Undisclosed Deal",
       "icon": "🤝",
       "blurb": "An arrangement with local powerbrokers, made quietly.",
       "cost": 6000000,
@@ -294,7 +294,7 @@
     {
       "id": "influence",
       "group": "risky",
-      "label": "Secret Influence",
+      "label": "Political Influence",
       "icon": "🌀",
       "blurb": "Quiet pressure applied through intermediaries.",
       "cost": 4000000,
@@ -377,7 +377,7 @@
         "seats": 3,
         "share": 0.5
       },
-      "menu": "corruption",
+      "menu": "campaign",
       "allowsAmount": true
     },
     {
@@ -876,7 +876,7 @@
     },
     "underground": {
       "id": "underground",
-      "label": "Underground Funding",
+      "label": "Secret Funding",
       "icon": "💼",
       "cost": 0,
       "heat": 24,
@@ -1195,6 +1195,247 @@
       2500000,
       5000000,
       10000000
+    ]
+  },
+  "bribe": {
+    "_comment": [
+      "A separate menu of the highest-risk moves in the game.",
+      "",
+      "Every one of these is a fictional mechanic and nothing more: a cost, a",
+      "weighted table, a lot of heat, and a real chance of an investigation. None",
+      "of them describes a method or explains how anything would be done. What a",
+      "player is choosing is a gamble inside a game, and the interesting part is",
+      "what happens when the oversight system notices.",
+      "",
+      "They are deliberately worse than campaigning on expectation. The upside is",
+      "real, the downside is worse, and the heat lands whichever way it goes."
+    ],
+    "actions": [
+      {
+        "id": "voteinfluence",
+        "label": "Risky Vote Influence",
+        "icon": "🎲",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 2000000,
+        "allowsAmount": true,
+        "riskLabel": "Very high risk",
+        "impactLabel": "A swing, or a scandal",
+        "blurb": "An approach nobody will admit to making.",
+        "reach": {
+          "seats": 3,
+          "share": 0.5
+        },
+        "outcomes": [
+          {
+            "id": "swing",
+            "weight": 26,
+            "label": "It moves",
+            "support": 6.5,
+            "heat": 26,
+            "text": "Something shifted. Nobody is saying what."
+          },
+          {
+            "id": "slight",
+            "weight": 30,
+            "label": "A small shift",
+            "support": 2.5,
+            "heat": 24,
+            "text": "A little movement, and a lot of exposure for it."
+          },
+          {
+            "id": "nothing",
+            "weight": 26,
+            "label": "Nothing came of it",
+            "support": 0,
+            "heat": 28,
+            "text": "The money went. The votes did not follow."
+          },
+          {
+            "id": "backfire",
+            "weight": 18,
+            "label": "It got out",
+            "support": -4.5,
+            "seats": 3,
+            "heat": 36,
+            "text": "Word travelled faster than the offer did."
+          }
+        ]
+      },
+      {
+        "id": "hiddenoffer",
+        "label": "Hidden Offer",
+        "icon": "🤫",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 3500000,
+        "allowsAmount": true,
+        "riskLabel": "Very high risk",
+        "impactLabel": "A big swing, or an inquiry",
+        "blurb": "Terms agreed somewhere with no minutes taken.",
+        "reach": {
+          "seats": 4,
+          "share": 0.55
+        },
+        "outcomes": [
+          {
+            "id": "accepted",
+            "weight": 24,
+            "label": "Accepted",
+            "support": 8,
+            "heat": 30,
+            "text": "Whatever was agreed, it is holding."
+          },
+          {
+            "id": "partial",
+            "weight": 28,
+            "label": "Partly honoured",
+            "support": 3.5,
+            "heat": 28,
+            "text": "Half of what was promised, at full price."
+          },
+          {
+            "id": "refused",
+            "weight": 26,
+            "label": "Refused",
+            "support": -1,
+            "heat": 32,
+            "text": "Turned down, and remembered."
+          },
+          {
+            "id": "exposed",
+            "weight": 22,
+            "label": "Exposed",
+            "support": -6,
+            "seats": 4,
+            "heat": 40,
+            "text": "Somebody in the room was taking notes."
+          }
+        ]
+      },
+      {
+        "id": "lastgamble",
+        "label": "Last-Minute Gamble",
+        "icon": "🎰",
+        "group": "risky",
+        "menu": "bribe",
+        "cost": 5000000,
+        "allowsAmount": true,
+        "riskLabel": "Extreme risk",
+        "impactLabel": "Everything, or nothing at all",
+        "blurb": "One throw, on the last stretch, for everything.",
+        "reach": {
+          "seats": 5,
+          "share": 0.6
+        },
+        "outcomes": [
+          {
+            "id": "lands",
+            "weight": 22,
+            "label": "It lands",
+            "support": 11,
+            "heat": 34,
+            "text": "It worked. It should not have, but it did."
+          },
+          {
+            "id": "modest",
+            "weight": 24,
+            "label": "Modest return",
+            "support": 3,
+            "heat": 32,
+            "text": "Some of it stuck."
+          },
+          {
+            "id": "wasted",
+            "weight": 26,
+            "label": "Wasted",
+            "support": -1.5,
+            "heat": 36,
+            "text": "A great deal of money for nothing at all."
+          },
+          {
+            "id": "disaster",
+            "weight": 28,
+            "label": "A disaster",
+            "support": -8,
+            "seats": 5,
+            "heat": 45,
+            "text": "It came apart in public, and it came apart badly."
+          }
+        ]
+      }
+    ]
+  },
+  "profiles": {
+    "_comment": [
+      "Player profiles, levels, achievements and the leaderboard score.",
+      "",
+      "Everything here is counted from games the server actually ran. A solo",
+      "game runs entirely in the browser, so its result is self-reported: it is",
+      "recorded on the player's own profile and shown to them, but it never",
+      "feeds the global leaderboard, because there is no way to tell a real solo",
+      "win from a crafted request. Verified games are the ones that count for",
+      "rank.",
+      "",
+      "The score formula is configurable on purpose. It weights winning and",
+      "seats rather than turning up, so grinding games is not a strategy."
+    ],
+    "score": {
+      "perWin": 250,
+      "perSeat": 4,
+      "perCoalitionWin": 150,
+      "perAchievement": 100,
+      "perGamePlayed": 10
+    },
+    "level": {
+      "_comment": "Level is score-based, on a widening curve so early levels come quickly.",
+      "base": 400,
+      "growth": 1.35,
+      "maxLevel": 50
+    },
+    "achievements": [
+      {
+        "id": "firstwin",
+        "label": "First Win",
+        "blurb": "Win your first Punjab election.",
+        "icon": "🏆"
+      },
+      {
+        "id": "majority",
+        "label": "Majority",
+        "blurb": "Win 59 seats or more.",
+        "icon": "🎯"
+      },
+      {
+        "id": "landslide",
+        "label": "Landslide",
+        "blurb": "Win 75 seats or more.",
+        "icon": "🌊"
+      },
+      {
+        "id": "kingmaker",
+        "label": "Kingmaker",
+        "blurb": "Form a coalition after a hung assembly.",
+        "icon": "🤝"
+      },
+      {
+        "id": "comeback",
+        "label": "Comeback",
+        "blurb": "Win after trailing at round ten.",
+        "icon": "📈"
+      },
+      {
+        "id": "frugal",
+        "label": "Financial Master",
+        "blurb": "Win having spent under ₹3 crore.",
+        "icon": "💎"
+      },
+      {
+        "id": "risktaker",
+        "label": "Risk Taker",
+        "blurb": "Win after using the high-risk mechanics.",
+        "icon": "🔥"
+      }
     ]
   }
 }

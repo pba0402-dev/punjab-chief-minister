@@ -32,18 +32,33 @@ CMP.ui.election = (function () {
   var mount = CMP.ui.dom.mount;
   var money = CMP.ui.money;
 
-  // Campaigning is not in this menu. It happens through the candidate, the
-  // constituency and the CAMPAIGN HERE button — which is the point of the
-  // whole layout.
+  /**
+   * The menu, as a two-column grid on the home screen rather than a strip of
+   * tabs across the top. Eight destinations fit on a phone without scrolling
+   * sideways, and each one opens a screen of its own: click, open, decide,
+   * back.
+   *
+   * CAMPAIGN is first because it is what a player is here to do. It opens the
+   * candidate's own seats, and the spending decision happens two taps later at
+   * a named constituency, never from this menu.
+   */
   var SECTIONS = [
-    { id: 'home', label: 'Home' },
-    { id: 'areas', label: 'My Areas' },
-    { id: 'money', label: 'Money' },
-    { id: 'grants', label: 'Grants' },
-    { id: 'loan', label: 'Loan' },
-    { id: 'corruption', label: 'High Risk' },
-    { id: 'map', label: 'Map' },
+    { id: 'areas', label: 'Campaign', hint: 'Your seats', icon: '◆' },
+    { id: 'money', label: 'Money', hint: 'Cash and debt', icon: '₹' },
+    { id: 'grants', label: 'Grants', hint: 'Apply for funds', icon: '◈' },
+    { id: 'loan', label: 'Loan', hint: 'Borrow at 20%', icon: '◇' },
+    { id: 'corruption', label: 'Corruption', hint: 'High risk', icon: '▲', risky: true },
+    { id: 'bribe', label: 'Bribe', hint: 'Highest risk', icon: '▲', risky: true },
+    { id: 'map', label: 'Map', hint: 'All of Punjab', icon: '◉' },
+    { id: 'seats', label: 'Constituencies', hint: 'All 117', icon: '☰' },
   ];
+
+  function sectionById(id) {
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (SECTIONS[i].id === id) return SECTIONS[i];
+    }
+    return null;
+  }
 
   function create(opts) {
     var game = null;
@@ -64,8 +79,6 @@ CMP.ui.election = (function () {
     var headNode = el('header', { class: 'g-head' });
     var roundNode = el('div', { class: 'g-round' });
     var playerNode = el('div', { class: 'g-player' });
-    var navNode = el('nav', { class: 'g-nav', 'aria-label': 'Sections' });
-    var navWrap = el('div', { class: 'g-nav-wrap' }, [navNode]);
     var noticeNode = el('div', { class: 'g-notice' });
     var bodyNode = el('div', { class: 'g-body' });
     var resultsNode = el('div', { class: 'g-results' });
@@ -81,6 +94,14 @@ CMP.ui.election = (function () {
       },
     });
     mount(resultsNode, [resultsView.root]);
+
+    // All 117, searchable — the way to reach a seat by name rather than by
+    // whose it is. Built once and reused, so the search box keeps its text.
+    var seatBrowser = CMP.ui.seats.browser({
+      onOpen: function (number) {
+        openSeatDetail(number);
+      },
+    });
 
     var areasView = CMP.ui.areas.create({
       onOpen: function (number) {
@@ -101,7 +122,6 @@ CMP.ui.election = (function () {
         headNode,
         roundNode,
         playerNode,
-        navWrap,
         noticeNode,
         summaryNode,
         resultsNode,
@@ -184,7 +204,6 @@ CMP.ui.election = (function () {
       openSeat = null;
       if (next === 'areas' && !openParty) openParty = game.partyId;
       if (next !== 'areas') openParty = null;
-      paintNav();
       paintBody();
     }
 
@@ -193,7 +212,6 @@ CMP.ui.election = (function () {
       openParty = partyId;
       openSeat = null;
       section = 'areas';
-      paintNav();
       paintBody();
       toTop();
     }
@@ -247,14 +265,16 @@ CMP.ui.election = (function () {
             text: CMP.TOTAL_SEATS + ' seats · majority ' + CMP.MAJORITY,
           }),
         ]),
+        // Not the game menu — this is everything that is not part of a
+        // round: the election history, leaving, declaring early.
         el('button', {
-          class: 'g-menu',
+          class: 'g-more',
           type: 'button',
-          'aria-label': 'Menu',
+          'aria-label': 'More',
           onclick: openMenu,
         }, [
-          el('span', { class: 'g-menu-bars', 'aria-hidden': 'true' }),
-          el('span', { class: 'g-menu-label', text: 'Menu' }),
+          el('span', { class: 'g-more-bars', 'aria-hidden': 'true' }),
+          el('span', { class: 'g-more-label', text: 'More' }),
         ]),
       ]);
     }
@@ -325,6 +345,7 @@ CMP.ui.election = (function () {
       var sheet = el('div', { class: 'sheet' }, [
         el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
           el('h2', { class: 'sheet-title', text: 'Election history' }),
+          CMP.ui.scoreboard.historyChart((game && game.seatTrend) || []),
           CMP.ui.scoreboard.historyTable((game && game.seatTrend) || []),
           el('button', {
             class: 'btn btn-quiet btn-wide',
@@ -395,18 +416,40 @@ CMP.ui.election = (function () {
 
     /* -------------------------------------------------------------- nav */
 
-    function paintNav() {
-      mount(navNode, SECTIONS.map(function (s) {
+    /** The two-column menu. Lives on the home screen, not above every screen. */
+    function menuGrid() {
+      return el('nav', { class: 'g-menu', 'aria-label': 'Menu' }, SECTIONS.map(function (s) {
         return el('button', {
-          class: 'g-nav-item' + (section === s.id ? ' is-active' : ''),
+          class: 'g-menu-item' + (s.risky ? ' is-risky' : ''),
           type: 'button',
-          text: s.label,
-          'aria-current': section === s.id ? 'page' : null,
           onclick: function () {
             setSection(s.id);
           },
-        });
+        }, [
+          el('span', { class: 'g-menu-icon', 'aria-hidden': 'true', text: s.icon }),
+          el('span', { class: 'g-menu-label', text: s.label }),
+          el('span', { class: 'g-menu-hint', text: s.hint }),
+        ]);
       }));
+    }
+
+    /** Every screen but home opens with a way back to it. */
+    function sectionHead(title, note) {
+      return el('header', { class: 'g-section-head' }, [
+        el('button', {
+          class: 'sd-back',
+          type: 'button',
+          'aria-label': 'Back to the election',
+          text: '‹',
+          onclick: function () {
+            setSection('home');
+          },
+        }),
+        el('div', { class: 'g-section-titles' }, [
+          el('h2', { class: 'g-section-title', text: title }),
+          note ? el('p', { class: 'g-section-note', text: note }) : null,
+        ]),
+      ]);
     }
 
     function paintNotice() {
@@ -427,14 +470,33 @@ CMP.ui.election = (function () {
         return;
       }
 
-      if (section === 'home') mount(bodyNode, homeSection());
-      else if (section === 'areas') mount(bodyNode, [areasSection()]);
-      else if (section === 'money') mount(bodyNode, moneySection());
-      else if (section === 'grants') mount(bodyNode, actionsSection('grants', 'Grants',
-        'Fund visible work and apply for support. No heat, and the money is never certain.'));
-      else if (section === 'loan') mount(bodyNode, loanSection());
-      else if (section === 'corruption') mount(bodyNode, riskSection());
-      else if (section === 'map') mount(bodyNode, [mapSection()]);
+      if (section === 'home') {
+        mount(bodyNode, homeSection());
+        return;
+      }
+
+      // Every other screen is a destination reached from the menu, so each
+      // one carries its own way back.
+      var body;
+      if (section === 'areas') body = [areasSection()];
+      else if (section === 'money') body = moneySection();
+      else if (section === 'grants') {
+        body = actionsSection('grants', 'Grants',
+          'Fund visible work and apply for support. No heat, and the money is never certain.');
+      } else if (section === 'loan') body = loanSection();
+      else if (section === 'corruption') body = riskSection('corruption');
+      else if (section === 'bribe') body = riskSection('bribe');
+      else if (section === 'map') body = [mapSection()];
+      else if (section === 'seats') body = [seatsSection()];
+      else body = [];
+
+      // The candidate's own screen carries its own portrait, name and back
+      // arrow, so it does not want a second header on top. Everything else
+      // does — including the map, which is otherwise a screen with no way
+      // off it.
+      var meta = sectionById(section);
+      var wantsHead = section !== 'areas';
+      mount(bodyNode, (wantsHead && meta ? [sectionHead(meta.label)] : []).concat(body));
     }
 
     /* ---------------------------------------------------- campaign home */
@@ -449,6 +511,7 @@ CMP.ui.election = (function () {
       var people = roster();
 
       return [
+        menuGrid(),
         leaderboardBlock(counts, people),
         majorityLine(counts),
         el('section', { class: 'g-block' }, [
@@ -566,14 +629,69 @@ CMP.ui.election = (function () {
      * grants and high risk. Campaigning proper goes through the constituency
      * sheet, where an amount can be chosen alongside the move.
      */
+    /**
+     * What a risky move might win and what it might cost, in words.
+     *
+     * Every figure here is read off the same config the engine plays from, so
+     * the two can never drift apart. The exact odds are deliberately not
+     * shown: a player choosing one of these is meant to be taking a gamble,
+     * not reading a payout table.
+     */
+    function riskDetail(action) {
+      var best = 0;
+      var worst = 0;
+      var heat = 0;
+      (action.outcomes || []).forEach(function (o) {
+        best = Math.max(best, o.support || 0);
+        worst = Math.min(worst, o.support || 0);
+        heat = Math.max(heat, o.heat || 0);
+      });
+
+      var seats = (action.reach && action.reach.seats) || 1;
+      var inv = CMP.CAMPAIGN.investigation;
+      var fines = (inv.outcomes || [])
+        .map(function (o) {
+          return o.fine || 0;
+        })
+        .filter(function (f) {
+          return f > 0;
+        });
+      var maxFine = fines.length ? Math.max.apply(null, fines) : 0;
+
+      // Heat is what an inquiry is opened on, so how much a move adds is the
+      // honest way to describe the risk of one without inventing a number.
+      var heatWord = heat >= 34 ? 'Sharply raises' : heat >= 26 ? 'Raises' : 'Slightly raises';
+
+      function line(label, value) {
+        return el('div', { class: 'act-line' }, [
+          el('span', { class: 'act-line-label', text: label }),
+          el('span', { class: 'act-line-value', text: value }),
+        ]);
+      }
+
+      return el('div', { class: 'act-detail' }, [
+        line('Possible reward',
+          best > 0
+            ? 'Up to +' + best.toFixed(1) + ' support' + (seats > 1 ? ' across ' + seats + ' seats' : '')
+            : 'Money, with no support gained'),
+        line('If it backfires',
+          worst < 0 ? worst.toFixed(1) + ' support' : 'Nothing gained'),
+        line('Investigation risk', heatWord + ' political heat'),
+        line('Possible fine', maxFine ? 'Up to ' + money.words(maxFine) : 'None'),
+      ]);
+    }
+
     function actionList(menu) {
       var actions = CMP.actionsByMenu(menu);
+      var explain = menu === 'corruption' || menu === 'bribe';
+
       return el('div', { class: 'act-list' }, actions.map(function (action) {
         var check = CMP.campaign.canPlay(game, action.id, selected);
         var risky = action.group === 'risky' || action.id === 'underground';
 
         return el('div', {
-          class: 'act' + (risky ? ' is-risky' : '') + (check.ok ? '' : ' is-blocked'),
+          class: 'act' + (risky ? ' is-risky' : '') + (check.ok ? '' : ' is-blocked')
+            + (explain ? ' has-detail' : ''),
         }, [
           el('span', { class: 'act-icon', 'aria-hidden': 'true', text: action.icon }),
           el('span', { class: 'act-body' }, [
@@ -596,6 +714,7 @@ CMP.ui.election = (function () {
               runAction(action);
             },
           }),
+          explain ? riskDetail(action) : null,
           !check.ok ? el('span', { class: 'act-why', text: check.reason }) : null,
         ]);
       }));
@@ -632,9 +751,15 @@ CMP.ui.election = (function () {
 
     /* -------------------------------------------------------------- money */
 
+    /**
+     * Everything about the campaign's money in one place: what is left, what
+     * has gone, what is owed, what came in from grants and what oversight has
+     * taken back — then every transaction behind those figures.
+     */
     function moneySection() {
       var debt = CMP.campaign.debtOf(game);
       var level = CMP.campaign.heatLevel(game.heat);
+      var ledger = moneyLedger();
 
       function row(label, value, tone) {
         return el('div', { class: 'sum-line' + (tone ? ' ' + tone : '') }, [
@@ -645,13 +770,24 @@ CMP.ui.election = (function () {
 
       return [
         el('section', { class: 'g-block' }, [
-          el('h2', { class: 'g-block-title', text: 'Money' }),
-          el('div', { class: 'sum-lines' }, [
-            row('Cash', money.words(CMP.campaign.remaining(game)) || '₹0'),
-            row('Spent', money.words(game.spent) || '₹0'),
-            row('Debt', debt ? money.words(debt) : '₹0', debt ? 'is-debt' : ''),
-            row('Political heat', Math.round(game.heat) + ' / ' + CMP.CAMPAIGN.heat.max + '  ' + level.label),
+          el('div', { class: 'g-money-head' }, [
+            el('span', { class: 'g-money-label', text: 'Cash in hand' }),
+            el('strong', {
+              class: 'g-money-value',
+              text: money.words(CMP.campaign.remaining(game)) || '₹0',
+            }),
           ]),
+          el('div', { class: 'sum-lines' }, [
+            row('Spent on the campaign', money.words(game.spent) || '₹0'),
+            row('Debt outstanding', debt ? money.words(debt) : '₹0', debt ? 'is-debt' : ''),
+            row('Grants received', ledger.grants ? money.words(ledger.grants) : '₹0'),
+            row('Fines paid', ledger.fines ? money.words(ledger.fines) : '₹0',
+              ledger.fines ? 'is-debt' : ''),
+          ]),
+        ]),
+
+        el('section', { class: 'g-block' }, [
+          el('h2', { class: 'g-block-title', text: 'Political heat' }),
           el('div', { class: 'g-heat-track' }, [
             el('span', {
               class: 'g-heat-fill',
@@ -661,27 +797,122 @@ CMP.ui.election = (function () {
               },
             }),
           ]),
-          el('div', { class: 'g-actions-row' }, [
-            el('button', {
-              class: 'btn btn-primary btn-small',
-              type: 'button',
-              text: 'Borrow money',
-              onclick: function () {
-                setSection('loan');
-              },
-            }),
-            el('button', {
-              class: 'btn btn-quiet btn-small',
-              type: 'button',
-              text: 'Where it came from',
-              onclick: function () {
-                showBreakdown();
-              },
-            }),
-          ]),
+          el('p', {
+            class: 'g-block-note',
+            text: Math.round(game.heat) + ' of ' + CMP.CAMPAIGN.heat.max + ' — ' + level.label +
+              '. Heat falls a little every round on its own.',
+          }),
         ]),
-        logBlock(),
+
+        el('div', { class: 'g-actions-row' }, [
+          el('button', {
+            class: 'btn btn-primary btn-small',
+            type: 'button',
+            text: 'Borrow money',
+            onclick: function () {
+              setSection('loan');
+            },
+          }),
+          el('button', {
+            class: 'btn btn-quiet btn-small',
+            type: 'button',
+            text: 'Where it came from',
+            onclick: function () {
+              showBreakdown();
+            },
+          }),
+        ]),
+
+        transactionsBlock(ledger.rows),
       ];
+    }
+
+    /**
+     * Every movement of money this campaign, newest first, read back off the
+     * action log and the loan book. Nothing is stored twice — this is the same
+     * record the engine writes as it plays.
+     */
+    function moneyLedger() {
+      var rows = [];
+
+      (game.actions || []).forEach(function (a) {
+        var seat = a.constituency ? seatDef(a.constituency) : null;
+
+        if (a.cost) {
+          rows.push({
+            round: a.round,
+            turn: a.turn,
+            label: a.label,
+            note: seat ? seat.name : null,
+            amount: -a.cost,
+          });
+        }
+        if (a.funds) {
+          rows.push({
+            round: a.round,
+            turn: a.turn,
+            label: a.label,
+            note: a.outcomeLabel || 'received',
+            amount: a.funds,
+          });
+        }
+      });
+
+      (game.loans || []).forEach(function (loan) {
+        rows.push({
+          round: loan.takenRound,
+          label: 'Loan taken',
+          note: 'due round ' + loan.dueRound,
+          amount: loan.amount,
+        });
+        if (loan.settled) {
+          rows.push({
+            round: loan.dueRound,
+            label: loan.defaulted ? 'Loan defaulted' : 'Loan repaid',
+            note: money.words(loan.interest) + ' interest',
+            amount: -loan.repay,
+          });
+        }
+      });
+
+      // Newest first, and within a round the later move first.
+      rows.sort(function (a, b) {
+        if ((b.round || 0) !== (a.round || 0)) return (b.round || 0) - (a.round || 0);
+        return (b.turn || 0) - (a.turn || 0);
+      });
+
+      // These two are running totals the engine already keeps, so the summary
+      // and the list can never disagree about a fine nobody logged.
+      return { rows: rows, grants: game.granted || 0, fines: game.finesPaid || 0 };
+    }
+
+    function transactionsBlock(rows) {
+      if (!rows.length) {
+        return el('section', { class: 'g-block' }, [
+          el('h2', { class: 'g-block-title', text: 'Transactions' }),
+          el('p', { class: 'g-block-note', text: 'Nothing has moved yet.' }),
+        ]);
+      }
+
+      return el('section', { class: 'g-block' }, [
+        el('h2', { class: 'g-block-title', text: 'Transactions' }),
+        el('div', { class: 'g-txns' }, rows.slice(0, 25).map(function (t) {
+          return el('div', { class: 'g-txn' + (t.amount < 0 ? ' is-out' : ' is-in') }, [
+            el('span', { class: 'g-txn-round', text: 'R' + (t.round || 1) }),
+            el('span', { class: 'g-txn-body' }, [
+              el('strong', { class: 'g-txn-label', text: t.label }),
+              t.note ? el('span', { class: 'g-txn-note', text: t.note }) : null,
+            ]),
+            el('strong', {
+              class: 'g-txn-amount',
+              text: (t.amount < 0 ? '−' : '+') + money.words(Math.abs(t.amount)),
+            }),
+          ]);
+        })),
+        rows.length > 25
+          ? el('p', { class: 'g-block-note', text: 'Showing the last 25 of ' + rows.length + '.' })
+          : null,
+      ]);
     }
 
     function showBreakdown() {
@@ -827,21 +1058,24 @@ CMP.ui.election = (function () {
         });
     }
 
-    /* --------------------------------------------------------- high risk */
+    /* --------------------------------------------------- corruption, bribe */
 
-    function riskSection() {
+    var RISK_BLURB = {
+      corruption: 'Bigger swings, uncertain results, and heat. Every one of these ' +
+        'can backfire, and the odds are never shown.',
+      bribe: 'The riskiest moves in the game. Worse than campaigning on average, ' +
+        'and the heat lands whichever way the roll goes.',
+    };
+
+    function riskSection(menu) {
       var blocks = [
         el('section', { class: 'g-block' }, [
           el('div', { class: 'g-block-head' }, [
-            el('h2', { class: 'g-block-title is-risky', text: 'High risk' }),
+            el('h2', { class: 'g-block-title is-risky', text: 'Every move here carries risk' }),
             targetChip(),
           ]),
-          el('p', {
-            class: 'g-block-note',
-            text: 'Bigger swings, uncertain results, and heat. Every one of these ' +
-              'can backfire, and the odds are never shown.',
-          }),
-          actionList('corruption'),
+          el('p', { class: 'g-block-note', text: RISK_BLURB[menu] }),
+          actionList(menu),
         ]),
       ];
 
@@ -879,10 +1113,7 @@ CMP.ui.election = (function () {
 
     function seatsSection() {
       seatBrowser.render(game, roster());
-      return el('section', { class: 'g-block' }, [
-        el('h2', { class: 'g-block-title', text: 'Constituencies' }),
-        seatBrowser.root,
-      ]);
+      return el('section', { class: 'g-block' }, [seatBrowser.root]);
     }
 
     /**
@@ -1114,8 +1345,9 @@ CMP.ui.election = (function () {
       mount(roundNode, [roundView.root]);
       paintPlayer();
 
+      // While the round is being counted the menu is not offered at all —
+      // paintBody clears the body, and the results panel has the screen.
       var counting = isCounting();
-      navWrap.style.display = counting ? 'none' : '';
       resultsNode.style.display = counting ? '' : 'none';
 
       if (counting) {
@@ -1124,7 +1356,6 @@ CMP.ui.election = (function () {
         return;
       }
 
-      paintNav();
       paintNotice();
       paintBody();
     }

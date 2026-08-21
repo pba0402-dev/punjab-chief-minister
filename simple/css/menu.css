@@ -1,0 +1,433 @@
+/* ------------------------------------------------------------------
+   The game menu, the money screen, the candidate summary and the
+   election-history chart.
+
+   Loaded last of all, so it wins where it overlaps the older sheets.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------ the menu */
+
+.g-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.g-menu-item {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 12px 12px 11px;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 9px;
+  align-items: center;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.g-menu-icon {
+  grid-row: 1 / 3;
+  font-size: 0.92rem;
+  line-height: 1;
+  text-align: center;
+  color: var(--wheat);
+}
+.g-menu-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.g-menu-hint {
+  font-size: 0.66rem;
+  color: var(--muted-2);
+  line-height: 1.3;
+}
+.g-menu-item:hover {
+  border-color: var(--wheat-deep);
+  background: var(--ink-3);
+}
+.g-menu-item:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 2px;
+}
+.g-menu-item.is-risky .g-menu-icon { color: var(--danger); }
+.g-menu-item.is-risky:hover { border-color: var(--danger); }
+
+/* ------------------------------------------------- a screen's own head */
+
+.g-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+.g-section-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.g-section-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+.g-section-note {
+  margin: 1px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted-2);
+}
+
+/* ------------------------------------------------------------- money */
+
+.g-money-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.g-money-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.g-money-value {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+
+.g-txns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.g-txn {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.g-txn:first-child { border-top: 0; }
+.g-txn-round {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.g-txn-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.g-txn-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-txn-note {
+  font-size: 0.68rem;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-txn-amount {
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.g-txn.is-out .g-txn-amount { color: var(--muted); }
+.g-txn.is-in .g-txn-amount { color: var(--river); }
+
+/* ------------------------------------------- the candidate's summary */
+
+.ar-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ar-summary:empty { display: none; }
+
+.ar-block {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ar-block-title {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+.ar-block-note {
+  margin: -5px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+
+/* the ring */
+
+.ar-ring-block {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  align-items: center;
+  gap: 18px;
+}
+.ar-ring-wrap {
+  position: relative;
+  width: 116px;
+  height: 116px;
+}
+.ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ring-arc { transition: stroke-dasharray 0.4s ease; }
+.ar-ring-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  pointer-events: none;
+}
+.ar-ring-value {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.ar-ring-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.ar-ring-key {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ar-key-row {
+  display: grid;
+  grid-template-columns: 9px 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+.ar-key-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.ar-key-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.ar-key-count {
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* statewide support */
+
+.ar-support {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ar-support-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 48px;
+  align-items: center;
+  gap: 10px;
+}
+.ar-support-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--party, var(--cream));
+}
+.ar-support-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ink-3);
+  overflow: hidden;
+}
+.ar-support-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--party, var(--wheat));
+}
+.ar-support-share {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-view-all { margin-top: 2px; }
+
+/* -------------------------------------------------- the history chart */
+
+.history-chart-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.history-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.hc-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.hc-majority {
+  stroke: var(--wheat-deep);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+}
+.hc-tick {
+  fill: var(--muted-2);
+  font-family: var(--font);
+  font-size: 8px;
+  font-weight: 700;
+}
+.hc-key {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+}
+.hc-key-row {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.hc-key-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.hc-key-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hc-key-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hc-note {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--muted-2);
+}
+
+/* ------------------------------------------------------------- narrow */
+
+@media (max-width: 359px) {
+  .g-menu { gap: 6px; }
+  .g-menu-item { padding: 10px 9px; column-gap: 7px; }
+  .g-menu-label { font-size: 0.72rem; letter-spacing: 0.05em; }
+  .g-menu-hint { font-size: 0.62rem; }
+  .ar-ring-block {
+    grid-template-columns: 96px 1fr;
+    gap: 12px;
+  }
+  .ar-ring-wrap { width: 96px; height: 96px; }
+  .ar-ring-value { font-size: 1.6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-menu-item { transition: none; }
+  .ring-arc { transition: none; }
+}
+
+/* --------------------------------- what a risky move might do to you */
+
+.act.has-detail {
+  grid-template-areas:
+    'icon body use'
+    'detail detail detail';
+  row-gap: 10px;
+}
+.act.has-detail .act-icon { grid-area: icon; }
+.act.has-detail .act-body { grid-area: body; }
+.act.has-detail .act-use { grid-area: use; }
+
+.act-detail {
+  grid-area: detail;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+}
+.act-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.act-line-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  flex: 0 0 auto;
+}
+.act-line-value {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--cream);
+}

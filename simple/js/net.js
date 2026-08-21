@@ -53,7 +53,25 @@ CMP.net = (function () {
 
   /* ------------------------------------------------------ transport */
 
+  /** What every failed request resolves to. Nothing here ever rejects. */
+  function offline(why) {
+    return {
+      ok: false,
+      offline: true,
+      error: why || 'Cannot reach the game server. Check your connection.',
+      code: 'offline',
+    };
+  }
+
   function request(action, payload, method) {
+    // Solo play works with no server at all — from the filesystem, from a
+    // test harness, from a phone with no signal. A missing fetch is that
+    // case, not an error, so it resolves like any other failed request
+    // rather than throwing out of a caller that never asked about network.
+    if (typeof fetch !== 'function') {
+      return Promise.resolve(offline('The game server is not available here.'));
+    }
+
     var url = ENDPOINT + '?action=' + encodeURIComponent(action);
     var opts = { method: method || 'POST', headers: { 'Content-Type': 'application/json' } };
 
@@ -77,12 +95,7 @@ CMP.net = (function () {
         });
       })
       .catch(function () {
-        return {
-          ok: false,
-          offline: true,
-          error: 'Cannot reach the game server. Check your connection.',
-          code: 'offline',
-        };
+        return offline();
       });
   }
 
@@ -97,8 +110,11 @@ CMP.net = (function () {
 
   /* ------------------------------------------------------ actions */
 
-  function create() {
-    return request('create', {}).then(function (res) {
+  function create(profile) {
+    return request('create', {
+      profileId: profile ? profile.id : null,
+      profileName: profile ? profile.name : null,
+    }).then(function (res) {
       if (res.ok) {
         writeSession({ code: res.code, playerId: res.playerId, token: res.token });
       }
@@ -106,8 +122,12 @@ CMP.net = (function () {
     });
   }
 
-  function join(code) {
-    return request('join', { code: code }).then(function (res) {
+  function join(code, profile) {
+    return request('join', {
+      code: code,
+      profileId: profile ? profile.id : null,
+      profileName: profile ? profile.name : null,
+    }).then(function (res) {
       if (res.ok) {
         writeSession({ code: res.code, playerId: res.playerId, token: res.token });
       }
@@ -123,11 +143,18 @@ CMP.net = (function () {
     return request('party', authed({ partyId: partyId || '' }));
   }
 
-  function setDetails(candidateName, slogan) {
+  function setDetails(candidateName, slogan, profile) {
     // Budget is granted by the server, never submitted by the client.
+    //
+    // The profile rides along because this is the first point at which the
+    // player has typed a name: a profile started in the lobby has to reach
+    // the server somehow, or the election they are about to play is credited
+    // to nobody.
     return request('details', authed({
       candidateName: candidateName,
       slogan: slogan,
+      profileId: profile ? profile.id : '',
+      profileName: profile ? profile.name : '',
     }));
   }
 
@@ -165,6 +192,35 @@ CMP.net = (function () {
    */
   function seatHistory(constituency) {
     return request('history', authed({ constituency: constituency }), 'GET');
+  }
+
+  /* ------------------------------------------------------ profiles */
+
+  /**
+   * The home screen's figures: counters, the leaderboard and party
+   * performance. All counted from games that actually finished — a new
+   * installation answers zero, and the screen says zero.
+   */
+  function stats() {
+    return request('stats', {}, 'GET');
+  }
+
+  /** Fetch a profile, creating it on first contact. */
+  function profile(profileId, name, portraitSeed) {
+    return request('profile', {
+      profileId: profileId,
+      name: name,
+      portraitSeed: portraitSeed,
+    });
+  }
+
+  /**
+   * Report a finished solo game. The server never saw it played, so it is
+   * kept on the player's own profile and deliberately never reaches the
+   * leaderboard — see api/lib/Profiles.php.
+   */
+  function recordSolo(payload) {
+    return request('record', payload || {});
   }
 
   /** Report a rival. Each player may report each rival once. */
@@ -256,6 +312,9 @@ CMP.net = (function () {
     loanQuote: loanQuote,
     takeLoan: takeLoan,
     seatHistory: seatHistory,
+    stats: stats,
+    profile: profile,
+    recordSolo: recordSolo,
     report: report,
     declare: declare,
     coalition: coalition,

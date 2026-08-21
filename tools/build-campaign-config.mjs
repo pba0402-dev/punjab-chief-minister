@@ -17,12 +17,19 @@ const raw = fs.readFileSync(SRC, 'utf8');
 const config = JSON.parse(raw);
 
 /* Sanity checks, so a bad edit fails here rather than mid-game. */
+const MENUS = ['campaign', 'grants', 'corruption', 'bribe'];
 const problems = [];
 if (!config.startingBudget || config.startingBudget <= 0) problems.push('startingBudget missing');
 if (!Array.isArray(config.actions) || !config.actions.length) problems.push('no actions');
 
 const ids = new Set();
-for (const a of config.actions || []) {
+
+/* Bribe moves live in their own list so the config reads as two separate
+   menus, but they are the same shape and go through the same validation. */
+const bribeActions = (config.bribe || {}).actions || [];
+if (!bribeActions.length) problems.push('bribe.actions missing');
+
+for (const a of [...(config.actions || []), ...bribeActions]) {
   if (ids.has(a.id)) problems.push('duplicate action id: ' + a.id);
   ids.add(a.id);
   if (!a.cost || a.cost <= 0) problems.push(a.id + ': cost must be positive');
@@ -30,9 +37,13 @@ for (const a of config.actions || []) {
   const total = (a.outcomes || []).reduce((t, o) => t + (o.weight || 0), 0);
   if (total <= 0) problems.push(a.id + ': outcome weights total zero');
   if (['safe', 'risky'].indexOf(a.group) === -1) problems.push(a.id + ': group must be safe or risky');
-  if (['campaign', 'grants', 'corruption'].indexOf(a.menu) === -1) {
-    problems.push(a.id + ': menu must be campaign, grants or corruption');
+  if (MENUS.indexOf(a.menu) === -1) {
+    problems.push(a.id + ': menu must be one of ' + MENUS.join(', '));
   }
+}
+for (const a of bribeActions) {
+  if (a.menu !== 'bribe') problems.push(a.id + ': a bribe action must sit on the bribe menu');
+  if (a.group !== 'risky') problems.push(a.id + ': a bribe action must be risky');
 }
 for (const c of config.consequences || []) {
   if (!c.weight || c.weight <= 0) problems.push('consequence ' + c.id + ': weight must be positive');
@@ -83,13 +94,32 @@ for (const key of ['grant', 'underground']) {
   if (ids.has(f.id)) problems.push('funding.' + key + ' duplicates an action id');
   ids.add(f.id);
   if (!Array.isArray(f.outcomes) || !f.outcomes.length) problems.push(f.id + ': no outcomes');
-  if (['campaign', 'grants', 'corruption'].indexOf(f.menu) === -1) {
-    problems.push(f.id + ': menu must be campaign, grants or corruption');
+  if (MENUS.indexOf(f.menu) === -1) {
+    problems.push(f.id + ': menu must be one of ' + MENUS.join(', '));
   }
   if ((f.outcomes || []).reduce((t, o) => t + (o.weight || 0), 0) <= 0) {
     problems.push(f.id + ': outcome weights total zero');
   }
 }
+
+/* Profiles, levels and achievements. The score formula is configurable, so
+   the only thing worth enforcing is that it cannot be gamed by turning up:
+   playing a game must never be worth more than winning one. */
+const pf = config.profiles || {};
+if (!pf.score) problems.push('profiles.score missing');
+else if (!(pf.score.perWin > pf.score.perGamePlayed)) {
+  problems.push('profiles.score: a win must be worth more than a game played');
+}
+if (!(((pf.level || {}).base > 0) && (pf.level || {}).growth > 1)) {
+  problems.push('profiles.level: base must be positive and growth above 1');
+}
+const achievementIds = new Set();
+for (const a of pf.achievements || []) {
+  if (achievementIds.has(a.id)) problems.push('duplicate achievement id: ' + a.id);
+  achievementIds.add(a.id);
+  if (!a.label || !a.blurb) problems.push('achievement ' + a.id + ': needs a label and a blurb');
+}
+if (!achievementIds.size) problems.push('profiles.achievements missing');
 
 for (const e of (config.events || {}).list || []) {
   if (!e.weight || e.weight <= 0) problems.push('event ' + e.id + ': weight must be positive');
@@ -132,13 +162,15 @@ CMP.EVENTS = CMP.CAMPAIGN.events;
  * weighted outcome table — so the engine resolves all three the same way and
  * the interface needs no special case for them.
  */
-CMP.ACTIONS = CMP.CAMPAIGN.actions.concat(
-  ['grant', 'underground'].map(function (id) {
-    var entry = JSON.parse(JSON.stringify(CMP.CAMPAIGN.funding[id]));
-    entry.group = 'funding';
-    return entry;
-  })
-);
+CMP.ACTIONS = CMP.CAMPAIGN.actions
+  .concat(CMP.CAMPAIGN.bribe.actions)
+  .concat(
+    ['grant', 'underground'].map(function (id) {
+      var entry = JSON.parse(JSON.stringify(CMP.CAMPAIGN.funding[id]));
+      entry.group = 'funding';
+      return entry;
+    })
+  );
 
 CMP.getAction = function (id) {
   for (var i = 0; i < CMP.ACTIONS.length; i++) {
@@ -169,9 +201,10 @@ fs.writeFileSync(OUT, body);
 const safe = config.actions.filter((a) => a.group === 'safe').length;
 const risky = config.actions.filter((a) => a.group === 'risky').length;
 console.log('starting budget: ₹' + config.startingBudget.toLocaleString('en-IN'));
-console.log('actions: ' + safe + ' safe, ' + risky + ' risky, 2 funding');
-console.log('menus:   ' + ['campaign', 'grants', 'corruption'].map((m) =>
-  m + ' ' + [...config.actions, config.funding.grant, config.funding.underground]
+console.log('actions: ' + safe + ' safe, ' + risky + ' risky, ' +
+  bribeActions.length + ' bribe, 2 funding');
+console.log('menus:   ' + MENUS.map((m) =>
+  m + ' ' + [...config.actions, ...bribeActions, config.funding.grant, config.funding.underground]
     .filter((a) => a.menu === m).length).join(', '));
 console.log('rounds: ' + r.total + ' x ' + r.seconds + 's, ' +
   r.actionsPerRound + ' moves each (' + r.total * r.actionsPerRound + ' a campaign)');
@@ -185,4 +218,6 @@ console.log('intermission: ' + r.intermissionSeconds + 's between rounds');
 console.log('events: ' + (config.events.list || []).length +
   ' at ' + Math.round(config.events.chancePerRound * 100) + '% a round');
 console.log('consequences: ' + config.consequences.length);
+console.log('achievements: ' + achievementIds.size + ', level curve base ' +
+  pf.level.base + ' x ' + pf.level.growth);
 console.log('written: ' + path.relative(path.join(HERE, '..'), OUT));

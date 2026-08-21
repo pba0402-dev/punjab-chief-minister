@@ -120,7 +120,10 @@ CMP.ui.campaignSheet = (function () {
 
       function paintChoose() {
         var ordinary = CMP.actionsByMenu('campaign');
-        var risky = CMP.actionsByMenu('corruption');
+        // Corruption and bribe both belong behind the same second tap. They
+        // are separate menus on the game screen because they are different
+        // gambles; here they are simply the moves that can go wrong.
+        var risky = CMP.actionsByMenu('corruption').concat(CMP.actionsByMenu('bribe'));
 
         mount(body, [
           header(),

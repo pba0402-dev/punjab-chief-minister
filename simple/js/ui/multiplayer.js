@@ -27,7 +27,9 @@ CMP.ui.multiplayer = (function () {
       if (busy) return;
       busy = true;
       paint();
-      CMP.net.create().then(function (res) {
+      // The profile goes with the request, so a finished election can be
+      // credited afterwards. A player without one simply is not credited.
+      CMP.net.create(CMP.profile.get()).then(function (res) {
         busy = false;
         if (!res.ok) {
           setMessage(res.error || 'Could not create a game.');
@@ -46,7 +48,7 @@ CMP.ui.multiplayer = (function () {
       if (busy) return;
       busy = true;
       paint();
-      CMP.net.join(code).then(function (res) {
+      CMP.net.join(code, CMP.profile.get()).then(function (res) {
         busy = false;
         if (!res.ok) {
           setMessage(res.error || 'Could not join that game.');

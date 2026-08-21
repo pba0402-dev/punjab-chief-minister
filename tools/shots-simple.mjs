@@ -40,9 +40,26 @@ function startGame() {
 function sectionScene(label) {
   return startGame() +
     "setTimeout(function(){" +
-    "  var t=document.querySelectorAll('.g-nav-item');" +
-    "  for(var i=0;i<t.length;i++)if(t[i].textContent===" + JSON.stringify(label) + ")t[i].click();" +
+    "  var t=document.querySelectorAll('.g-menu-item');" +
+    "  for(var i=0;i<t.length;i++){" +
+    "    var n=t[i].querySelector('.g-menu-label');" +
+    "    if(n&&n.textContent===" + JSON.stringify(label) + ")t[i].click();" +
+    "  }" +
     "},80);";
+}
+
+/** A game with a few rounds and some spending behind it. */
+function playedGame(rounds) {
+  return "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<" + rounds + ";r++){" +
+    "  for(var m=0;m<3;m++){" +
+    "    CMP.campaign.play(g,m===1?'media':'rally',(r*11+m*7)%117+1," +
+    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);CMP.campaign.startNextRound(g);" +
+    "}" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');";
 }
 
 const SCENES = {
@@ -69,6 +86,17 @@ const SCENES = {
     startGame() +
     "setTimeout(function(){" +
     "  var r=document.querySelector('.lb-row.is-you');if(r)r.click();" +
+    "},80);",
+
+  'flow-all-seats':
+    startGame() +
+    "setTimeout(function(){" +
+    "  var r=document.querySelector('.lb-row.is-you');if(r)r.click();" +
+    "  setTimeout(function(){" +
+    "    var b=[].slice.call(document.querySelectorAll('button'))" +
+    "      .filter(function(x){return /View all 117/.test(x.textContent);})[0];" +
+    "    if(b)b.click();" +
+    "  },60);" +
     "},80);",
 
   'flow-seat':
@@ -114,7 +142,45 @@ const SCENES = {
 
   'sec-money': sectionScene('Money'),
   'sec-loan': sectionScene('Loan'),
-  'sec-risk': sectionScene('High Risk'),
+  'sec-grants': sectionScene('Grants'),
+  'sec-corruption': sectionScene('Corruption'),
+  'sec-bribe': sectionScene('Bribe'),
+  'sec-seats': sectionScene('Constituencies'),
+
+  // The money screen with something in the ledger to show.
+  'money-spent':
+    playedGame(4) +
+    "setTimeout(function(){" +
+    "  var t=document.querySelectorAll('.g-menu-item');" +
+    "  for(var i=0;i<t.length;i++){" +
+    "    var n=t[i].querySelector('.g-menu-label');" +
+    "    if(n&&n.textContent==='Money')t[i].click();" +
+    "  }" +
+    "},80);",
+
+  // The candidate summary: the ring, statewide support, top five, closest five.
+  'candidate-summary':
+    playedGame(4) +
+    "setTimeout(function(){" +
+    "  var r=document.querySelector('.lb-row.is-you');if(r)r.click();" +
+    "},80);",
+
+  // The election history, which is deliberately not on the game screen.
+  'history':
+    playedGame(6) +
+    "setTimeout(function(){" +
+    "  var b=document.querySelector('.g-more');if(b)b.click();" +
+    "  setTimeout(function(){" +
+    "    var it=[].slice.call(document.querySelectorAll('.sheet-item'))" +
+    "      .filter(function(x){return /Election history/.test(x.textContent);})[0];" +
+    "    if(it)it.click();" +
+    "  },60);" +
+    "},80);",
+
+  // The profile and the leaderboard.
+  profile:
+    "CMP.profile.create('Simran Kaur Gill');CMP.app.goTo('profile');",
+  leaderboard: "CMP.app.goTo('leaderboard');",
 
   // A round settling: the scoreboard, seat changes and the position panel.
   // Built straight from the engine and handed to the shell mid-break, rather
@@ -158,18 +224,29 @@ const SCENES = {
     "},150);",
 };
 
+// The four phone widths the brief names, plus a tablet and a desktop so a
+// change that only works small is caught too.
 const CASES = [
   { w: 1400, h: 950 },
   { w: 768, h: 900 },
+  { w: 430, h: 932 },
   { w: 390, h: 844 },
-  { w: 360, h: 780 },
+  { w: 375, h: 812 },
+  { w: 320, h: 700 },
 ];
 
 function auditScript(setup) {
+  // Every scene but the bare home screen builds a game, and a game needs the
+  // board — which the page no longer carries, because the opening screen has
+  // no use for it. So the scene waits for it, exactly as the app does.
+  const scene = setup
+    ? 'CMP.data.ensure().then(function(){' + setup + '});'
+    : '';
+
   return [
     '<script>window.addEventListener("load",function(){',
     'var NL=String.fromCharCode(10);',
-    'try{' + setup + '}catch(e){document.title="SCENE ERROR "+e.message;}',
+    'try{' + scene + '}catch(e){document.title="SCENE ERROR "+e.message;}',
     'var W=document.documentElement.clientWidth, bad=[];',
     'var all=document.querySelectorAll("*");',
     // A deliberate horizontal scroller is not page overflow: its children are

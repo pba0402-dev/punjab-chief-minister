@@ -10,6 +10,10 @@
  * Anyone watching an election can count seats; nobody can read a rival's bank
  * statement.
  *
+ * It opens as a summary — the shape of the campaign in one screenful — and
+ * the full list of 117 is one tap further in. Somebody deciding where to spend
+ * wants the five closest races, not a scroll through every seat in Punjab.
+ *
  * The default sort is the closest race first, because that is where a move
  * changes a seat rather than padding a lead.
  */
@@ -20,6 +24,7 @@ CMP.ui.areas = (function () {
   'use strict';
 
   var el = CMP.ui.dom.el;
+  var svg = CMP.ui.dom.svg;
   var mount = CMP.ui.dom.mount;
   var money = CMP.ui.money;
 
@@ -87,6 +92,118 @@ CMP.ui.areas = (function () {
     return rows;
   }
 
+  /**
+   * Where this party stands across all 117, as a ring. Three slices only —
+   * leading, close, behind — because a chart with a slice for every bucket
+   * would need a legend to read, and this needs to be read at a glance.
+   */
+  function shapeRing(rows) {
+    var leading = 0;
+    var close = 0;
+    var behind = 0;
+    rows.forEach(function (row) {
+      if (row.bucket === 'close') close++;
+      else if (row.leading) leading++;
+      else behind++;
+    });
+
+    var total = rows.length || 1;
+    var slices = [
+      { label: 'Leading', count: leading, colour: 'var(--wheat)' },
+      { label: 'Close', count: close, colour: 'var(--river)' },
+      { label: 'Behind', count: behind, colour: 'var(--line)' },
+    ];
+
+    // A stroked circle with a dash pattern draws a ring without any path
+    // arithmetic, and gets the arcs exactly right at every size.
+    var R = 42;
+    var C = 2 * Math.PI * R;
+    var offset = 0;
+
+    var arcs = slices.map(function (slice) {
+      var length = (slice.count / total) * C;
+      var node = svg('circle', {
+        class: 'ring-arc',
+        cx: '50',
+        cy: '50',
+        r: String(R),
+        fill: 'none',
+        stroke: slice.colour,
+        'stroke-width': '13',
+        'stroke-dasharray': length + ' ' + (C - length),
+        'stroke-dashoffset': String(-offset),
+      });
+      offset += length;
+      return node;
+    });
+
+    var chart = svg('svg', {
+      class: 'ring',
+      viewBox: '0 0 100 100',
+      role: 'img',
+      'aria-label': leading + ' leading, ' + close + ' close, ' + behind + ' behind',
+    }, [
+      svg('circle', {
+        cx: '50', cy: '50', r: String(R),
+        fill: 'none', stroke: 'var(--line-soft)', 'stroke-width': '13',
+      }),
+    ].concat(arcs));
+
+    return el('div', { class: 'ar-ring-block' }, [
+      el('div', { class: 'ar-ring-wrap' }, [
+        chart,
+        el('div', { class: 'ar-ring-centre' }, [
+          el('strong', { class: 'ar-ring-value', text: String(leading) }),
+          el('span', { class: 'ar-ring-label', text: 'leading' }),
+        ]),
+      ]),
+      el('ul', { class: 'ar-ring-key' }, slices.map(function (slice) {
+        return el('li', { class: 'ar-key-row' }, [
+          el('span', { class: 'ar-key-dot', style: { background: slice.colour } }),
+          el('span', { class: 'ar-key-label', text: slice.label }),
+          el('strong', { class: 'ar-key-count', text: String(slice.count) }),
+        ]);
+      })),
+    ]);
+  }
+
+  /**
+   * Average support across all 117 seats, for each party.
+   *
+   * This is a figure the game computes from its own board. It is not a poll,
+   * it does not come from anywhere outside the game, and it says nothing about
+   * how anybody would actually vote in Punjab.
+   */
+  function statewideSupport(game) {
+    var totals = {};
+    var seats = Object.keys(game.support || {});
+    seats.forEach(function (key) {
+      var seat = game.support[key];
+      Object.keys(seat).forEach(function (pid) {
+        totals[pid] = (totals[pid] || 0) + seat[pid];
+      });
+    });
+
+    var rows = CMP.PLAYABLE_PARTIES.map(function (p) {
+      return {
+        party: p,
+        share: seats.length ? Math.round((totals[p.id] || 0) / seats.length * 10) / 10 : 0,
+      };
+    }).sort(function (a, b) {
+      return b.share - a.share;
+    });
+
+    return el('div', { class: 'ar-support' }, rows.map(function (row) {
+      return el('div', { class: 'ar-support-row', style: { '--party': row.party.colour } }, [
+        el('span', { class: 'ar-support-name', text: row.party.short }),
+        el('span', { class: 'ar-support-track' }, [
+          el('span', { class: 'ar-support-fill', style: { width: row.share + '%' } }),
+        ]),
+        el('strong', { class: 'ar-support-share', text: row.share.toFixed(1) + '%' }),
+      ]);
+    }));
+  }
+
   function bucketLabel(row) {
     if (row.bucket === 'safe') return { text: 'Safe', tone: 'is-safe' };
     if (row.bucket === 'leading') return { text: 'Leading', tone: 'is-leading' };
@@ -135,13 +252,21 @@ CMP.ui.areas = (function () {
     var filter = 'all';
     var sort = 'closest';
     var query = '';
+    var showAll = false;   // summary first, the full 117 on request
 
     var headNode = el('div', { class: 'ar-head' });
+    var summaryNode = el('div', { class: 'ar-summary' });
     var controlsNode = el('div', { class: 'ar-controls' });
     var listNode = el('div', { class: 'area-list' });
     var countNode = el('p', { class: 'ar-count' });
 
-    var root = el('section', { class: 'areas' }, [headNode, controlsNode, countNode, listNode]);
+    var root = el('section', { class: 'areas' }, [
+      headNode,
+      summaryNode,
+      controlsNode,
+      countNode,
+      listNode,
+    ]);
 
     function paintHead() {
       var party = CMP.getParty(partyId);
@@ -190,7 +315,79 @@ CMP.ui.areas = (function () {
       ]);
     }
 
+    /** Five rows under a heading — the top of a sorted survey. */
+    function topFive(title, note, rows) {
+      if (!rows.length) return null;
+      return el('section', { class: 'ar-block' }, [
+        el('h3', { class: 'ar-block-title', text: title }),
+        note ? el('p', { class: 'ar-block-note', text: note }) : null,
+        el('div', { class: 'area-list' }, rows.slice(0, 5).map(function (row) {
+          return areaRow(row, partyId, opts.onOpen);
+        })),
+      ]);
+    }
+
+    /**
+     * The summary: the shape of the campaign, then the five seats worth
+     * knowing about in each direction. Everything else is behind one button.
+     */
+    function paintSummary() {
+      if (showAll) {
+        mount(summaryNode, []);
+        return;
+      }
+
+      var rows = survey(game, partyId);
+
+      var strongest = rows.filter(function (r) {
+        return r.leading;
+      }).sort(function (a, b) {
+        return b.margin - a.margin;
+      });
+
+      var closest = rows.filter(function (r) {
+        return r.bucket === 'close';
+      }).sort(function (a, b) {
+        return Math.abs(a.margin) - Math.abs(b.margin);
+      });
+
+      mount(summaryNode, [
+        shapeRing(rows),
+
+        el('section', { class: 'ar-block' }, [
+          el('h3', { class: 'ar-block-title', text: 'Statewide support' }),
+          el('p', {
+            class: 'ar-block-note',
+            text: 'Average share across all 117 seats. This is fictional game data, ' +
+              'not a real-world opinion poll.',
+          }),
+          statewideSupport(game),
+        ]),
+
+        topFive('Top 5 strongest seats', null, strongest),
+        topFive('Closest 5 races', 'Where one move could change a seat.', closest),
+
+        el('button', {
+          class: 'btn btn-quiet btn-wide ar-view-all',
+          type: 'button',
+          text: 'View all 117 constituencies',
+          onclick: function () {
+            showAll = true;
+            paintSummary();
+            paintControls();
+            paintList();
+          },
+        }),
+      ]);
+    }
+
     function paintControls() {
+      if (!showAll) {
+        mount(controlsNode, []);
+        countNode.textContent = '';
+        return;
+      }
+
       mount(controlsNode, [
         el('input', {
           class: 'field-input seat-search',
@@ -231,6 +428,11 @@ CMP.ui.areas = (function () {
     }
 
     function paintList() {
+      if (!showAll) {
+        mount(listNode, []);
+        return;
+      }
+
       var rows = survey(game, partyId).filter(function (row) {
         if (filter !== 'all' && row.bucket !== filter) return false;
         if (!query) return true;
@@ -255,10 +457,18 @@ CMP.ui.areas = (function () {
 
     function render(nextGame, nextParty, nextCandidate, youAre) {
       game = nextGame;
-      partyId = nextParty;
       candidate = nextCandidate;
+      // A different candidate is a different question, so it opens on the
+      // summary again rather than inheriting the last one's filters.
+      if (nextParty !== partyId) {
+        showAll = false;
+        filter = 'all';
+        query = '';
+      }
       isYou = !!youAre;
+      partyId = nextParty;
       paintHead();
+      paintSummary();
       paintControls();
       paintList();
     }

@@ -217,8 +217,14 @@ CMP.ui.lobby = (function () {
 
     function sendDetails() {
       detailsTimer = null;
+
+      // The name they have just typed is the name their profile carries, and
+      // this is the first moment there is one to start.
+      var name = nameInput.value.trim();
+      if (name && !CMP.profile.has()) CMP.profile.create(name);
+
       CMP.net
-        .setDetails(nameInput.value, sloganInput.value)
+        .setDetails(nameInput.value, sloganInput.value, CMP.profile.get())
         .then(function (res) {
           if (!res.ok && !res.offline) setNotice(res.error);
           if (res.game) update(res.game);

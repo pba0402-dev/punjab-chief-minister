@@ -166,7 +166,7 @@ async function openClient(label, seedSession) {
 section('Two people sit down');
 
 const host = await openClient('host');
-host.click(host.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 host.click(host.button('CREATE GAME'));
 await host.until('lobby', () => !!host.q('.screen-lobby'));
 await host.until('code', () =>
@@ -175,7 +175,7 @@ await host.until('code', () =>
 const code = host.q('.code-value').textContent.trim();
 
 const guest = await openClient('guest');
-guest.click(guest.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+guest.click(guest.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 guest.click(guest.button('JOIN GAME'));
 guest.type(guest.q('.field-input'), code);
 guest.click(guest.button('JOIN'));

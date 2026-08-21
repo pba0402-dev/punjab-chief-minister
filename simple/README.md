@@ -60,23 +60,48 @@ a wall of controls:
 | **Constituency** | What is happening here? |
 | **Campaign** | How much do I want to spend here? |
 
+Nothing is a long scrolling page. Every destination is **click → open → decide
+→ back**, and every screen but the one you start on carries its own way back.
+
 Designed for a phone — 320 to 430px — and allowed to breathe on a larger
 screen rather than rebuilt for one.
 
 ### Home
 
 A sticky round strip (round, a dot per move remaining, the clock), one compact
-player row, and then the only thing home is for: **WHO'S LEADING?** — four
-candidates ranked by projected seats, each with their face and their place.
-One line for the majority. Then **LEADING FROM**, naming the tightest seats
-under each party.
+player row, then the menu, then the only thing home is for: **WHO'S LEADING?**
+— four candidates ranked by projected seats, each with their face and their
+place. One line for the majority. Then **LEADING FROM**, naming the tightest
+seats under each party.
 
-No campaign actions live here at all. Tapping a candidate is how you campaign.
+The menu is a two-column grid of eight, not a strip that scrolls sideways:
+
+| | |
+| --- | --- |
+| **Campaign** | **Money** |
+| **Grants** | **Loan** |
+| **Corruption** | **Bribe** |
+| **Map** | **Constituencies** |
+
+It lives here rather than above every screen, which is what makes each
+destination a place you go and come back from instead of a tab you switch to.
+
+No campaign actions live on home at all. Tapping a candidate is how you
+campaign, and so is the Campaign item — they open the same page.
 
 ### Candidate — the strategy centre
 
-Tapping your own row opens your areas: every constituency from your party's
-point of view, split by how the race stands — **Leading**, **Close**,
+Tapping your own row opens a summary of where the campaign stands, not 117
+rows:
+
+- a ring showing **leading / close / behind** across all 117
+- **statewide support** — each party's average share across every seat, which
+  is a figure the game computes from its own board and not an opinion poll
+- the **five strongest seats** and the **five closest races**, each row
+  tappable straight through to the constituency
+
+**View all 117** opens the full list underneath: every constituency from your
+party's point of view, split by how the race stands — **Leading**, **Close**,
 **Losing**, **Uncontested** — with a search box and a sort that defaults to
 **closest race first**, because that is where a move changes a seat rather
 than padding a lead.
@@ -106,10 +131,38 @@ a dashboard and made to navigate back.
 The map is the same journey by another route: tap a seat, and CAMPAIGN HERE
 works identically.
 
-Everything that is not campaigning is on a compact menu that scrolls sideways
-on a phone: **Home · My Areas · Money · Grants · Loan · High Risk · Map**.
-Closing the polls and the election history are in the header menu, since
-neither belongs to a round.
+### Money
+
+One screen for everything financial: cash in hand as the single large figure,
+then spent, debt outstanding, grants received and fines paid, the heat meter,
+and every movement of money this campaign as a transaction list — read back off
+the action log and the loan book rather than stored a second time, so the
+summary and the list can never disagree.
+
+### Corruption and Bribe
+
+Two separate menus, because they are two different gambles. Corruption holds
+Secret Funding, Undisclosed Deal and Political Influence; Bribe holds Risky
+Vote Influence, Hidden Offer and Last-Minute Gamble. Each states its cost, its
+risk, what it might win and what it might cost in investigations and fines.
+
+Every one of them is a fictional mechanic and nothing else: a cost, a weighted
+table, a lot of heat, and a real chance of an investigation. None describes a
+method or explains how anything would be done. They are deliberately worse
+than campaigning on expectation — the upside is real, the downside is worse,
+and the heat lands whichever way the roll goes.
+
+Inside a constituency's campaign sheet the two are offered together behind one
+deliberate second tap, because there what matters is simply that the move can
+go wrong.
+
+---
+
+Closing the polls and the election history are in the header's **More** menu,
+since neither belongs to a round. The history is a chart of all four parties
+across every round played, plus the same figures as a table — deliberately not
+on the game screen, because it is the shape of a whole campaign and a
+distraction during one.
 
 ## How much to spend
 
@@ -527,6 +580,79 @@ for multiplayer, because a client cannot be trusted to roll its own dice.
 `npm run test:campaign` proves the two agree: same seeded random sequence, same
 outcome for the same roll, same cost and heat.
 
+## Profiles, statistics and the leaderboard
+
+A profile is a chosen name, a drawn face and a record of elections. There is no
+email, no phone number and no password, because none is collected — the browser
+generates an id on first play and keeps it in `localStorage`. That is a
+deliberately low bar: this is a game, and asking somebody to make an account
+before they can find out whether they enjoy it would cost more players than it
+protects.
+
+A profile starts itself the first time somebody names a candidate, in solo
+setup or in the lobby. Nothing is ever asked for.
+
+### Verified and self-reported
+
+A solo game runs entirely in the browser. The server never sees a roll and
+cannot tell a real result from a crafted request, so a solo result is recorded
+as **self-reported**: it counts on the player's own profile, where it is their
+business, and it is excluded from the global counters and the leaderboard,
+where it would be an invitation.
+
+A multiplayer game is **verified** — the server rolled every die and owns the
+board — so it counts everywhere.
+
+| | verified | self-reported |
+| --- | --- | --- |
+| Your own profile | yes | yes |
+| Global counters | yes | no |
+| Leaderboard | yes | no |
+
+### What is public
+
+Only game statistics: chosen name, drawn portrait, elections, wins, seats,
+level, achievements. The profile id is never published — the portrait seed is
+generated separately from it, precisely so that putting a face on a leaderboard
+row does not put the player's id there too.
+
+### Live figures
+
+The home screen's players / elections / governments come from a counter on the
+server, incremented once per finished election — not once per player, because
+four people contesting one election is still one election. Nothing is seeded.
+A fresh install shows zeros and says so: *"No elections have finished here yet.
+Yours would be the first."* A number nobody can trust is worse than a small one.
+
+### The score
+
+Configurable, in `api/campaign-config.json` under `profiles.score`: wins,
+seats, coalition wins and achievements, with a small amount for turning up.
+Winning is worth far more than playing, so grinding games is not a strategy —
+the build script refuses a config where a game played is worth more than a game
+won.
+
+Level follows the score on a widening curve, so the early levels come quickly.
+
+### Achievements
+
+FIRST WIN, MAJORITY (59+), LANDSLIDE (75+), KINGMAKER (a coalition after a hung
+assembly), COMEBACK (won after being behind at round ten), FINANCIAL MASTER
+(won on under ₹3 crore) and RISK TAKER (won after using the high-risk
+mechanics). Awarded by the server from the result, never claimed by the client.
+
+## What the home screen does not download
+
+The 117 constituency records, the sitting MLAs and the map geometry are
+together the largest thing this game fetches, and the opening screen uses none
+of them — it shows a title, two buttons and some counters.
+
+So they are not in the page. `js/data/loader.js` pulls them in the moment
+somebody starts, resumes or joins an election, once per session, and
+`app.js` waits for them on the way into any screen that needs a board. Parties
+and campaign actions stay in the page, because the home screen shows party
+performance and they are small.
+
 ## Multiplayer
 
 Two to four players, one party each, over a shared server — not localStorage,
@@ -593,20 +719,23 @@ in `index.php` that constructs the store.
 
 ## The screens
 
-- **Home** — title, seat count, and the two ways to play: `PLAY SOLO` and
-  `PLAY WITH FRIENDS`. Anything already in progress appears as a quiet resume
-  line underneath
-- **Setup** — pick AAP, INC, BJP or SAD, then candidate name, slogan and budget
-  (formatted in Indian grouping as you type: `₹10,00,00,000`)
-- **The game screen** — see below
-- **Round results** — between rounds, an election-night scoreboard
+- **Home** — the title, `117 Assembly Seats`, and the two ways to play as the
+  loudest things on the screen: `PLAY SOLO` and `PLAY WITH FRIENDS`. A
+  returning player is welcomed back by name and offered the election they are
+  in the middle of. Underneath, quietly: the live figures, the top players,
+  your own record and your recent elections
+- **Setup** — pick AAP, INC, BJP or SAD, then candidate name and slogan. The
+  ₹5 crore is granted, not typed
+- **The game screen** — see above
+- **Round results** — between rounds, an election-night scoreboard: four
+  candidates with portraits ranked by projected seats, the seats that changed
+  hands, and who leads now
+- **Profile** — portrait, name, level, the record, the party record, every
+  achievement earned or not, and the full election history
+- **Leaderboard** — ranked on the configured score, verified games only
 - **Autosave** — solo progress writes to `localStorage` after every round and
   every move, and needs no server; multiplayer state lives on the server, saved
   under lock on every change
-
-- **Round results** — between rounds, an election-night scoreboard: four
-  candidates with portraits ranked by projected seats, the seats that changed
-  hands, the biggest movements, and how far the leader is from a majority
 
 Everything in the brief is built. The obvious next things would be more than
 four players, and refreshing the MLA data before the next state election.
@@ -617,13 +746,16 @@ four players, and refreshing the MLA data before the next state election.
 simple/
   index.html
   css/styles.css           base; then campaign, systems, rounds, scoreboard,
-                           game (the screen redesign) and map, in that order
+                           game, map, home (the opening screen, profile and
+                           leaderboard) and menu (the menu grid, money screen,
+                           candidate summary and history chart), in that order
   js/
     data/parties.js          the four parties — the only place a party is defined
-    data/constituencies.js   GENERATED: the 117 seats
     data/actions.js          GENERATED: costs, outcomes, heat, consequences
-    data/incumbents.js       GENERATED: the 117 sitting MLAs
-    data/geometry.js         GENERATED: map shapes and hex tiles
+    data/loader.js           fetches the board when a game starts, not before
+    data/constituencies.js   GENERATED: the 117 seats        ] fetched on
+    data/incumbents.js       GENERATED: the 117 sitting MLAs ] demand, not
+    data/geometry.js         GENERATED: map shapes and hex tiles ] in the page
     engine/rng.js            seeded randomness
     engine/campaign.js       campaign rules for solo play: moves, money, rounds
     engine/ai.js             opponents for solo play
@@ -631,7 +763,9 @@ simple/
     storage.js               localStorage save/load behind a tiny adapter
     ui/dom.js                element helper + Indian currency formatting
     net.js                   multiplayer API client + polling
-    ui/home.js               home screen (solo / multiplayer)
+    profile.js               who the player is between games
+    ui/home.js               the opening screen and the live figures
+    ui/profile.js            the profile and leaderboard screens
     ui/setup.js              solo party + candidate form
     ui/multiplayer.js        create game / join game
     ui/lobby.js              the four-player lobby
@@ -658,6 +792,7 @@ simple/
     lib/Election.php         election day and the verdict
     lib/Coalition.php        coalition proposals and terms
     lib/Investigation.php    reports, evidence, findings and penalties
+    lib/Profiles.php         profiles, levels, achievements and the counters
     campaign-config.json     THE balance sheet — both sides read this
 ```
 

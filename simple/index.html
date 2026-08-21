@@ -15,17 +15,21 @@
     <link rel="stylesheet" href="css/rounds.css" />
     <link rel="stylesheet" href="css/scoreboard.css" />
     <link rel="stylesheet" href="css/game.css" />
+    <link rel="stylesheet" href="css/home.css" />
+    <link rel="stylesheet" href="css/menu.css" />
     <link rel="stylesheet" href="css/map.css" />
   </head>
   <body>
     <div id="app"></div>
 
     <!-- Data -->
+    <!-- Parties and campaign actions are small and the home screen shows
+         them. The 117 constituencies, the sitting MLAs and the map are the
+         bulk of the download and no part of the opening screen, so they are
+         fetched by js/data/loader.js when a game actually starts. -->
     <script src="js/data/parties.js"></script>
-    <script src="js/data/constituencies.js"></script>
-    <script src="js/data/incumbents.js"></script>
-    <script src="js/data/geometry.js"></script>
     <script src="js/data/actions.js"></script>
+    <script src="js/data/loader.js"></script>
 
     <!-- Engine: campaign rules and randomness, no DOM -->
     <script src="js/engine/rng.js"></script>
@@ -36,10 +40,12 @@
     <script src="js/state.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/net.js"></script>
+    <script src="js/profile.js"></script>
 
     <!-- UI -->
     <script src="js/ui/dom.js"></script>
     <script src="js/ui/home.js"></script>
+    <script src="js/ui/profile.js"></script>
     <script src="js/ui/setup.js"></script>
     <script src="js/ui/multiplayer.js"></script>
     <script src="js/ui/lobby.js"></script>

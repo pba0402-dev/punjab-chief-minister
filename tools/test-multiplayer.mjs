@@ -147,13 +147,38 @@ async function openClient(label, seedSession) {
   };
 }
 
+/**
+ * Get a client back to the game's home screen.
+ *
+ * The menu lives on the home screen now rather than above every screen, so
+ * reaching any section means going back first. Driving the suites the same way
+ * a player moves is what proves the way back exists on every screen.
+ */
+function goHome(c) {
+  for (let i = 0; i < 4 && !c.q('.g-menu'); i++) {
+    const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
+    if (!back) break;
+    c.click(back);
+  }
+  return !!c.q('.g-menu');
+}
+
+/** One item in the game's menu grid, by its label. */
+function menuItem(c, label) {
+  goHome(c);
+  return c.qq('.g-menu-item').find((n) => {
+    const name = n.querySelector('.g-menu-label');
+    return name && name.textContent === label;
+  });
+}
+
 /* ---------------------------------------------------------------- host */
 
 section('Host creates a game');
 const host = await openClient('host');
-check('home shows both ways to play', /PLAY SOLO/.test(host.text()) && /PLAY WITH FRIENDS/.test(host.text()));
+check('home shows both ways to play', /Play solo/i.test(host.text()) && /Play with friends/i.test(host.text()));
 
-host.click(host.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 check('multiplayer screen opens', !!host.q('.screen-multiplayer'));
 check('CREATE GAME is offered', !!host.button('CREATE GAME'));
 check('JOIN GAME is offered', !!host.button('JOIN GAME'));
@@ -182,7 +207,7 @@ section('Three friends join with the code');
 const players = [host];
 for (const label of ['p2', 'p3', 'p4']) {
   const c = await openClient(label);
-  c.click(c.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+  c.click(c.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
   c.type(c.q('.code-input'), label === 'p3' ? code.toLowerCase() : code);
   c.click(c.button('JOIN GAME'));
   const ok = await c.until('lobby', () => !!c.q('.screen-lobby'));
@@ -288,9 +313,14 @@ check("the host's own party is shown", /AAP/.test(host.q('.g-player-party').text
 check('the host sees their candidate', /Simran Kaur Gill/.test(host.q('.g-player').textContent));
 check('the home screen carries no campaign actions', host.qq('.act').length === 0,
   host.qq('.act').length + ' actions');
-check('campaigning is not one of the menu items',
-  !host.qq('.g-nav-item').some((n) => /^Campaign$/.test(n.textContent)),
-  host.qq('.g-nav-item').map((n) => n.textContent).join('/'));
+goHome(host);
+check('1. the menu is a compact grid, not a scrolling strip',
+  host.qq('.g-menu').length === 1 && !host.q('.g-nav'));
+check('1. with all eight destinations',
+  host.qq('.g-menu-item').length === 8,
+  host.qq('.g-menu-item .g-menu-label').map((n) => n.textContent).join('/'));
+check('2. corruption and bribe are separate items',
+  !!menuItem(host, 'Corruption') && !!menuItem(host, 'Bribe'));
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
@@ -327,7 +357,7 @@ const cashOf = (client) =>
 
 /** Open a menu section on one client. */
 function openSection(client, label) {
-  const tab = client.qq('.g-nav-item').find((n) => n.textContent === label);
+  const tab = menuItem(client, label);
   if (tab) client.click(tab);
 }
 
@@ -339,22 +369,48 @@ function moneyOf(client, label) {
     return l && l.textContent === label;
   });
   const value = row ? row.querySelector('.sum-line-value').textContent : null;
-  openSection(client, 'Campaign');
+  goHome(client);
   return value;
+}
+
+/** Cash in hand, the one large figure at the top of the money screen. */
+function cashOnMoneyScreen(client) {
+  openSection(client, 'Money');
+  const node = client.q('.g-money-value');
+  const value = node ? node.textContent : null;
+  goHome(client);
+  return value;
+}
+
+/** The heat figure, which is a sentence on the money screen rather than a row. */
+function heatOf(client) {
+  openSection(client, 'Money');
+  const m = /(\d+) of 100/.exec(client.q('.screen-election').textContent);
+  goHome(client);
+  return m ? Number(m[1]) : null;
 }
 
 for (const c of players) {
   check(c.label + ' starts on ₹5 crore', cashOf(c) === '₹5 crore', cashOf(c));
   check(c.label + ' starts with no debt', !c.q('.g-player-debt'));
 }
-check('the high-risk section stands on its own', (function () {
-  openSection(host, 'High Risk');
+check('2. corruption stands on its own', (function () {
+  openSection(host, 'Corruption');
   const n = host.qq('.act').length;
-  openSection(host, 'Home');
-  return n === 4;
+  goHome(host);
+  return n === 3;
 })());
-check('political heat starts at zero',
-  /0 \/ 100/.test(moneyOf(host, 'Political heat') || ''), moneyOf(host, 'Political heat'));
+check('2. and bribe is a separate section again', (function () {
+  openSection(host, 'Bribe');
+  const n = host.qq('.act').length;
+  const names = host.qq('.act-name').map((x) => x.textContent);
+  goHome(host);
+  return n === 3 &&
+    names.indexOf('Risky Vote Influence') !== -1 &&
+    names.indexOf('Hidden Offer') !== -1 &&
+    names.indexOf('Last-Minute Gamble') !== -1;
+})());
+check('political heat starts at zero', heatOf(host) === 0, String(heatOf(host)));
 
 // The host spends; nobody else's purse may move.
 /** Home → my candidate → a constituency → the campaign sheet. */
@@ -378,7 +434,7 @@ host.click(host.qq('button').find((b) => /High-risk options/.test(b.textContent)
 await sleep(80);
 const hostCard = host.qq('.campaign-sheet .act').find((c) => {
   const n = c.querySelector('.act-name');
-  return n && n.textContent === 'Underground Deal';
+  return n && n.textContent === 'Undisclosed Deal';
 });
 host.click(hostCard.querySelector('.act-use'));
 await sleep(80);
@@ -396,20 +452,27 @@ await sleep(80);
 
 check(
   'the server deducted exactly what was chosen',
-  moneyOf(host, 'Spent') === host.dom.window.CMP.ui.money.words(dealCost),
-  moneyOf(host, 'Spent')
+  moneyOf(host, 'Spent on the campaign') === host.dom.window.CMP.ui.money.words(dealCost),
+  moneyOf(host, 'Spent on the campaign')
 );
 check('the cash in hand dropped', cashOf(host) !== '₹5 crore', cashOf(host));
-check('a risky action raised the host heat',
-  !/^0 \//.test(moneyOf(host, 'Political heat') || ''), moneyOf(host, 'Political heat'));
+check('23. and the money screen agrees with the player strip',
+  cashOnMoneyScreen(host) === cashOf(host),
+  cashOnMoneyScreen(host) + ' vs ' + cashOf(host));
+check('23. the spending is listed as a transaction', (function () {
+  openSection(host, 'Money');
+  const rows = host.qq('.g-txn').length;
+  goHome(host);
+  return rows >= 1;
+})());
+check('a risky action raised the host heat', heatOf(host) > 0, String(heatOf(host)));
 
 // Give the other clients a poll or two to refresh, then confirm they are untouched.
 await sleep(3500);
 for (const c of [players[1], players[2], players[3]]) {
   check(c.label + " cash is untouched by the host's spending",
     cashOf(c) === '₹5 crore', cashOf(c));
-  check(c.label + ' heat is untouched',
-    /0 \/ 100/.test(moneyOf(c, 'Political heat') || ''), moneyOf(c, 'Political heat'));
+  check(c.label + ' heat is untouched', heatOf(c) === 0, String(heatOf(c)));
 }
 
 // A second player spends independently.
@@ -437,11 +500,14 @@ check(
 section('Constituency detail shows real MLA and fictional race');
 
 const tabButton = (client, label) =>
-  client.qq('.g-nav-item').find((t) => t.textContent === label);
+  menuItem(client, label);
 
-// A constituency is opened through the candidate's areas, as a player does.
-host.click(tabButton(host, 'My Areas'));
+// A constituency is opened through the candidate's own screen, as a player
+// does. CAMPAIGN is where that lives now.
+host.click(tabButton(host, 'Campaign'));
 await host.until('areas', () => !!host.q('.area-row'));
+host.click(host.qq('button').find((b) => /View all 117/.test(b.textContent)));
+await host.until('all areas', () => host.qq('.area-row').length > 20);
 check('my areas splits the board by how the race stands',
   host.qq('.area-status').length > 0,
   [...new Set(host.qq('.area-status').map((n) => n.textContent))].join('/'));
@@ -466,7 +532,7 @@ check('one bar is marked as leading', host.qq('.sd-bar.is-leading').length === 1
 
 section('Reporting a rival');
 // Rivals sit with the high-risk play they exist to police.
-host.click(tabButton(host, 'High Risk'));
+host.click(tabButton(host, 'Corruption'));
 await host.until('rivals', () => !!host.q('.rival-list'));
 check('the rivals tab opens', !!host.q('.rival-list'));
 check('it lists the other three players', host.qq('.rival-row').length === 3,
@@ -490,7 +556,7 @@ check('you cannot report the same player twice',
 
 // A second, different player reporting the same rival opens an inquiry.
 const targetName = host.qq('.rival-row')[0].querySelector('.rival-name').textContent;
-players[1].click(tabButton(players[1], 'High Risk'));
+players[1].click(tabButton(players[1], 'Corruption'));
 await players[1].until('rivals', () => !!players[1].q('.rival-list'));
 const sameTarget = players[1].qq('.rival-row').find((r) =>
   r.querySelector('.rival-name').textContent.indexOf(targetName.replace(/^[A-Z]+/, '').trim()) !== -1
@@ -512,8 +578,8 @@ check('the evidence score is never sent to the browser',
 section('Closing the polls');
 // Closing the polls is not part of a round, so it lives in the menu rather
 // than on the campaign screen.
-host.click(tabButton(host, 'Home'));
-host.click(host.q('.g-menu'));
+goHome(host);
+host.click(host.q('.g-more'));
 await sleep(60);
 const hostSheet = host.q('.sheet-panel');
 check('the menu opens', !!hostSheet);
@@ -523,7 +589,7 @@ check('only the host is offered the declare control',
 check('the menu also offers the election history',
   !!host.qq('.sheet-item').find((b) => /Election history/.test(b.textContent)));
 
-players[1].click(players[1].q('.g-menu'));
+players[1].click(players[1].q('.g-more'));
 await sleep(60);
 check('a guest is not offered it',
   !players[1].qq('.sheet-item').find((b) => /Close the polls/.test(b.textContent)),
@@ -645,7 +711,7 @@ check('their candidate survived', /Ravinder Singh Bajwa/.test(returningText()));
 
 section('A fifth player is turned away');
 const fifth = await openClient('p5');
-fifth.click(fifth.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+fifth.click(fifth.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 fifth.type(fifth.q('.code-input'), code);
 fifth.click(fifth.button('JOIN GAME'));
 const refused = await fifth.until('notice', () => !!fifth.q('.notice'));
@@ -658,17 +724,109 @@ check(
 );
 
 const badCode = await openClient('bad');
-badCode.click(badCode.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+badCode.click(badCode.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 badCode.type(badCode.q('.code-input'), 'QQQQQ');
 badCode.click(badCode.button('JOIN GAME'));
 const badRefused = await badCode.until('notice', () => !!badCode.q('.notice'));
 check('an unused code is refused with a message', badRefused);
 
+/* -------------------------------------------------- profiles and stats */
+
+section('The statistics are counted from games that actually finished');
+
+// This election really was played: four clients, fifteen rounds' worth of
+// state, a server that rolled every die. So it is a verified result, and it
+// is the only kind that reaches the global counters or the leaderboard.
+await sleep(400);
+const afterStats = await host.dom.window.CMP.net.stats();
+check('the stats endpoint answers', afterStats && afterStats.ok === true);
+check('4. one finished election is counted',
+  afterStats.summary.elections === 1, String(afterStats.summary.elections));
+check('4. the players are counted', afterStats.summary.players >= 4,
+  String(afterStats.summary.players));
+check('4. and a government is recorded if one formed',
+  afterStats.summary.governments + afterStats.summary.coalitions <= 1);
+check('10. party performance comes from the games played',
+  afterStats.summary.byParty.length >= 1 &&
+  afterStats.summary.byParty.every((r) => r.played >= 1),
+  JSON.stringify(afterStats.summary.byParty));
+
+check('9. the leaderboard has somebody on it',
+  afterStats.leaderboard.length >= 1, String(afterStats.leaderboard.length));
+check('9. it is not ranked by games played',
+  afterStats.leaderboard.every((r) => typeof r.score === 'number' && r.score > 0));
+check('33. no private detail is published',
+  !/@|phone|email|token|playerId/i.test(JSON.stringify(afterStats.leaderboard)),
+  JSON.stringify(afterStats.leaderboard).slice(0, 160));
+
+// The portrait seed is published on every row so the face can be drawn. The
+// profile id is what proves a request belongs to somebody. Deriving one from
+// the other would hand every player's id to anybody who opened the
+// leaderboard, so they must never match.
+const myId = host.dom.window.CMP.profile.get().id;
+check('33. and the published portrait seed is not the private profile id',
+  afterStats.leaderboard.every((r) => r.portraitSeed !== myId) &&
+  !JSON.stringify(afterStats.leaderboard).includes(myId));
+
+const hostProfile = await host.dom.window.CMP.profile.refresh();
+check('5. the host has a profile with a record on it',
+  !!hostProfile && hostProfile.played === 1, JSON.stringify(hostProfile && hostProfile.played));
+check('5. it carries their chosen game name, not an account',
+  hostProfile.name === 'Simran Kaur Gill', String(hostProfile && hostProfile.name));
+check('5. their seats are recorded', hostProfile.seatsTotal > 0, String(hostProfile.seatsTotal));
+check('5. and the party they played', !!hostProfile.byParty.aap);
+check('6. a level is worked out from what they have done',
+  hostProfile.level >= 1, String(hostProfile.level));
+check('7. achievements are awarded, not claimed',
+  Array.isArray(hostProfile.achievements));
+
+// The screens the brief asks for, with that data actually in them.
+//
+// Opened cold first: the record is fetched after the screen is already on
+// display, which is what a player who taps straight through from home sees,
+// and is the path a screen that only ever renders pre-loaded data would
+// silently fail on.
+host.dom.window.CMP.profile.forget();
+host.dom.window.CMP.app.goTo('profile');
+check('30. the screen fills itself in when the record arrives',
+  await host.until('record', () => !!host.q('.pf-figure'), 8000));
+
+host.dom.window.CMP.app.goTo('home');
+host.dom.window.CMP.app.goTo('profile');
+await host.until('profile screen', () => !!host.q('.screen-profile') && !!host.q('.pf-name'));
+check('30. the profile screen names the player',
+  host.q('.pf-name').textContent === 'Simran Kaur Gill', host.q('.pf-name').textContent);
+check('30. with a drawn portrait', !!host.q('.screen-profile .portrait'));
+check('30. their record', host.qq('.pf-figure').length === 6,
+  String(host.qq('.pf-figure').length));
+check('7. and the full achievement list, earned or not',
+  host.qq('.pf-achievement').length ===
+    host.dom.window.CMP.CAMPAIGN.profiles.achievements.length,
+  String(host.qq('.pf-achievement').length));
+check('31. election history is listed', host.qq('.pf-history-row').length === 1,
+  String(host.qq('.pf-history-row').length));
+
+host.dom.window.CMP.app.goTo('leaderboard');
+await host.until('leaderboard screen', () => !!host.q('.lbd-row'));
+check('9. the leaderboard screen lists players',
+  host.qq('.lbd-row').length >= 1, String(host.qq('.lbd-row').length));
+check('9. each with a score', host.qq('.lbd-score').length === host.qq('.lbd-row').length);
+
+host.dom.window.CMP.app.goTo('home');
+await host.until('home', () => !!host.q('.screen-home'));
+await sleep(400);
+check('4. the home screen shows the live figures',
+  /1\s*election/i.test(host.text()), host.text().slice(0, 200));
+check('10. and labels party performance as game statistics',
+  /not a real-world poll/i.test(host.text()));
+
 /* ---------------------------------------------------------------- solo */
 
 section('Solo mode still needs no server');
 const solo = await openClient('solo');
-solo.click(solo.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY SOLO') === 0));
+solo.click(solo.qq('.h-play-btn').find((b) => /Play solo/i.test(b.textContent)));
+await solo.dom.window.CMP.data.ensure();
+await sleep(60);
 check('solo setup opens', !!solo.q('.screen-setup'));
 solo.click(solo.qq('.party-card').find((c) => c.textContent.includes('BJP')));
 const soloFields = solo.qq('.field-input');

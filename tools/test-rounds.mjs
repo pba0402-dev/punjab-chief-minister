@@ -182,6 +182,31 @@ async function openClient(label) {
   };
 }
 
+/**
+ * Get a client back to the game's home screen.
+ *
+ * The menu lives on the home screen now rather than above every screen, so
+ * reaching any section means going back first. Driving the suites the same way
+ * a player moves is what proves the way back exists on every screen.
+ */
+function goHome(c) {
+  for (let i = 0; i < 4 && !c.q('.g-menu'); i++) {
+    const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
+    if (!back) break;
+    c.click(back);
+  }
+  return !!c.q('.g-menu');
+}
+
+/** One item in the game's menu grid, by its label. */
+function menuItem(c, label) {
+  goHome(c);
+  return c.qq('.g-menu-item').find((n) => {
+    const name = n.querySelector('.g-menu-label');
+    return name && name.textContent === label;
+  });
+}
+
 /* ------------------------------------------------------------ the lobby */
 
 section('Four players sit down');
@@ -190,7 +215,7 @@ const clients = [];
 const host = await openClient('host');
 clients.push(host);
 
-host.click(host.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
 host.click(host.button('CREATE GAME'));
 await host.until('lobby', () => !!host.q('.screen-lobby'));
 // The lobby paints before the create call lands, so the code slot shows
@@ -203,7 +228,7 @@ check('the host created a game', /^[23479ACDEFGHJKMNPQRTUVWXY]{5}$/.test(code), 
 
 for (let i = 2; i <= 4; i++) {
   const c = await openClient('p' + i);
-  c.click(c.qq('.mode-card').find((b) => b.textContent.indexOf('PLAY WITH FRIENDS') === 0));
+  c.click(c.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
   c.click(c.button('JOIN GAME'));
   c.type(c.q('.field-input'), code);
   c.click(c.button('JOIN'));
@@ -247,7 +272,9 @@ for (const c of clients) {
 }
 
 ACTIONS = host.dom.window.CMP.actionsByMenu('campaign').map((a) => a.label);
-check('the campaign moves are read from the config', ACTIONS.length === 5,
+check('the campaign moves are read from the config',
+  ACTIONS.length === host.dom.window.CMP.CAMPAIGN.actions
+    .filter((a) => a.menu === 'campaign').length && ACTIONS.length > 0,
   ACTIONS.join(', '));
 check('the round clock is showing', !!host.q('.round-clock'));
 check(
@@ -299,8 +326,7 @@ async function act(c, label) {
   // Home → my candidate → the closest seat → campaign → confirm. That is the
   // whole loop, so playing it here is what keeps this suite honest about the
   // flow a player actually uses.
-  const home = c.qq('.g-nav-item').find((n) => n.textContent === 'Home');
-  if (home) c.click(home);
+  goHome(c);
   await sleep(60);
 
   const mine = c.q('.lb-row.is-you');
@@ -380,7 +406,7 @@ for (let round = 1; round <= 15; round++) {
   // The host borrows once, early, so repayment and interest are exercised
   // inside a real game rather than only in the unit tests.
   if (round === 2 && !loanTaken) {
-    const tab = host.qq('.g-nav-item').find((t) => t.textContent === 'Loan');
+    const tab = menuItem(host, 'Loan');
     if (tab) {
       host.click(tab);
       await sleep(150);
@@ -394,7 +420,7 @@ for (let round = 1; round <= 15; round++) {
           loanTaken = await host.until('loan', () => host.game().loans.length > 0, 8000);
         }
       }
-      const back = host.qq('.g-nav-item').find((t) => t.textContent === 'Campaign');
+      const back = menuItem(host, 'Campaign');
       if (back) host.click(back);
     }
   }
