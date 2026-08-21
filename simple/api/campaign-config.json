@@ -757,13 +757,18 @@
       "read a board, let alone decide anything.",
       "",
       "There is no cap on moves per round. What limits a round is the money a",
-      "player has and the moment they press END ROUND."
+      "player has and the moment they press END ROUND.",
+      "",
+      "Two rounds get a longer break: the one where alliances close and the one",
+      "where the review runs. Both put something on the screen that has to be",
+      "read and decided on rather than glanced at, and nine seconds is a glance."
     ],
     "total": 20,
     "seconds": 120,
     "graceSeconds": 2,
     "actionsPerRound": 0,
     "intermissionSeconds": 9,
+    "milestoneIntermissionMultiplier": 2.5,
     "eliminationRound": 15,
     "allianceDeadline": 10,
     "finalPhaseFrom": 16,
@@ -776,16 +781,17 @@
   "finance": {
     "_comment": [
       "Cash and debt are tracked separately and cash may never go negative.",
-      "",
-      "Loans are the interesting decision: money now against a bill two rounds",
-      "later, at a rate that hurts. Borrowing in round 13 or later is refused",
-      "because the bill would land after the campaign has closed, which would make",
-      "late borrowing free.",
-      "",
-      "Defaulting is deliberately worse than the money involved: heat, a campaign",
-      "restriction and lost support. Otherwise the right play would always be to",
-      "borrow the maximum in the last rounds and never repay."
-    ],
+    "",
+    "Loans are the interesting decision: money now against a bill four rounds",
+    "later, at a rate that hurts. Borrowing after round 16 is refused because",
+    "the bill would land after the campaign has closed, which would make late",
+    "borrowing free.",
+    "",
+    "The bank lends against capacity rather than appetite, and a payment that",
+    "cannot be met carries forward with a penalty rather than clearing. The",
+    "default block below is what remains of the old rule and now applies only",
+    "where a campaign is beyond recovery."
+  ],
     "loan": {
       "interestRate": 0.2,
       "repayAfterRounds": 4,
@@ -1055,11 +1061,12 @@
       "four competitors and a solo game is still an election.",
       "",
       "The AI plays by exactly the same rules as a human: the same actions, the",
-      "same costs, the same weighted outcomes, the same heat, the same three",
-      "moves a round, the same consequences when it runs hot. It has no extra",
-      "information and no extra money. What differs between the profiles is",
-      "temperament — how much risk it will take and how tightly it targets — so",
-      "the three opponents in a solo game do not all play the same way.",
+      "same costs, the same weighted outcomes, the same heat, the same money,",
+      "the same consequences when it runs hot. Its round is bounded by what it",
+      "can afford, exactly as a human round is. It has no extra information and",
+      "no extra money. What differs between the profiles is temperament: how",
+      "much risk it will take, how tightly it targets, and how much it plays",
+      "for districts rather than for the next seat.",
       "",
       "Names are drawn at random per game from the pools below. They are ordinary",
       "Punjabi given names and surnames combined freely; any resemblance to a",
@@ -1074,7 +1081,8 @@
         "riskAppetite": 0.1,
         "targetSpread": 6,
         "borrowChance": 0.1,
-        "blurb": "Works the marginals and keeps out of trouble."
+        "territoryFocus": 0.55,
+        "blurb": "Works the marginals and builds a district at a time."
       },
       {
         "id": "ambitious",
@@ -1082,6 +1090,7 @@
         "riskAppetite": 0.22,
         "targetSpread": 10,
         "borrowChance": 0.35,
+        "territoryFocus": 0.4,
         "blurb": "Spends hard and takes the occasional gamble."
       },
       {
@@ -1090,6 +1099,7 @@
         "riskAppetite": 0.38,
         "targetSpread": 16,
         "borrowChance": 0.5,
+        "territoryFocus": 0.25,
         "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
       }
     ],

@@ -319,6 +319,47 @@ CMP.ui.result = (function () {
     }
 
     /**
+     * What each campaign built, rather than what it won.
+     *
+     * Seats are the result; districts and the money they paid are the reason
+     * for it. A campaign that took six districts and ran on their grants
+     * fought a different election from one that spent its allowance and never
+     * held ground, and the seat count alone hides that entirely.
+     */
+    function campaignNumbers() {
+      var rows = (view.result.standings || []).filter(function (s) {
+        return s.districts || s.grantIncome;
+      });
+      if (!rows.length) return null;
+
+      return el('section', { class: 'result-block' }, [
+        el('h3', { class: 'result-subheading', text: 'The campaign in numbers' }),
+        el('div', { class: 'cn-rows' }, view.result.standings.map(function (s) {
+          var party = CMP.getParty(s.party);
+          return el('div', { class: 'cn-row' }, [
+            el('span', { class: 'cn-party' }, [
+              el('span', { class: 'race-dot', style: { background: party.colour } }),
+              party.short,
+            ]),
+            el('span', { class: 'cn-fig' }, [
+              el('strong', { text: String(s.districts || 0) }),
+              el('span', { class: 'cn-label', text: 'districts' }),
+            ]),
+            el('span', { class: 'cn-fig' }, [
+              el('strong', { text: CMP.ui.money.words(s.grantIncome || 0) }),
+              el('span', { class: 'cn-label', text: 'in grants' }),
+            ]),
+          ]);
+        })),
+        el('p', {
+          class: 'ar-block-note',
+          text: 'Districts held when the polls closed, and what those ' +
+            'districts paid out across the campaign.',
+        }),
+      ]);
+    }
+
+    /**
      * The whole assembly as one ring.
      *
      * A hundred and seventeen seats divided four ways is the single fact the
@@ -696,6 +737,7 @@ CMP.ui.result = (function () {
           notice ? el('p', { class: 'notice notice-' + notice.tone, text: notice.text }) : null,
           finalBoard(),
           resultTable(),
+          campaignNumbers(),
           coalitionSection(),
         ]),
       ]);

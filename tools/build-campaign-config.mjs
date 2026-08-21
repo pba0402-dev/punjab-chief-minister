@@ -217,6 +217,8 @@ CMP.TERRITORY = CMP.CAMPAIGN.territory;
 CMP.SCOREBOARD = CMP.CAMPAIGN.scoreboard;
 CMP.FINANCE = CMP.CAMPAIGN.finance;
 CMP.EVENTS = CMP.CAMPAIGN.events;
+CMP.ELIMINATION = CMP.CAMPAIGN.elimination;
+CMP.ALLIANCES = CMP.CAMPAIGN.alliances;
 
 /**
  * Campaign strategies and the two ways of raising money, in one list. Grants

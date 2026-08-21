@@ -448,6 +448,25 @@ CMP.campaign = (function () {
   }
 
   /** Seconds left of the results break, or 0 while a round is running. */
+  /**
+   * How long the break after a round runs.
+   *
+   * Nine seconds is right for a scoreboard and wrong for the two rounds that
+   * change the rules: alliances closing, and the review. Both put something on
+   * the screen that has to be read and decided on rather than glanced at.
+   */
+  function breakAfter(round) {
+    var rounds = CMP.ROUNDS || {};
+    var normal = rounds.intermissionSeconds || 9;
+    var milestone = round === rounds.allianceDeadline
+      || round === (CMP.ELIMINATION || {}).round;
+    if (!milestone) return normal;
+
+    // A multiple rather than a fixed number of seconds, so shortening the
+    // clock shortens this too.
+    return Math.max(normal, Math.round(normal * (rounds.milestoneIntermissionMultiplier || 1)));
+  }
+
   function intermissionLeft(game, now) {
     if (!game || game.stage !== 'results') return 0;
     return Math.max(0, Math.ceil((game.nextRoundAt - (now || Date.now())) / 1000));
@@ -879,7 +898,7 @@ CMP.campaign = (function () {
 
     // Into the results break. The shell opens the next round when it expires.
     game.stage = 'results';
-    game.nextRoundAt = Date.now() + CMP.ROUNDS.intermissionSeconds * 1000;
+    game.nextRoundAt = Date.now() + breakAfter(game.round) * 1000;
     game.updatedAt = Date.now();
 
     return { summary: summary, finished: isFinalRound(game) };
@@ -957,11 +976,36 @@ CMP.campaign = (function () {
         change: (counts[party.id] || 0) - before,
         heat: actor ? Math.round(actor.heat || 0) : 0,
         disqualified: !!(actor && actor.disqualified),
+        eliminated: !!(actor && actor.eliminated),
         moves: mine ? null : (aiMoves[party.id] || null),
       };
     }).sort(function (a, b) {
       return b.seats - a.seats || (a.party < b.party ? -1 : 1);
     });
+
+    // The checkpoint, at the configured round and only there.
+    var review = null;
+    if (game.round === (CMP.ELIMINATION || {}).round) {
+      review = reviewField(standingsRows, majority);
+      review.round = game.round;
+      if (review.party) {
+        var out = review.party === game.partyId ? game : findOpponent(game, review.party);
+        if (out) {
+          out.eliminated = true;
+          out.eliminatedReason = review.reason;
+        }
+        review.eliminated = {
+          party: review.party,
+          candidateName: (out && out.candidateName) || null,
+        };
+
+        // The row was built before the review ran, so it still reads as a
+        // live campaign. Mark it, and leave its seats exactly where they are.
+        standingsRows.forEach(function (row) {
+          if (row.party === review.party) row.eliminated = true;
+        });
+      }
+    }
 
     var leader = standingsRows[0];
     var runnerUp = standingsRows[1] || null;
@@ -989,7 +1033,56 @@ CMP.campaign = (function () {
       changes: shown,
       changeCount: changes.length,
       changesHidden: Math.max(0, changes.length - shown.length),
+      review: review,
       at: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  /**
+   * The round-fifteen review.
+   *
+   * The weakest campaign may be put out at the checkpoint, and only if it is
+   * genuinely beyond saving: a field that is still close stays whole. The
+   * same three tests the server applies, so a solo game and a multiplayer
+   * game reach the same verdict from the same standings.
+   *
+   * Whatever an eliminated campaign built stays on the board. Its seats do
+   * not go back into play — it is out of the running, not erased.
+   */
+  function reviewField(rows, majority) {
+    var cfg = CMP.ELIMINATION || {};
+    var minPlayers = cfg.minPlayersToEliminate || 3;
+    var safeMajority = cfg.safeIfWithinSeatsOfMajority || 20;
+    var safeLeader = cfg.safeIfWithinSeatsOfLeader || 12;
+
+    var live = rows.filter(function (r) {
+      return !r.eliminated;
+    });
+    if (live.length <= Math.max(2, minPlayers - 1)) {
+      return { party: null, reason: 'Too few campaigns left for a review.', standings: live };
+    }
+
+    var bottom = live[live.length - 1];
+    if (bottom.seats >= majority - safeMajority) {
+      return {
+        party: null,
+        reason: 'Every campaign is still within reach of a majority.',
+        standings: live,
+      };
+    }
+    if (live[0].seats - bottom.seats <= safeLeader) {
+      return {
+        party: null,
+        reason: 'The field is too close to put anybody out.',
+        standings: live,
+      };
+    }
+
+    return {
+      party: bottom.party,
+      reason: (bottom.candidateName || 'That campaign') + ' finished the review on ' +
+        bottom.seats + ' seats, too far back to reach a majority.',
+      standings: live,
     };
   }
 
@@ -1463,6 +1556,7 @@ CMP.campaign = (function () {
         // player and listed three party names would read as though nobody
         // else had stood.
         var opponent = findOpponent(game, id);
+        var them = id === game.partyId ? game : opponent;
         return {
           party: id,
           seats: totals[id],
@@ -1472,6 +1566,13 @@ CMP.campaign = (function () {
             : (opponent ? opponent.candidateName : null),
           slot: id === game.partyId ? 1 : null,
           disqualified: false,
+
+          // What the campaign built, as opposed to what it won. Districts are
+          // counted off the final board; grant income is what those districts
+          // actually paid out over the twenty rounds, which is not the same
+          // number as holding them at the end.
+          districts: districtsHeldBy(game.support, id).length,
+          grantIncome: (them && them.grantTotalEarned) || 0,
         };
       })
       .sort(function (a, b) {
@@ -1638,6 +1739,7 @@ CMP.campaign = (function () {
     endRound: endRound,
     startNextRound: startNextRound,
     intermissionLeft: intermissionLeft,
+    breakAfter: breakAfter,
     currentLeaders: currentLeaders,
     diffLeaders: diffLeaders,
     secondsLeft: secondsLeft,
@@ -1664,6 +1766,7 @@ CMP.campaign = (function () {
     seatView: seatView,
     seatsLed: seatsLed,
     standings: standings,
+    reviewField: reviewField,
     weightedPick: weightedPick,
     gamePartyFor: gamePartyFor,
     normalise: normalise,

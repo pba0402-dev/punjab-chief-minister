@@ -701,6 +701,7 @@ CMP.CAMPAIGN = {
     "graceSeconds": 2,
     "actionsPerRound": 0,
     "intermissionSeconds": 9,
+    "milestoneIntermissionMultiplier": 2.5,
     "eliminationRound": 15,
     "allianceDeadline": 10,
     "finalPhaseFrom": 16,
@@ -922,7 +923,8 @@ CMP.CAMPAIGN = {
         "riskAppetite": 0.1,
         "targetSpread": 6,
         "borrowChance": 0.1,
-        "blurb": "Works the marginals and keeps out of trouble."
+        "territoryFocus": 0.55,
+        "blurb": "Works the marginals and builds a district at a time."
       },
       {
         "id": "ambitious",
@@ -930,6 +932,7 @@ CMP.CAMPAIGN = {
         "riskAppetite": 0.22,
         "targetSpread": 10,
         "borrowChance": 0.35,
+        "territoryFocus": 0.4,
         "blurb": "Spends hard and takes the occasional gamble."
       },
       {
@@ -938,6 +941,7 @@ CMP.CAMPAIGN = {
         "riskAppetite": 0.38,
         "targetSpread": 16,
         "borrowChance": 0.5,
+        "territoryFocus": 0.25,
         "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
       }
     ],
@@ -1294,6 +1298,8 @@ CMP.TERRITORY = CMP.CAMPAIGN.territory;
 CMP.SCOREBOARD = CMP.CAMPAIGN.scoreboard;
 CMP.FINANCE = CMP.CAMPAIGN.finance;
 CMP.EVENTS = CMP.CAMPAIGN.events;
+CMP.ELIMINATION = CMP.CAMPAIGN.elimination;
+CMP.ALLIANCES = CMP.CAMPAIGN.alliances;
 
 /**
  * Campaign strategies and the two ways of raising money, in one list. Grants

@@ -205,6 +205,11 @@ CMP.ui.profile = (function () {
           figure(profile.bestResult, 'best result'),
           figure(profile.seatsTotal, 'seats won'),
           figure(profile.coalitionWins, 'coalitions'),
+
+          // Ground held and what it paid. Seats say who won; these say how
+          // the campaign was funded, which is the other half of the record.
+          figure(profile.districtsTotal || 0, 'districts held'),
+          figure(CMP.ui.money.words(profile.grantIncomeTotal || 0), 'grant income'),
         ]),
 
         profile.played > profile.verifiedPlayed

@@ -62,6 +62,56 @@ function playedGame(rounds) {
     "CMP.app.setGame(g);CMP.app.goTo('election');";
 }
 
+/**
+ * Six rounds played and the sixth settling, handed to the shell mid-break
+ * rather than raced against the app's own clock.
+ */
+function roundSix() {
+  return "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<6;r++){" +
+    "  for(var m=0;m<3;m++){" +
+    "    CMP.campaign.play(g,'rally',(r*11+m*7)%117+1," +
+    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<5)CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');";
+}
+
+/** N rounds played, the last of them settling, handed straight to the shell. */
+function settledAt(rounds) {
+  return "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<" + rounds + ";r++){" +
+    "  for(var m=0;m<3;m++){" +
+    "    CMP.campaign.play(g,m===1?'media':'rally',(r*11+m*7)%117+1," +
+    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<" + (rounds - 1) + ")CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');";
+}
+
+/** Walk the round-results panel forward by clicking through its stages. */
+function throughStages(setup, clicks) {
+  var body = "";
+  for (var i = clicks; i > 0; i--) {
+    body = "setTimeout(function(){" +
+      "  var b=[].slice.call(document.querySelectorAll('.round-results button'))" +
+      "    .filter(function(x){return /^Continue$|who.s leading|Halfway|round 15 review/i" +
+      "      .test(x.textContent);})[0];" +
+      "  if(b)b.click();" +
+      (body ? "  " + body : "") +
+      "},120);";
+  }
+  return setup + body;
+}
+
 const SCENES = {
   home: '',
   'home-saved':
@@ -198,19 +248,53 @@ const SCENES = {
   // A round settling: the scoreboard, seat changes and the position panel.
   // Built straight from the engine and handed to the shell mid-break, rather
   // than raced against the app's own clock.
-  'round-results':
-    "var g=CMP.state.startElection({partyId:'aap'," +
-    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
-    "for(var r=0;r<6;r++){" +
-    "  for(var m=0;m<3;m++){" +
-    "    CMP.campaign.play(g,'rally',(r*11+m*7)%117+1," +
-    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+  'round-results': roundSix(),
+
+  /*
+   * The line everybody sees once, before round one.
+   *
+   * It takes itself away after four seconds, and virtual time burns through
+   * four seconds long before the shutter opens — so the scene puts it back.
+   */
+  opening:
+    "CMP.app.setGame(CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill'}));CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var s=document.querySelector('.sheet.is-opening');if(!s)return;" +
+    "  var keep=s.cloneNode(true);" +
+    "  setInterval(function(){" +
+    "    if(!document.querySelector('.sheet.is-opening'))document.body.appendChild(keep);" +
+    "  },40);" +
+    "},120);",
+
+  // Round results, second screen: the standings, one tap past what changed.
+  'round-leading':
+    roundSix() +
+    "setTimeout(function(){" +
+    "  var b=[].slice.call(document.querySelectorAll('button'))" +
+    "    .filter(function(x){return /^Continue$|who.s leading/i.test(x.textContent);})[0];" +
+    "  if(b)b.click();" +
+    "},120);",
+
+  // The loan screen with a debt already running and a payment behind it, which
+  // is the state the numbers actually have to survive.
+  'loan-owed':
+    playedGame(5) +
+    "setTimeout(function(){" +
+    "  var g=CMP.app.getGame();" +
+    "  CMP.campaign.takeLoan(g,CMP.campaign.maxLoan(g));" +
+    "  var t=document.querySelectorAll('.g-menu-item');" +
+    "  for(var i=0;i<t.length;i++){" +
+    "    var n=t[i].querySelector('.g-menu-label');" +
+    "    if(n&&n.textContent==='Loan')t[i].click();" +
     "  }" +
-    "  CMP.campaign.endRound(g);" +
-    "  if(r<5)CMP.campaign.startNextRound(g);" +
-    "}" +
-    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
-    "CMP.app.setGame(g);CMP.app.goTo('election');",
+    "},80);",
+
+  // Round ten: alliances close, and the screen that says so.
+  'milestone-halfway': throughStages(settledAt(10), 2),
+
+  // Round fifteen: the review, and whether anybody is out.
+  'milestone-checkpoint': throughStages(settledAt(15), 2),
 
   'election-count':
     "var g=CMP.state.startElection({partyId:'aap'," +

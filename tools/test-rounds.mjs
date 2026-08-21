@@ -1,5 +1,5 @@
 /**
- * A whole campaign, four players, fifteen rounds.
+ * A whole campaign, four players, twenty rounds.
  * ------------------------------------------------------------------
  * Boots the real PHP server and opens FOUR independent jsdom windows against
  * it — separate localStorage, separate sessions, exactly like four devices.
@@ -46,7 +46,7 @@ const BASE = 'http://127.0.0.1:' + PORT + '/';
 const DATA = path.join(os.tmpdir(), 'cmp-rounds-test-' + Date.now());
 
 /* Six seconds a round: long enough for four clients to poll at least twice on
-   a single-threaded dev server, short enough that fifteen rounds is a minute
+   a single-threaded dev server, short enough that twenty rounds is a minute
    and a half rather than fifteen. */
 /* Campaigning is a four-step drill-down — home, candidate, seat, sheet — so a
    round has to be long enough for four clients to walk it. Six seconds was
@@ -261,7 +261,7 @@ check('all four are ready and the host can start', allReady);
 
 /* ------------------------------------------------------------- the game */
 
-section('The campaign runs for fifteen rounds');
+section('The campaign runs for twenty rounds');
 
 host.click(host.button('START ELECTION'));
 
@@ -395,6 +395,8 @@ async function lateMove(c) {
 
 let desyncs = 0;
 let roundsSeen = 0;
+let checkpoint = null;
+let checkpointAgreed = false;
 let summariesSeen = 0;
 let boardsSeen = 0;
 let lockFailures = 0;
@@ -473,10 +475,13 @@ for (let round = 1; round <= 20; round++) {
   }
 
   // The break runs out: the next round opens, or the count begins.
+  // Rounds ten and fifteen get a longer break, because both put something on
+  // the screen that has to be read rather than glanced at.
+  const breakNow = host.dom.window.CMP.campaign.breakAfter(round);
   const moved = await host.until(
     'round ' + round + ' ends',
     () => host.game().round > round || host.screen() === 'result',
-    (BREAK_SECONDS + 12) * 1000
+    (breakNow + 12) * 1000
   );
   if (!moved) {
     check('round ' + round + ' ended on the server clock', false, 'stuck on ' + host.game().round);
@@ -496,6 +501,20 @@ for (let round = 1; round <= 20; round++) {
   const sameSeats = worlds.every((w) => JSON.stringify(w.seats) === JSON.stringify(worlds[0].seats));
   const sameBoard = worlds.every((w) => w.boardHash === worlds[0].boardHash);
   if (!agreed || !sameRound || !sameSeats || !sameBoard) desyncs++;
+
+  /*
+    * The checkpoint. The server decides it, so every client must be told the
+    * same verdict — a review that one player saw and another did not would be
+    * worse than no review at all.
+    */
+  if (round === 15) {
+    checkpoint = host.game().lastResult ? host.game().lastResult.review : null;
+    const seen = clients.map((c) => {
+      const r = c.game().lastResult ? c.game().lastResult.review : null;
+      return r ? JSON.stringify([r.reason, r.eliminated ? r.eliminated.playerId : null]) : null;
+    });
+    checkpointAgreed = seen.every((x) => x !== null && x === seen[0]);
+  }
 
   roundsSeen++;
   if (clients.some((c) => !!c.q('.summary-card'))) summariesSeen++;
@@ -524,7 +543,25 @@ console.log('\n' + roundLog.map((l) => '     ' + l).join('\n'));
 
 check('players actually campaigned through the drill-down', movesPlayed >= 25,
   movesPlayed + ' moves played of ' + (roundsSeen * clients.length) + ' attempted');
-check('the server drove all fifteen rounds', roundsSeen >= 14, roundsSeen + ' rounds observed');
+check('the server drove all twenty rounds', roundsSeen >= 19, roundsSeen + ' rounds observed');
+
+/*
+ * The round-fifteen checkpoint, decided on the server.
+ *
+ * Whatever the verdict, every client has to be told the same one. A review
+ * that one player saw and another did not would be worse than no review.
+ */
+check('the checkpoint ran at round fifteen', !!checkpoint,
+  JSON.stringify(checkpoint));
+check('it gave a reason either way', !!(checkpoint && checkpoint.reason),
+  checkpoint && checkpoint.reason);
+check('and all four clients were told the same verdict', checkpointAgreed);
+if (checkpoint && checkpoint.eliminated) {
+  const row = (host.game().lastResult.standings || [])
+    .find((x) => x.playerId === checkpoint.eliminated.playerId);
+  check('an eliminated campaign is marked, not removed', !!row && row.eliminated === true,
+    JSON.stringify(row && { party: row.party, eliminated: row.eliminated, seats: row.seats }));
+}
 check('all four clients stayed in step throughout', desyncs === 0, desyncs + ' rounds out of step');
 check('round summaries were shown', summariesSeen > 0, summariesSeen + ' rounds reported');
 check('the scoreboard appeared between rounds', boardsSeen >= roundsSeen - 1,

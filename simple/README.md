@@ -32,7 +32,7 @@ npm run test:api            # the multiplayer API
 npm run test:systems        # incumbents, elections, coalitions, investigations
 npm run test:mp             # four browsers in one lobby, start to result
 npm run test:ai             # two humans, two opponents, portraits, reconnection
-npm run test:rounds         # four browsers through all fifteen rounds
+npm run test:rounds         # four browsers through all twenty rounds
 npm run measure:board       # opening-board balance across 60 games
 npm run balance:ai          # are the opponents a real contest?
 npm run shots:portraits     # render a grid of candidate portraits
@@ -244,6 +244,19 @@ minutes, two being the default and the floor. A round also ends the moment
 every player still in it has pressed END ROUND — waiting out a clock nobody is
 using is the fastest way to make twenty rounds feel like a chore.
 
+### Everybody starts on nothing
+
+No seats and no money. The board underneath is still dealt from the sitting
+members and still decides who is *ahead* in each constituency — but being ahead
+is not holding it. **Seats are awarded when a round is settled**, so the
+scoreboard opens 0 – 0 – 0 – 0 and round one is the round that decides all 117.
+
+That is a genuine change from how this used to open, where a player could find
+themselves twenty seats up on a deal they had taken no part in. A short
+**Election started** note says so once, before round one, and takes itself away
+after a few seconds; an announcement that appeared every round would be
+something to dismiss rather than something to read.
+
 ### The allowance is income, not a limit
 
 Nobody starts with money. **₹5 crore arrives at the start of every round**, and
@@ -379,7 +392,8 @@ In this order, because the steps feed each other:
 
 1. The opponents campaign, so their spending lands in the same round as
    everybody else's.
-2. Loans falling due are repaid — or defaulted on.
+2. Loans falling due are repaid, before a rupee of that round's money can be
+   spent. What cannot be met carries forward with its penalty.
 3. At most one random event per player, most rounds none.
 4. Events move the shared board.
 5. Political heat cools slightly.
@@ -389,40 +403,77 @@ In this order, because the steps feed each other:
 8. A snapshot of all 117 seats is added to the history.
 9. The scoreboard is built and the game saved.
 10. Play stays locked for the results break, then the next round opens — or,
-    after round 15, the polls close and the count begins.
+    after round 20, the polls close and the count begins.
 
 Each player also sees a summary of what the round did to *them*: money spent,
 money raised, cash in hand, debt outstanding, support change, seats gained or
 lost, heat change, and any events. It sits in the page rather than over it, so
 it can be read alongside the scoreboard rather than dismissed to reach it.
 
-## The scoreboard
+## The scoreboard, in two screens
 
-Every round ends on an election-night screen: four candidates ranked by
-projected seats, each with their face, their party and what the round did to
-them, over a bar with the majority marked on it.
+A round does not end on a table. It ends on what changed, and only then on
+where that leaves everybody — because the standings move slowly and the seats
+move every round, so leading with the table buries the news under a scoreboard
+that has barely shifted.
 
-Under the leaderboard, two blocks and no more:
+**First: what changed.** Only the constituencies that changed hands, named,
+with who held them and who holds them now. Yours come first — the ones you
+took and the ones you lost — because which five appear decides whether the
+screen is news or a list. Five are shown, and a longer list is capped with the
+remainder counted, never silently dropped. Early rounds can settle forty seats
+at once and all 117 every round is a wall nobody reads.
 
-- **Seats changed** — only the constituencies that changed hands, named, with
-  who held them and who holds them now. Early rounds can settle forty seats at
-  once and a list of all 117 every round is a wall nobody reads; the
-  differences are the news. A long list is capped and the remainder counted,
-  never silently dropped.
-- **Current leader** — their seats against the majority and how many more they
-  need.
+A round where nothing moved says so in a line rather than showing an empty
+table.
 
-Plus a **new leader** or **close race** banner when either is true. Movements
-per party were dropped because every row already carries its own change, and
-the whole round-by-round table lives in the header menu rather than on a screen
-that is up for nine seconds.
+**Then: who is leading.** Four candidates ranked by seats, each with their
+face, their party and what the round did to them, over a bar with the majority
+marked on it; then the current leader against the majority, and where you sit.
+A **new leader** or **close race** banner when either is true.
+
+Movements per party were dropped because every row already carries its own
+change, and the whole round-by-round table lives in the header menu rather than
+on a screen that is up for nine seconds.
+
+### Two rounds are not like the others
+
+Round ten and round fifteen get a third screen, because in both of them
+something about the rules changes and another seat count would not say so.
+
+**Round ten — halfway.** Alliances close at the end of it: whatever is agreed
+by then is what goes into the second half. The screen states that, ranks the
+field with how far each campaign is from a majority, and says how many rounds
+are left.
+
+**Round fifteen — the review.** The weakest campaign can be put out here, and
+only if it is genuinely beyond saving: a field still within reach of a majority
+stays whole, and so does one that is simply close. The screen gives the verdict
+and the reason either way, shows the whole field with anybody eliminated marked
+rather than removed — **their seats stay exactly where they are** — and names
+the final phase that follows.
+
+Neither screen interrupts. Both sit one tap past the standings, so a player who
+only wants the numbers is not made to read a ceremony.
 
 Every figure on that screen is worked out **once, on the server**, and shipped
 whole. Nothing on the client counts anything. Four people watching the same
 round see the same numbers, because they are literally the same numbers — a
 scoreboard where two players disagree about the score is worse than no
 scoreboard at all. `npm run test:rounds` checks exactly this after every one of
-the fifteen rounds, across four browser windows.
+the twenty rounds, across four browser windows.
+
+## What the result says beyond the seats
+
+Under the final table, one block per party: **districts controlled** when the
+polls closed, and the **grant income** those districts paid across the whole
+campaign.
+
+Seats are the result; districts and the money they paid are the reason for it.
+A campaign that took six districts and ran on their grants fought a different
+election from one that spent its allowance and never held ground, and the seat
+count on its own hides that completely. Both figures also go onto the permanent
+profile, alongside seats won and coalitions.
 
 ## Opponents
 
@@ -430,11 +481,35 @@ Any party nobody claims is played by an opponent, so the scoreboard always has
 four competitors and a solo game is still an election rather than a walkover.
 
 They play by exactly the same rules: the same actions, the same costs, the same
-weighted outcome tables, the same heat, the same consequences, the same three
-moves a round, the same starting grant. They get no extra information and no
-extra money. What separates them is temperament — **steady**, **ambitious** or
-**reckless** — which sets how much risk each takes, how tightly it targets and
-how readily it borrows, so three rivals in a solo game do not all play alike.
+weighted outcome tables, the same heat, the same consequences, the same round
+allowance. Their round is bounded by what they can afford, exactly as a human
+round is. They get no extra information and no extra money. What separates them
+is temperament — **steady**, **ambitious** or **reckless** — which sets how much
+risk each takes, how tightly it targets, how readily it borrows and how much it
+plays for districts rather than for the next seat, so three rivals in a solo
+game do not all play alike.
+
+### They play for ground, not only for seats
+
+Three things an opponent that only chased the closest race got wrong, each
+worth seats:
+
+- **A district pays every round it is held.** The two seats that complete one
+  are worth far more than two seats anywhere else, so an opponent looks for
+  the district it is closest to finishing — grant over the square of what is
+  missing, so one seat short beats a richer district four short. Districts the
+  deal handed it pay nothing, and it knows not to chase those.
+- **Grant money is money.** It is locked to the region that earned it, so it
+  never joins the cash pile — but any one move lands in one region and can
+  draw that region's purse in full. An opponent that counted only cash sat on
+  tens of crores of grant income while declaring itself broke. It now spends
+  a region's purse in that region.
+- **Heat is a tax on every move, not a one-off.** Consequences fire on every
+  action once heat is past the floor, and a round is now as many moves as the
+  money buys. So an opponent takes a risky strategy only if it lands *under*
+  that floor, and lets the per-round cooling keep it there.
+
+Together those are worth about eighteen seats a campaign.
 
 Their names are drawn per game from a pool of ordinary Punjabi given names and
 surnames combined freely — 600 combinations, so a new game feels different.
@@ -449,15 +524,23 @@ same map is played from all four seats. Over 48 campaigns:
 
 | | mean seats | won | heat | defaults |
 | --- | --- | --- | --- | --- |
-| human (safe moves, never borrows) | 32.8 | 12/48 | 5 | 0 |
-| opponents | 28.0 | 36/48 | 57 | 0 |
+| human (safe moves, never borrows) | 31.5 | 12/48 | 5 | 0 |
+| opponents | 28.3 | 36/48 | 87 | 0 |
 
-Same party, human against opponent: the human is ahead by about **4 seats**.
-One of four players winning 12 games in 48 is exactly their share, so an
-attentive player is slightly better than an opponent and beaten roughly three
-games in four — which is what having three rivals should feel like. The three
-temperaments finish differently (ambitious 40, steady 28, reckless 23), so the
+Same party, human against opponent: the human is ahead by about **3 seats**,
+down from twenty-one before the opponents learned to play for districts. One of
+four players winning 12 games in 48 is exactly their share, so an attentive
+player is slightly better than an opponent and beaten roughly three games in
+four — which is what having three rivals should feel like. The three
+temperaments finish differently (ambitious 41, steady 31, reckless 21), so the
 risk system means something for them too.
+
+Their heat runs high and the human's does not, because the human baseline never
+takes a risky move at all and so never crosses the floor where consequences
+begin. An opponent that takes one crosses it, and from then on every move it
+makes rolls against itself for the rest of the campaign. That is a real cost of
+the risk system rather than a fault in the opponents — but it is why nobody
+should read the risk actions as free.
 
 ## Candidate portraits
 
@@ -485,18 +568,19 @@ heat, the loan book and the action log — a rival's secret spending is never
 shipped to another client.
 
 `npm run test:rounds` proves it: four independent browser windows play all
-fifteen rounds against a real server, and after every single round the test
+twenty rounds against a real server, and after every single round the test
 checks that all four agree on the round number, the board and the seat counts.
 They finish on identical results.
 
 ## Money: cash and debt are different numbers
 
-Every player is **granted ₹5,00,00,000**. It is never typed in, and in
-multiplayer the server grants it, so a client cannot set its own purse.
+Nobody is granted anything at the start. The purse fills from the round
+allowance, and in multiplayer the server credits it, so a client cannot set its
+own.
 
 Cash is what can be spent and **never goes below zero**. Debt is tracked
-separately and stays separate all the way to the screen: a player carrying two
-crore of borrowing is not two crore richer, they have moved a problem two
+separately and stays separate all the way to the screen: a player carrying ten
+crore of borrowing is not ten crore richer, they have moved a problem four
 rounds down the road.
 
 ### The bank
@@ -504,19 +588,48 @@ rounds down the road.
 | | |
 | --- | --- |
 | Interest | 20% |
-| Repayment falls | 2 rounds later |
-| One loan | ₹10 lakh to ₹1 crore |
-| Total debt limit | ₹2 crore |
-| No borrowing after | round 12 |
+| Repayment falls | 4 rounds later |
+| One loan | ₹6.5 lakh to ₹6.65 crore |
+| Total debt limit | ₹13.35 crore |
+| No borrowing after | round 16 |
+| Missed payment | +30%, carried forward |
 
 Borrowing late is refused because the bill would land after election day, which
 would quietly make late borrowing free money. Loans can be stacked up to the
 debt limit, and the terms are quoted and confirmed before anything is signed.
 
-**Defaulting** — being unable to cover a repayment — costs more than the money:
-heat, lost support, a three-round campaign restriction, and no bank will lend to
-you again. Without that, the best play would be to borrow the maximum every
-round and never repay.
+### Lent against capacity, not appetite
+
+The maximum is worked out before anything is offered, from money that is
+actually coming:
+
+- cash in hand,
+- the round allowances certain to arrive before the bill falls due,
+- the grants already being paid by districts already held,
+- less everything already owed.
+
+Nothing speculative counts. **Seats are not cash.** Campaign winnings may never
+arrive. A grant from a district nobody has taken is not income. So a campaign
+holding ₹4 crore with three rounds to run can borrow against ₹19 crore of
+certain money, not against the ₹100 crore a whole game would eventually pay.
+
+The screen leads with the figure that can actually be borrowed, and no amount
+above it is offered — dangling a number and then refusing it is worse than not
+showing it.
+
+### A missed payment does not go away
+
+If the payment cannot be met, the campaign is not declared bankrupt and the
+debt does not disappear. What it has goes toward the bill, the balance carries
+into the next round, and **30% is added to whatever is left**. It keeps
+carrying, and keeps taking the penalty, until it is cleared — and nobody lends
+again while a payment is outstanding.
+
+Repayment happens **before** anything can be spent that round. The other order
+let a player borrow, spend the lot, and arrive at the due round with nothing,
+which is not a strategy so much as a bug with a plan.
+
+All of it is worked out on the server. The browser asks; the server decides.
 
 ### Raising money mid-campaign
 

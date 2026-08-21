@@ -103,6 +103,12 @@ final class Profiles
             'seatsTotal' => 0,
             'bestResult' => 0,
             'coalitionWins' => 0,
+
+            // Ground held and what it paid. Two campaigns can finish on the
+            // same seat count having played completely different games.
+            'districtsTotal' => 0,
+            'bestDistricts' => 0,
+            'grantIncomeTotal' => 0,
             'verifiedPlayed' => 0,
             'verifiedWon' => 0,
             'verifiedSeats' => 0,
@@ -163,9 +169,15 @@ final class Profiles
         $won = !empty($result['won']);
         $coalition = !empty($result['coalition']);
 
+        $districts = max(0, (int) ($result['districts'] ?? 0));
+        $grantIncome = max(0, (int) ($result['grantIncome'] ?? 0));
+
         $profile['played']++;
         $profile['seatsTotal'] += $seats;
         $profile['bestResult'] = max((int) $profile['bestResult'], $seats);
+        $profile['districtsTotal'] = (int) ($profile['districtsTotal'] ?? 0) + $districts;
+        $profile['bestDistricts'] = max((int) ($profile['bestDistricts'] ?? 0), $districts);
+        $profile['grantIncomeTotal'] = (int) ($profile['grantIncomeTotal'] ?? 0) + $grantIncome;
         if ($won) {
             $profile['won']++;
         }
@@ -195,6 +207,7 @@ final class Profiles
             'at' => time(),
             'party' => $party,
             'seats' => $seats,
+            'districts' => $districts,
             'won' => $won,
             'coalition' => $coalition,
             'outcome' => (string) ($result['outcome'] ?? ''),
@@ -354,6 +367,9 @@ final class Profiles
             'seatsTotal' => (int) $profile['seatsTotal'],
             'bestResult' => (int) $profile['bestResult'],
             'coalitionWins' => (int) $profile['coalitionWins'],
+            'districtsTotal' => (int) ($profile['districtsTotal'] ?? 0),
+            'bestDistricts' => (int) ($profile['bestDistricts'] ?? 0),
+            'grantIncomeTotal' => (int) ($profile['grantIncomeTotal'] ?? 0),
             'favouriteParty' => $favourite,
             'byParty' => $profile['byParty'] ?? (object) [],
             'level' => $level['level'],

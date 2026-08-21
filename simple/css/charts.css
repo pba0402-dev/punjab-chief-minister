@@ -470,3 +470,64 @@
   flex-direction: column;
   gap: 11px;
 }
+
+/* ------------------------------------------- the campaign in numbers */
+
+.result-subheading {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cn-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cn-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.cn-row:first-child { border-top: 0; }
+
+.cn-party {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cn-fig {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  min-width: 0;
+}
+.cn-fig strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cn-label {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+@media (max-width: 359px) {
+  .cn-row { gap: 9px; }
+  .cn-fig strong { font-size: 0.82rem; }
+}

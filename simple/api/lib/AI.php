@@ -131,17 +131,15 @@ final class AI
 
             $target = null;
             if (!empty($action['needsConstituency'])) {
-                $target = self::chooseSeat($board, $partyId, $profile, $rand);
+                $target = self::chooseSeat($board, $partyId, $profile, $rand, $engine, $player);
                 if ($target === null) {
                     break;
                 }
             }
 
-            // How much to put behind it. Spreading evenly across the moves
-            // available is the efficient play under a square-root curve, so
-            // that is what an opponent does: its remaining cash divided by the
-            // moves it expects to have left.
-            $amount = self::chooseAmount($player, $action, $engine, $round);
+            // How much goes behind it: cash spread over the moves still to
+            // come, plus whatever the region purse can add.
+            $amount = self::chooseAmount($player, $action, $engine, $round, $target);
 
             if ($engine->blockedReason($player, $board, $action['id'], $target, $amount) !== null) {
                 break;
@@ -178,8 +176,13 @@ final class AI
      * paying the sticker price: what it has left, divided by the moves it can
      * still expect to make, clamped to what the action allows.
      */
-    private static function chooseAmount(array $player, array $action, Campaign $engine, int $round): ?int
-    {
+    private static function chooseAmount(
+        array $player,
+        array $action,
+        Campaign $engine,
+        int $round,
+        $target = null
+    ): ?int {
         if (empty($action['allowsAmount'])) {
             return null;
         }
@@ -194,10 +197,52 @@ final class AI
          */
         $rounds = $engine->rounds();
         $roundsLeft = max(1, (int) $rounds['total'] - $round + 1);
-        $budget = (int) floor($engine->remaining($player) / max(2, min(6, $roundsLeft)));
+
+        /*
+         * Against what this particular move can draw on — cash plus the purse
+         * for its own region — rather than against cash alone. Grant money is
+         * region-locked and cannot be saved for later somewhere else, so
+         * there is nothing to gain by holding it back.
+         */
+        $pot = $engine->spendableOn($player, $target);
+        $budget = (int) floor($pot['cash'] / max(2, min(6, $roundsLeft))) + $pot['grant'];
 
         $range = $engine->amountRange($action);
         return (int) max($range['min'], min($range['max'], $budget));
+    }
+
+    /**
+     * The most one move could possibly put behind itself: general cash plus
+     * the largest single region purse, because a move lands in one region.
+     */
+    private static function spendableCeiling(array $player, Campaign $engine): int
+    {
+        $best = 0;
+        foreach (($player['grants'] ?? []) as $amount) {
+            $best = max($best, max(0, (int) $amount));
+        }
+        return $engine->remaining($player) + $best;
+    }
+
+    /**
+     * The region holding the most grant money, if it is worth aiming at.
+     *
+     * Money that can only be spent in Malwa should be spent in Malwa. An
+     * opponent that campaigned wherever the closest race happened to be would
+     * strand its grant income the moment it lost the district that earned it.
+     */
+    private static function richestRegion(array $player, int $floor): ?string
+    {
+        $best = null;
+        $bestAmount = $floor;
+        foreach (($player['grants'] ?? []) as $region => $amount) {
+            $amount = max(0, (int) $amount);
+            if ($amount > $bestAmount) {
+                $bestAmount = $amount;
+                $best = (string) $region;
+            }
+        }
+        return $best;
     }
 
     /**
@@ -214,17 +259,38 @@ final class AI
         int $round,
         int $reserve = 0
     ): ?array {
-        $spendable = max(0, $engine->remaining($player) - $reserve);
+        /*
+         * Grant money is money.
+         *
+         * It is locked to the region that earned it, so it cannot be added to
+         * the cash pile — but any one move lands in exactly one region, and
+         * can draw that region's purse in full. The biggest purse is
+         * therefore the right ceiling for "can this opponent afford to play at
+         * all": counting only cash left it sitting on tens of crores of grant
+         * income while it declared itself broke.
+         */
+        $spendable = max(0, self::spendableCeiling($player, $engine) - $reserve);
         $heat = (float) ($player['heat'] ?? 0);
         $heatMax = (float) $engine->config()['heat']['max'];
         $restricted = Investigation::isRestricted($player, $round);
 
-        // Heat is a dial the opponent watches. Past two thirds it stops
-        // reaching for anything that would raise it further and lets the
-        // per-round cooling bring it back down, the way a player who had been
-        // paying attention would.
-        $backoff = (float) ($engine->config()['ai']['heatBackoff'] ?? 0.5);
-        $runningHot = $heat >= $heatMax * $backoff;
+        /*
+         * Heat is a dial the opponent watches, and it stops turning it well
+         * before the ceiling.
+         *
+         * Consequences fire at heat/100 of a chance on every action, floored
+         * below minHeat — so once heat is past that floor, every move the
+         * opponent makes is rolling against itself, and a round is now as
+         * many moves as the money buys rather than three. Sitting at seventy
+         * used to cost a little; it now costs on every move of every round.
+         *
+         * So the line is drawn where consequences actually begin, and the
+         * per-round cooling is left to bring it back down.
+         */
+        $config = $engine->config();
+        $backoff = (float) ($config['ai']['heatBackoff'] ?? 0.5);
+        $consequencesFrom = (float) ($config['heat']['minHeat'] ?? $heatMax);
+        $runningHot = $heat >= min($heatMax * $backoff, $consequencesFrom);
 
         $affordable = [];
         foreach ($engine->actions() as $action) {
@@ -232,10 +298,31 @@ final class AI
                 continue;
             }
             $group = $action['group'] ?? 'safe';
-            if ($group === 'risky' && ($restricted || $runningHot)) {
-                continue;
+
+            /*
+             * A risky move is only taken if it lands under the consequence
+             * floor.
+             *
+             * Below that floor nothing fires at all; above it, every single
+             * move of every round rolls against itself. Crossing the line for
+             * one strategy therefore taxes the whole rest of the campaign,
+             * which is a bad trade at any appetite — so the appetite decides
+             * how readily the room below the floor is used, not whether to go
+             * through it.
+             */
+            if ($group === 'risky') {
+                if ($restricted || $runningHot) {
+                    continue;
+                }
+                if ($heat + (float) ($action['heat'] ?? 0) >= $consequencesFrom) {
+                    continue;
+                }
             }
-            if ($action['id'] === 'underground' && $runningHot) {
+            // Undisclosed money is free and costs 24 heat, which is most of
+            // the way through the floor on its own. Same rule as a risky
+            // strategy: only if it lands under it.
+            if ($action['id'] === 'underground'
+                && ($runningHot || $heat + (float) ($action['heat'] ?? 0) >= $consequencesFrom)) {
                 continue;
             }
             $affordable[$group][] = $action;
@@ -267,7 +354,10 @@ final class AI
 
         // A grant is worth taking now and then: development work that also
         // pays for itself sometimes.
-        if ($spendable < $engine->startingBudget() * 0.35 && $rand() < 0.3) {
+        // Thin against what a round costs, not against a starting budget
+        // nobody is given any more.
+        $roundIncome = (int) (($engine->config()['income'] ?? [])['perRound'] ?? 0);
+        if ($spendable < $roundIncome * 0.35 && $rand() < 0.3) {
             $grant = self::findAction($funding, 'grant');
             if ($grant !== null) {
                 return $grant;
@@ -288,36 +378,141 @@ final class AI
     }
 
     /**
+     * The district worth finishing.
+     *
+     * A district pays its grant every round for the rest of the game, so the
+     * two seats that complete one are worth far more than two seats anywhere
+     * else — and a player who works that out is fifteen seats ahead of an
+     * opponent that only ever plays the closest race. Value is the grant over
+     * the square of what is still missing, so a district needing one seat
+     * beats a richer one needing four.
+     *
+     * Districts already held when the board was dealt pay nothing, so
+     * finishing one of those is worth no more than any other seat.
+     *
+     * @return string[] the seats still missing from the best district
+     */
+    private static function districtTarget(
+        array $board,
+        string $partyId,
+        Campaign $engine,
+        array $player
+    ): array {
+        $leaders = Territory::leadersOf($board);
+        $opening = $player['openingDistricts'] ?? [];
+
+        $bestValue = 0.0;
+        $bestMissing = [];
+
+        foreach ($engine->territory()->districts() as $d) {
+            if (in_array($d['id'], $opening, true)) {
+                continue;
+            }
+
+            $missing = [];
+            foreach ($d['seats'] as $number) {
+                if (($leaders[(string) $number] ?? null) !== $partyId) {
+                    $missing[] = (string) $number;
+                }
+            }
+            if ($missing === [] || count($missing) > 3) {
+                continue;
+            }
+
+            $value = (float) $d['grant'] / (count($missing) ** 2);
+            if ($value > $bestValue) {
+                $bestValue = $value;
+                $bestMissing = $missing;
+            }
+        }
+
+        return $bestMissing;
+    }
+
+    /**
      * Where to campaign: among the seats this party is closest to taking or
      * losing, since that is where a move changes the seat count. targetSpread
      * widens the shortlist, so a loose profile spreads itself thinner.
+     *
+     * Unless a district is nearly complete — finishing one buys income as
+     * well as a seat, and that is the difference between an opponent and a
+     * bystander.
      */
     private static function chooseSeat(
         array $board,
         string $partyId,
         array $profile,
-        callable $rand
+        callable $rand,
+        ?Campaign $engine = null,
+        array $player = []
     ): ?string {
         if (!$board) {
             return null;
         }
 
-        $margins = [];
-        foreach ($board as $key => $seat) {
-            $mine = (float) ($seat[$partyId] ?? 0);
-            $best = 0.0;
-            foreach ($seat as $pid => $value) {
-                if ($pid !== $partyId && $value > $best) {
-                    $best = (float) $value;
+        $closest = static function (array $keys) use ($board, $partyId): array {
+            $margins = [];
+            foreach ($keys as $key) {
+                $seat = $board[(string) $key] ?? null;
+                if ($seat === null) {
+                    continue;
+                }
+                $mine = (float) ($seat[$partyId] ?? 0);
+                $best = 0.0;
+                foreach ($seat as $pid => $value) {
+                    if ($pid !== $partyId && $value > $best) {
+                        $best = (float) $value;
+                    }
+                }
+                $margins[(string) $key] = abs($mine - $best);
+            }
+            asort($margins);
+            // array_keys hands back ints for numeric string keys, and the
+            // board is keyed by string throughout, so put them back.
+            return array_map('strval', array_keys($margins));
+        };
+
+        /*
+         * Not every move, or the opponent would tunnel on one district while
+         * the rest of the board walked away from it. Often enough that
+         * holding ground is part of how it plays.
+         */
+        $appetite = (float) ($profile['territoryFocus'] ?? 0.45);
+        if ($engine !== null && $rand() < $appetite) {
+            $missing = self::districtTarget($board, $partyId, $engine, $player);
+            if ($missing !== []) {
+                $near = $closest($missing);
+                if ($near !== []) {
+                    return $near[0];
                 }
             }
-            $margins[(string) $key] = abs($mine - $best);
         }
-        asort($margins);
 
-        // array_keys hands back ints for numeric string keys, and the board is
-        // keyed by string throughout, so put them back.
-        $shortlist = array_slice(array_map('strval', array_keys($margins)), 0, max(1, (int) $profile['targetSpread']));
+        /*
+         * Otherwise, if a region is holding real grant money, campaign there.
+         * The purse cannot be moved and cannot be saved for anywhere else, so
+         * a close race in the wrong region is worth less than a slightly
+         * wider one that the grant will actually pay for.
+         */
+        if ($engine !== null) {
+            $region = self::richestRegion($player, (int) ($engine->config()['actions'][0]['cost'] ?? 0));
+            if ($region !== null) {
+                $inRegion = [];
+                foreach (array_keys($board) as $key) {
+                    if ($engine->territory()->regionOfSeat($key) === $region) {
+                        $inRegion[] = (string) $key;
+                    }
+                }
+                if ($inRegion !== []) {
+                    $near = $closest($inRegion);
+                    $spread = max(1, (int) $profile['targetSpread']);
+                    $pool = array_slice($near, 0, $spread);
+                    return $pool[(int) floor($rand() * count($pool)) % count($pool)];
+                }
+            }
+        }
+
+        $shortlist = array_slice($closest(array_keys($board)), 0, max(1, (int) $profile['targetSpread']));
         return $shortlist[(int) floor($rand() * count($shortlist)) % count($shortlist)];
     }
 

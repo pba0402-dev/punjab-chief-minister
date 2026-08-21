@@ -468,3 +468,87 @@
   text-transform: uppercase;
   color: var(--muted-2);
 }
+
+/* ----------------------------------- the halfway and checkpoint screens */
+
+.ms-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--wheat);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.ms-note.is-out { border-left-color: var(--danger); }
+.ms-note.is-safe { border-left-color: var(--good); }
+
+.ms-note-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.ms-note-line {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.ms-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ms-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0 9px 9px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
+}
+.ms-row:first-child { border-top: 0; }
+.ms-row.is-you { border-left-color: var(--party, var(--wheat)); }
+.ms-row.is-out { opacity: 0.5; }
+
+.ms-row-party {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.ms-row-name {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-row-seats {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ms-row-need {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.ms-foot {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--muted-2);
+}
+
+@media (max-width: 359px) {
+  .ms-row { gap: 7px; }
+  .ms-row-name { font-size: 0.76rem; }
+}

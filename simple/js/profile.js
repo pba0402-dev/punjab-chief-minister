@@ -170,6 +170,8 @@ CMP.profile = (function () {
         spent: game.spent,
         behindAtTen: behindAtTen,
         usedHighRisk: usedHighRisk,
+        districts: mine.districts || 0,
+        grantIncome: mine.grantIncome || 0,
       })
       .then(function (res) {
         if (res && res.ok && res.profile) {

@@ -95,13 +95,14 @@ final class Election
             ];
         }
 
-        return $this->verdict($game, $perSeat, $totals, $byParty);
+        return $this->verdict($game, $perSeat, $totals, $byParty, $board);
     }
 
     /** Turn seat totals into a government, a hung assembly, or neither. */
-    private function verdict(array $game, array $perSeat, array $totals, array $byParty): array
+    private function verdict(array $game, array $perSeat, array $totals, array $byParty, array $board = []): array
     {
         $majority = (int) $this->config['majority'];
+        $leaders = $board === [] ? [] : Territory::leadersOf($board);
 
         $standings = [];
         foreach ($totals as $party => $seats) {
@@ -114,6 +115,15 @@ final class Election
                 'candidate' => $player['candidateName'] ?? null,
                 'slot' => $player['slot'] ?? null,
                 'disqualified' => !empty($player['record']['disqualified']),
+
+                // What the campaign built, as opposed to what it won.
+                // Districts come off the final board; grant income is what
+                // those districts actually paid across the whole campaign,
+                // which is not the same number as holding them at the end.
+                'districts' => $leaders === []
+                    ? 0
+                    : count($this->campaign->territory()->heldBy($leaders, (string) $party)),
+                'grantIncome' => (int) ($player['grantTotalEarned'] ?? 0),
             ];
         }
         usort($standings, static fn($a, $b) => $b['seats'] <=> $a['seats']);

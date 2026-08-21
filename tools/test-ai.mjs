@@ -366,6 +366,89 @@ check('portraits are vector drawings, not images',
 check('each portrait is labelled for a screen reader',
   faces.every((n) => /Illustration of/.test(n.getAttribute('aria-label') || '')));
 
+/* ------------------------------------------------------------ territory */
+
+/*
+ * An opponent that only ever plays the closest race is not an opponent.
+ *
+ * A district pays its grant every round for the rest of the game, so the two
+ * seats that complete one are worth far more than two seats anywhere else,
+ * and grant money is locked to the region that earned it. An opponent blind
+ * to both finishes about fifteen seats behind a human who is not.
+ */
+section('Opponents play for ground, not only for seats');
+
+const w = host.dom.window;
+const ai = w.CMP.ai;
+const board = host.game().support;
+
+// A district the party is one seat away from completing.
+const district = w.CMP.DISTRICTS.find((d) => d.seats.length >= 3);
+const leaders = w.CMP.campaign.currentLeaders(board);
+const held = district.seats.filter((n) => leaders[n] === 'aap');
+
+const nearly = {
+  partyId: 'aap',
+  openingDistricts: [],
+  grants: {},
+  cash: 100000000,
+};
+
+// Hand the party every seat in it but one, on a copy of the board.
+const rigged = JSON.parse(JSON.stringify(board));
+district.seats.slice(0, -1).forEach((n) => {
+  Object.keys(rigged[String(n)]).forEach((pid) => {
+    rigged[String(n)][pid] = pid === 'aap' ? 60 : 10;
+  });
+});
+const missing = String(district.seats[district.seats.length - 1]);
+Object.keys(rigged[missing]).forEach((pid) => {
+  rigged[missing][pid] = pid === 'aap' ? 20 : 40;
+});
+
+const target = ai.districtTarget(rigged, 'aap', nearly);
+check('a nearly-complete district is spotted', !!target,
+  district.name + ', held ' + held.length + ' of ' + district.seats.length);
+check('what it names is within reach',
+  !!target && target.missing.length > 0 && target.missing.length <= 3,
+  target ? target.missing.length + ' seats missing' : 'none');
+
+const riggedLeaders = w.CMP.campaign.currentLeaders(rigged);
+check('and every seat it names is one the party does not yet lead',
+  !!target && target.missing.every((n) => riggedLeaders[n] !== 'aap'),
+  target ? target.missing.join(',') : 'none');
+
+// With the appetite turned all the way up, that is where it campaigns.
+const always = { targetSpread: 6, territoryFocus: 1 };
+const picked = ai.chooseSeat(rigged, 'aap', always, () => 0.5, nearly);
+check('an opponent playing for ground goes there',
+  !!target && target.missing.indexOf(picked) !== -1,
+  'picked ' + picked + ', wanted one of ' + (target ? target.missing.join(',') : '-'));
+
+// Districts the deal handed over pay nothing, so finishing one is worth no
+// more than any other seat — and if every district is an inherited one there
+// is no territory worth chasing at all.
+const inherited = ai.districtTarget(rigged, 'aap', {
+  partyId: 'aap',
+  openingDistricts: w.CMP.DISTRICTS.map((d) => d.id),
+  grants: {},
+});
+check('a district the deal handed over is not worth chasing', !inherited,
+  inherited ? JSON.stringify(inherited.missing) : 'none');
+
+// Grant money is region-locked, so it has to be spent where it was earned.
+const withPurse = {
+  partyId: 'aap',
+  openingDistricts: w.CMP.DISTRICTS.map((d) => d.id),
+  grants: { malwa: 200000000 },
+  cash: 0,
+};
+const inMalwa = ai.chooseSeat(board, 'aap', { targetSpread: 6, territoryFocus: 0 },
+  () => 0.5, withPurse);
+check('grant money is spent in the region that earned it',
+  w.CMP.regionOfSeat(Number(inMalwa)) === 'malwa',
+  'seat ' + inMalwa + ' is in ' + w.CMP.regionOfSeat(Number(inMalwa)));
+
 /* --------------------------------------------------------------- health */
 
 section('Console and server log');

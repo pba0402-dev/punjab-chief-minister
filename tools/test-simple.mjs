@@ -949,6 +949,14 @@ check('10. and how far the leader is from it',
   /more seats? needed|Majority reached/.test(q(dom, '.position').textContent),
   q(dom, '.position').textContent.slice(0, 60));
 
+/*
+ * Round one is not a milestone round, so the third screen is not offered.
+ * The button appearing every round would make the two rounds that matter
+ * look like every other one.
+ */
+check('no milestone screen on an ordinary round',
+  !qq(dom, 'button').find((b) => /Halfway|round 15 review/i.test(b.textContent)));
+
 /* The break expires: the next round opens. */
 solo.nextRoundAt = Date.now() - 1000;
 for (let i = 0; i < 40 && dom.window.CMP.app.getGame().stage !== 'playing'; i++) {
@@ -957,6 +965,118 @@ for (let i = 0; i < 40 && dom.window.CMP.app.getGame().stage !== 'playing'; i++)
 solo = dom.window.CMP.app.getGame();
 check('the break ending opens the next round', solo.round === 2, 'round ' + solo.round);
 check('play is possible again', dom.window.CMP.campaign.roundIsLive(solo));
+goHome(dom);
+
+/* ----------------------------------------- the two rounds that are not
+ * like the others
+ *
+ * Round ten closes alliances and round fifteen is the review. Both get a
+ * third results screen that says what has changed about the rules, rather
+ * than another seat count.
+ */
+section('Round ten and round fifteen');
+
+async function settledAt(rounds) {
+  const w = dom.window;
+  const g = w.CMP.state.startElection({ partyId: 'aap', candidateName: 'Simran Kaur Gill' });
+  for (let r = 0; r < rounds; r++) {
+    for (let m = 0; m < 3; m++) {
+      w.CMP.campaign.play(g, m === 1 ? 'media' : 'rally', ((r * 11 + m * 7) % 117) + 1,
+        { outcome: 0.3, consequence: 0.9, consequencePick: 0.5 });
+    }
+    w.CMP.campaign.endRound(g);
+    if (r < rounds - 1) w.CMP.campaign.startNextRound(g);
+  }
+  g.intermissionLeft = w.CMP.campaign.intermissionLeft(g);
+  w.CMP.app.setGame(g);
+  w.CMP.app.goTo('election');
+  await settle();
+  return g;
+}
+
+function stageOn(re) {
+  return qq(dom, '.round-results button').find((b) => re.test(b.textContent));
+}
+
+/* ---- round ten: alliances close ---- */
+await settledAt(10);
+clickIt(dom, stageOn(/^Continue$|who.s leading/i));
+await settle();
+
+const halfwayBtn = stageOn(/Halfway/i);
+check('round ten offers the halfway screen', !!halfwayBtn,
+  qq(dom, '.round-results button').map((b) => b.textContent).join(' | ').slice(0, 120));
+clickIt(dom, halfwayBtn);
+await settle();
+
+check('it says alliances are closing',
+  /Alliances close now/i.test(q(dom, '.round-results').textContent));
+check('it ranks the whole field', qq(dom, '.ms-row').length === 4,
+  qq(dom, '.ms-row').length + ' rows');
+check('and says how far each is from a majority',
+  qq(dom, '.ms-row-need').every((n) => /short|majority|out/.test(n.textContent)),
+  qq(dom, '.ms-row-need').map((n) => n.textContent).join(', '));
+check('and what is still to come',
+  /rounds left/.test(q(dom, '.ms-foot').textContent), q(dom, '.ms-foot').textContent);
+
+// Nine seconds is a glance, and this screen has to be read and acted on.
+const w2 = dom.window;
+check('a milestone round gets a longer break',
+  w2.CMP.campaign.breakAfter(10) > w2.CMP.campaign.breakAfter(9),
+  w2.CMP.campaign.breakAfter(10) + 's vs ' + w2.CMP.campaign.breakAfter(9) + 's');
+check('and so does the review',
+  w2.CMP.campaign.breakAfter(15) === w2.CMP.campaign.breakAfter(10),
+  w2.CMP.campaign.breakAfter(15) + 's');
+check('every other round keeps the short one',
+  [1, 5, 12, 19].every((r) => w2.CMP.campaign.breakAfter(r) === w2.CMP.ROUNDS.intermissionSeconds));
+
+clickIt(dom, qq(dom, '.round-results button').find((b) => /Back to the standings/i.test(b.textContent)));
+await settle();
+check('and it goes back to the standings',
+  /Who.s leading/i.test(q(dom, '.round-results').textContent));
+
+/* ---- round fifteen: the review ---- */
+const checkpoint = await settledAt(15);
+clickIt(dom, stageOn(/^Continue$|who.s leading/i));
+await settle();
+
+const reviewBtn = stageOn(/round 15 review/i);
+check('round fifteen offers the review', !!reviewBtn,
+  qq(dom, '.round-results button').map((b) => b.textContent).join(' | ').slice(0, 120));
+clickIt(dom, reviewBtn);
+await settle();
+
+const review = checkpoint.lastResult.review;
+check('the engine ran the review at the checkpoint', !!review, JSON.stringify(review || null));
+check('and gave a reason either way', !!(review && review.reason), review && review.reason);
+check('the screen states the verdict',
+  /is out|Everybody survives/i.test(q(dom, '.ms-note-title').textContent),
+  q(dom, '.ms-note-title').textContent);
+check('the whole field is shown, out or not', qq(dom, '.ms-row').length === 4,
+  qq(dom, '.ms-row').length + ' rows');
+check('and the final phase is named',
+  /rounds 16 to 20/i.test(q(dom, '.ms-foot').textContent), q(dom, '.ms-foot').textContent);
+
+if (review && review.party) {
+  const out = qq(dom, '.ms-row.is-out');
+  check('an eliminated campaign is marked out, not removed', out.length === 1,
+    out.length + ' marked');
+  // Not "not zero" — a campaign put out at the review may genuinely be on
+  // nothing. What matters is that the elimination did not take its seats
+  // away: the number shown is the number the board says it holds.
+  const heldByOut = dom.window.CMP.campaign.heldSeats(checkpoint)[review.party] || 0;
+  check('its seats stay on the board',
+    Number((out[0].querySelector('.ms-row-seats') || {}).textContent) === heldByOut,
+    (out[0].querySelector('.ms-row-seats') || {}).textContent + ' shown, ' +
+      heldByOut + ' on the board');
+}
+
+// Those two were built to look at, not to play on. The suite carries on with
+// the campaign it was in the middle of.
+dom.window.CMP.app.setGame(solo);
+dom.window.CMP.app.goTo('election');
+await settle();
+
 goHome(dom);
 check('and the menu is back', qq(dom, '.g-menu-item').length === 10);
 check('the campaign log kept the round it happened in',
@@ -1064,6 +1184,30 @@ check('the full result follows', !!q(dom, '.result-rows'));
 const soloTotal = qq(dom, '.result-row .result-seats')
   .reduce((t, n) => t + Number(n.textContent.trim()), 0);
 check('all 117 seats are declared', soloTotal === 117, String(soloTotal));
+
+/*
+ * 54. What each campaign built, as opposed to what it won. Two campaigns can
+ * finish on the same seat count having played completely different games, and
+ * the seat total alone hides that entirely.
+ */
+check('54. the result reports districts controlled',
+  /districts/i.test((q(dom, '.cn-rows') || {}).textContent || ''),
+  ((q(dom, '.cn-rows') || {}).textContent || 'no block').replace(/\s+/g, ' ').slice(0, 120));
+check('54. and the grant income those districts paid',
+  /in grants/i.test((q(dom, '.cn-rows') || {}).textContent || ''));
+// Every party that took a seat, including the independents and small parties
+// the board carries as one row — the same set the result table lists.
+check('54. for every party on the board',
+  qq(dom, '.cn-row').length === qq(dom, '.result-row').length,
+  qq(dom, '.cn-row').length + ' of ' + qq(dom, '.result-row').length);
+check('54. two figures apiece',
+  qq(dom, '.cn-row .cn-fig strong').length === qq(dom, '.cn-row').length * 2,
+  qq(dom, '.cn-row .cn-fig strong').length + ' figures');
+// Real numbers off the board, not a row of zeroes: twenty rounds always
+// leaves somebody holding ground.
+check('54. and they are real figures, not a row of zeroes',
+  qq(dom, '.cn-row .cn-fig strong').some((n) => !/^(0|₹0)$/.test(n.textContent.trim())),
+  qq(dom, '.cn-row .cn-fig strong').map((n) => n.textContent).join(' / '));
 
 /* ---------------------------------------------------------------- console */
 

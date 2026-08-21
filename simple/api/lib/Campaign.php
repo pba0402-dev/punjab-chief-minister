@@ -45,9 +45,10 @@ final class Campaign
      * The round clock as configured.
      *
      * CMP_ROUND_SECONDS and CMP_INTERMISSION_SECONDS shorten a round and the
-     * results break, and exist so the test suite can play all fifteen rounds
+     * results break, and exist so the test suite can play all twenty rounds
      * against a real server in under a minute rather than a quarter of an
-     * hour. Nothing sets them in production, and if they were ever set the
+     * hour. The longer break at a milestone round is a multiple of this one,
+     * so it shortens with it. Nothing sets them in production, and if they were ever set the
      * only effect would be a faster clock — no rule changes with either.
      */
     public function rounds(): array

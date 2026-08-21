@@ -587,12 +587,156 @@ CMP.ui.scoreboard = (function () {
           el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
         ]),
         position(result),
+
+        milestoneKind()
+          ? el('button', {
+              class: 'btn btn-primary btn-wide',
+              type: 'button',
+              text: milestoneKind() === 'checkpoint'
+                ? 'The round 15 review'
+                : 'Halfway: where this stands',
+              onclick: function () {
+                stage = 'milestone';
+                render();
+              },
+            })
+          : null,
+
         el('button', {
           class: 'btn btn-quiet btn-wide',
           type: 'button',
           text: 'Back to what changed',
           onclick: function () {
             stage = 'changes';
+            render();
+          },
+        }),
+      ];
+    }
+
+    /* --------------------------------------- screen three, twice a game */
+
+    /**
+     * Two rounds are not like the others, and saying so is most of the point.
+     *
+     * Round ten is the last round in which an alliance can be agreed, and the
+     * moment the campaign stops being open-ended. Round fifteen is the review.
+     * Both deserve a screen that states what has just changed about the rules
+     * rather than another seat count.
+     */
+    function milestoneKind() {
+      if (!result) return null;
+      var rounds = CMP.ROUNDS || {};
+      if (result.round === (CMP.ELIMINATION || {}).round) return 'checkpoint';
+      if (result.round === rounds.allianceDeadline) return 'halfway';
+      return null;
+    }
+
+    function milestoneRow(row, you) {
+      var party = partyOf(row.party);
+      var short = Math.max(0, (result.majority || 59) - row.seats);
+      return el('div', {
+        class: 'ms-row' + (row.party === you ? ' is-you' : '') +
+          (row.eliminated ? ' is-out' : ''),
+        style: { '--party': party.colour },
+      }, [
+        el('span', { class: 'ms-row-party' }, [
+          el('span', { class: 'race-dot', style: { background: party.colour } }),
+          party.short,
+        ]),
+        el('span', { class: 'ms-row-name', text: row.candidateName || party.name }),
+        el('strong', { class: 'ms-row-seats', text: String(row.seats) }),
+        el('span', {
+          class: 'ms-row-need',
+          text: row.eliminated ? 'out' : short ? short + ' short' : 'majority',
+        }),
+      ]);
+    }
+
+    function halfwayScreen(secondsLeft) {
+      var you = opts.you ? opts.you() : null;
+      var total = (CMP.ROUNDS || {}).total || 20;
+      var left = Math.max(0, total - result.round);
+
+      return [
+        head('Halfway', 'Round ' + result.round + ' of ' + total, secondsLeft),
+        el('div', { class: 'ms-note' }, [
+          el('strong', { class: 'ms-note-title', text: 'Alliances close now' }),
+          el('span', {
+            class: 'ms-note-line',
+            text: 'No new alliance can be agreed after this round. Whatever ' +
+              'is agreed now is what goes into the second half.',
+          }),
+        ]),
+        el('h3', { class: 'results-title', text: 'Where the field stands' }),
+        el('div', { class: 'ms-rows' }, result.standings.map(function (row) {
+          return milestoneRow(row, you);
+        })),
+        el('p', {
+          class: 'ms-foot',
+          text: left + ' rounds left, and the review at round ' +
+            ((CMP.ELIMINATION || {}).round || 15) + '.',
+        }),
+        el('button', {
+          class: 'btn btn-quiet btn-wide',
+          type: 'button',
+          text: 'Back to the standings',
+          onclick: function () {
+            stage = 'leading';
+            render();
+          },
+        }),
+      ];
+    }
+
+    function checkpointScreen(secondsLeft) {
+      var you = opts.you ? opts.you() : null;
+      var review = result.review || {};
+      var gone = review.eliminated || null;
+      var goneParty = gone ? partyOf(gone.partyId || gone.party) : null;
+      var rounds = CMP.ROUNDS || {};
+
+      return [
+        head('The review', 'Round ' + result.round + ' checkpoint', secondsLeft),
+
+        gone
+          ? el('div', { class: 'ms-note is-out' }, [
+              el('strong', {
+                class: 'ms-note-title',
+                text: (gone.candidateName || (goneParty && goneParty.name) || 'A campaign') +
+                  ' is out',
+              }),
+              el('span', { class: 'ms-note-line', text: review.reason || '' }),
+              el('span', {
+                class: 'ms-note-line',
+                text: 'Their seats stay where they are. They are out of the ' +
+                  'running, not off the board.',
+              }),
+            ])
+          : el('div', { class: 'ms-note is-safe' }, [
+              el('strong', { class: 'ms-note-title', text: 'Everybody survives' }),
+              el('span', {
+                class: 'ms-note-line',
+                text: review.reason || 'The field is too close to put anybody out.',
+              }),
+            ]),
+
+        el('h3', { class: 'results-title', text: 'The field at the review' }),
+        el('div', { class: 'ms-rows' }, result.standings.map(function (row) {
+          return milestoneRow(row, you);
+        })),
+
+        el('p', {
+          class: 'ms-foot',
+          text: 'The final phase begins: rounds ' + (rounds.finalPhaseFrom || 16) +
+            ' to ' + (rounds.total || 20) + '.',
+        }),
+        el('button', {
+          class: 'btn btn-quiet btn-wide',
+          type: 'button',
+          text: 'Back to the standings',
+          onclick: function () {
+            stage = 'leading';
             render();
           },
         }),
@@ -612,9 +756,14 @@ CMP.ui.scoreboard = (function () {
       }
       if (!result) return;
 
+      var kind = milestoneKind();
+      if (stage === 'milestone' && !kind) stage = 'leading';
+
       mount(root, stage === 'changes'
         ? changesScreen(secondsLeft)
-        : leadingScreen(secondsLeft));
+        : stage === 'milestone'
+          ? (kind === 'checkpoint' ? checkpointScreen(secondsLeft) : halfwayScreen(secondsLeft))
+          : leadingScreen(secondsLeft));
     }
 
     return { root: root, render: render };

@@ -191,6 +191,31 @@ final class Rounds
     }
 
     /** Seconds left in the results break, or 0 when a round is running. */
+    /**
+     * How long the break after a round runs.
+     *
+     * Nine seconds is right for a scoreboard and wrong for the two rounds that
+     * change the rules: alliances closing, and the review. Both put something
+     * on the screen that has to be read and decided on rather than glanced at.
+     */
+    private static function breakAfter(Campaign $engine, int $round): int
+    {
+        $rounds = $engine->rounds();
+        $normal = (int) $rounds['intermissionSeconds'];
+
+        $milestone = $round === (int) ($rounds['allianceDeadline'] ?? 0)
+            || $round === (int) (($engine->config()['elimination'] ?? [])['round'] ?? 0);
+        if (!$milestone) {
+            return $normal;
+        }
+
+        // A multiple rather than a fixed number of seconds, so shortening the
+        // clock for a test shortens this too and the override stays a clock
+        // override rather than a rule change.
+        $factor = (float) ($rounds['milestoneIntermissionMultiplier'] ?? 1);
+        return max($normal, (int) round($normal * $factor));
+    }
+
     public static function intermissionLeft(array $game, ?int $now = null): int
     {
         if (($game['stage'] ?? 'playing') !== 'results') {
@@ -433,6 +458,15 @@ final class Rounds
                     'partyId' => (string) ($out['partyId'] ?? ''),
                     'candidateName' => (string) ($out['candidateName'] ?? ''),
                 ];
+
+                // The standings were built before the review ran, so the row
+                // still reads as a live campaign. Mark it, and leave its seats
+                // exactly where they are.
+                foreach ($game['lastResult']['standings'] as $i => $row) {
+                    if (($row['playerId'] ?? null) === $review['playerId']) {
+                        $game['lastResult']['standings'][$i]['eliminated'] = true;
+                    }
+                }
             }
         }
 
@@ -445,8 +479,7 @@ final class Rounds
         // read — one owed round at a time, forever.
         $game['roundState'] = 'completed';
         $game['stage'] = 'results';
-        $game['nextRoundAt'] = (int) $game['roundEndsAt']
-            + (int) $engine->rounds()['intermissionSeconds'];
+        $game['nextRoundAt'] = (int) $game['roundEndsAt'] + self::breakAfter($engine, $round);
 
         $game['updatedAt'] = time();
         return $game;
@@ -537,6 +570,7 @@ final class Rounds
                 'change' => $summary !== null ? (int) $summary['seatsChange'] : 0,
                 'heat' => $player !== null ? round((float) $player['heat'], 0) : 0,
                 'disqualified' => !empty($player['record']['disqualified']),
+                'eliminated' => !empty($player['eliminated']),
                 'moves' => $pid !== null ? ($aiMoves[$pid] ?? null) : null,
             ];
         }

@@ -360,6 +360,8 @@ function recordFinishedGame(array $game, Profiles $profiles): array
             'spent' => (int) ($player['spent'] ?? 0),
             'behindAtTen' => wasBehindAtTen($game, (string) $row['party']),
             'usedHighRisk' => usedHighRisk($player),
+            'districts' => (int) ($row['districts'] ?? 0),
+            'grantIncome' => (int) ($row['grantIncome'] ?? 0),
         ], true);
     }
 
@@ -1260,6 +1262,10 @@ switch (route()) {
             'spent' => max(0, (int) input('spent', 0)),
             'behindAtTen' => filter_var(input('behindAtTen', false), FILTER_VALIDATE_BOOLEAN),
             'usedHighRisk' => filter_var(input('usedHighRisk', false), FILTER_VALIDATE_BOOLEAN),
+            // A solo game is the player's own account of it, so these are
+            // bounded the same way the seat count is.
+            'districts' => max(0, min(23, (int) input('districts', 0))),
+            'grantIncome' => max(0, (int) input('grantIncome', 0)),
         ], false);
 
         send([

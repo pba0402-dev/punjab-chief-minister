@@ -819,6 +819,15 @@ check('5. it carries their chosen game name, not an account',
   hostProfile.name === 'Simran Kaur Gill', String(hostProfile && hostProfile.name));
 check('5. their seats are recorded', hostProfile.seatsTotal > 0, String(hostProfile.seatsTotal));
 check('5. and the party they played', !!hostProfile.byParty.aap);
+
+// 55. Ground held and what it paid. Seats say who won; these say how the
+// campaign was funded, which is the other half of the record.
+check('55. districts held are kept on the record',
+  typeof hostProfile.districtsTotal === 'number', String(hostProfile.districtsTotal));
+check('55. and the grant income they generated',
+  typeof hostProfile.grantIncomeTotal === 'number', String(hostProfile.grantIncomeTotal));
+check('55. neither is negative',
+  hostProfile.districtsTotal >= 0 && hostProfile.grantIncomeTotal >= 0);
 check('6. a level is worked out from what they have done',
   hostProfile.level >= 1, String(hostProfile.level));
 check('7. achievements are awarded, not claimed',
@@ -841,8 +850,12 @@ await host.until('profile screen', () => !!host.q('.screen-profile') && !!host.q
 check('30. the profile screen names the player',
   host.q('.pf-name').textContent === 'Simran Kaur Gill', host.q('.pf-name').textContent);
 check('30. with a drawn portrait', !!host.q('.screen-profile .portrait'));
-check('30. their record', host.qq('.pf-figure').length === 6,
+check('30. their record', host.qq('.pf-figure').length === 8,
   String(host.qq('.pf-figure').length));
+check('55. including the districts and what they paid',
+  /districts held/i.test(host.q('.pf-figures').textContent) &&
+  /grant income/i.test(host.q('.pf-figures').textContent),
+  host.q('.pf-figures').textContent.replace(/\s+/g, ' ').slice(0, 160));
 check('7. and the full achievement list, earned or not',
   host.qq('.pf-achievement').length ===
     host.dom.window.CMP.CAMPAIGN.profiles.achievements.length,
