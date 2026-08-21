@@ -41,6 +41,7 @@ for (const f of [
   'js/data/actions.js',
   'js/engine/rng.js',
   'js/engine/campaign.js',
+  'js/engine/ai.js',
   'js/state.js',
 ]) {
   vm.runInContext(fs.readFileSync(path.join(APP, f), 'utf8'), sandbox, { filename: f });
@@ -120,7 +121,9 @@ function playCampaign(name, seed) {
       });
     }
 
+    // A round settles into a results break; the next opens when it ends.
     if (CMP.campaign.endRound(game).finished) break;
+    CMP.campaign.startNextRound(game);
   }
 
   const result = CMP.campaign.runElection(game);

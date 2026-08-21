@@ -56,11 +56,24 @@ CMP.ui.election = (function () {
 
     var roundView = CMP.ui.round.create({});
     var summaryNode = el('div', { class: 'summary-slot' });
+    var resultsNode = el('div', { class: 'results-slot' });
+
+    // The round-results screen, shown while play is locked between rounds.
+    var resultsView = CMP.ui.scoreboard.create({
+      you: function () {
+        return game ? game.partyId : null;
+      },
+      trend: function () {
+        return (game && game.seatTrend) || [];
+      },
+    });
+    CMP.ui.dom.mount(resultsNode, [resultsView.root]);
 
     var root = el('section', { class: 'screen screen-election' }, [
       el('div', { class: 'election-inner' }, [
         headNode,
         roundView.root,
+        resultsNode,
         summaryNode,
         statsNode,
         projectionNode,
@@ -178,11 +191,34 @@ CMP.ui.election = (function () {
         })
       );
 
-      campaignNode.style.display = tab === 'campaign' ? '' : 'none';
-      moneyNode.style.display = tab === 'money' ? '' : 'none';
-      mapNode.style.display = tab === 'map' ? '' : 'none';
-      seatNode.style.display = tab === 'seat' ? '' : 'none';
-      oversightNode.style.display = tab === 'rivals' ? '' : 'none';
+      // While the round is being counted, nothing that spends money or
+      // changes the board is on screen at all. Hiding the controls is clearer
+      // than leaving them there disabled, and it puts the scoreboard where
+      // the eye already is.
+      var counting = isCounting();
+      if (counting) {
+        // Nothing to act on is actually rendered during the break, rather
+        // than rendered and hidden: it saves repainting ten action cards
+        // twice a second, and leaves no controls behind for a stray key
+        // press to find.
+        mount(tabsNode, []);
+        mount(safeNode, []);
+        mount(riskyNode, []);
+        mount(fundingNode, []);
+        mount(bankSlot, []);
+      }
+      tabsNode.style.display = counting ? 'none' : '';
+      reportNode.style.display = counting ? 'none' : '';
+      projectionNode.style.display = counting ? 'none' : '';
+      declareNode.style.display = counting ? 'none' : '';
+      resultsNode.style.display = counting ? '' : 'none';
+
+      campaignNode.style.display = !counting && tab === 'campaign' ? '' : 'none';
+      moneyNode.style.display = !counting && tab === 'money' ? '' : 'none';
+      mapNode.style.display = !counting && tab === 'map' ? '' : 'none';
+      seatNode.style.display = !counting && tab === 'seat' ? '' : 'none';
+      oversightNode.style.display = !counting && tab === 'rivals' ? '' : 'none';
+      if (counting) return;
 
       if (tab === 'map') paintMap();
       if (tab === 'seat') paintSeatDetail();
@@ -350,6 +386,11 @@ CMP.ui.election = (function () {
       return best ? Number(best.number) : CMP.CONSTITUENCIES[0].number;
     }
 
+    /** True while the round is settled and the scoreboard is up. */
+    function isCounting() {
+      return !!(game && game.stage === 'results' && game.lastResult);
+    }
+
     function setNotice(text, tone) {
       notice = text ? { text: text, tone: tone || 'bad' } : null;
       paintReport();
@@ -431,6 +472,7 @@ CMP.ui.election = (function () {
 
     function paintMoney() {
       mount(breakdownNode, [CMP.ui.bank.breakdown(game)]);
+      if (bankSlot.firstChild !== bankView.root) mount(bankSlot, [bankView.root]);
       bankView.render(game);
       mount(fundingNode, CMP.actionsByGroup('funding').map(actionCard));
     }
@@ -860,7 +902,18 @@ CMP.ui.election = (function () {
       }
       paintHead();
       roundView.render(game, secondsFromServer);
+
+      if (isCounting()) {
+        resultsView.render(game.lastResult, game.intermissionLeft);
+      }
+
       paintStats();
+      paintTabs();
+
+      // Between rounds the campaign surfaces are not on screen, so there is
+      // nothing to be gained by painting them.
+      if (isCounting()) return;
+
       paintProjection();
       paintHeat();
       paintTarget();
@@ -868,7 +921,6 @@ CMP.ui.election = (function () {
       paintMoney();
       paintReport();
       paintLog();
-      paintTabs();
       paintDeclare();
       if (mapView) mapView.render(game, selected);
     }

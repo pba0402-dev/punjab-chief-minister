@@ -49,6 +49,13 @@ final class Lobby
             'board' => (object) [],
             'history' => [],
             'roundLog' => [],
+
+            // Who led each seat when the last round was settled, so the next
+            // one can report what changed hands rather than listing all 117.
+            'leaders' => (object) [],
+            'leadParty' => null,
+            'lastResult' => null,
+            'stage' => 'lobby', // lobby | playing | results | final
             'players' => [],
             'incumbency' => (object) [],
             'result' => null,
@@ -96,6 +103,13 @@ final class Lobby
             'seatsLed' => 0,
             'summary' => null,
 
+            // A fictional candidate portrait, drawn from this seed. It is
+            // fixed the moment a player sits down and never changes, so the
+            // face on the scoreboard is the same face all game — including
+            // after a disconnection and a rejoin.
+            'portraitSeed' => bin2hex(random_bytes(6)),
+            'isAI' => false,
+
             'ready' => false,
             'joinedAt' => $now,
             'lastSeen' => $now,
@@ -122,16 +136,35 @@ final class Lobby
 
     public static function isConnected(array $player, ?int $now = null): bool
     {
+        // An opponent is never away from its desk.
+        if (!empty($player['isAI'])) {
+            return true;
+        }
         $now = $now ?? time();
         return ($now - (int) $player['lastSeen']) <= self::CONNECT_TIMEOUT;
     }
 
+    /**
+     * Connected humans. Opponents are excluded on purpose: this list decides
+     * who can host and whether the game can start, and neither is a question
+     * an opponent gets a say in.
+     */
     public static function connectedPlayers(array $game): array
     {
         $now = time();
         return array_values(array_filter($game['players'], static function ($p) use ($now) {
-            return self::isConnected($p, $now);
+            return empty($p['isAI']) && self::isConnected($p, $now);
         }));
+    }
+
+    /** Parties with nobody sitting behind them. */
+    public static function unclaimedParties(array $game): array
+    {
+        $taken = self::takenParties($game);
+        return array_values(array_filter(
+            self::PARTIES,
+            static fn($id) => !in_array($id, $taken, true)
+        ));
     }
 
     /**
@@ -282,6 +315,8 @@ final class Lobby
                 'isHost' => $game['hostId'] === $p['id'],
                 'isYou' => $isYou,
                 'connected' => self::isConnected($p, $now),
+                'isAI' => !empty($p['isAI']),
+                'portraitSeed' => $p['portraitSeed'] ?? null,
                 'partyId' => $p['partyId'],
                 'candidateName' => $p['candidateName'],
                 'slogan' => $p['slogan'],
@@ -360,6 +395,21 @@ final class Lobby
             'roundEndsAt' => (int) ($game['roundEndsAt'] ?? 0),
             'secondsLeft' => max(0, (int) ($game['roundEndsAt'] ?? 0) - $now),
             'serverNow' => $now,
+
+            // The results break: which stage the round is in, and how long is
+            // left of it. Clients lock their controls on this rather than on
+            // their own reading of the clock.
+            'stage' => $game['stage'] ?? 'lobby',
+            'intermissionSeconds' => (int) ($game['intermissionSeconds'] ?? 0),
+            'nextRoundAt' => (int) ($game['nextRoundAt'] ?? 0),
+            'intermissionLeft' => ($game['stage'] ?? '') === 'results'
+                ? max(0, (int) ($game['nextRoundAt'] ?? 0) - $now)
+                : 0,
+
+            // The round's scoreboard, worked out once on the server so every
+            // client shows identical figures.
+            'lastResult' => $game['lastResult'] ?? null,
+            'leaders' => $game['leaders'] ?? (object) [],
 
             // One board, seen by everyone.
             'board' => $board ?: (object) [],

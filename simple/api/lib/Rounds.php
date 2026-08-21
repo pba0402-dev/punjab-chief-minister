@@ -15,8 +15,15 @@
  * and if every player closed their laptop, the round ends the moment one of
  * them comes back, which is the behaviour you want anyway.
  *
+ * A round has two stages. While it is "playing", the sixty-second clock runs
+ * and moves are accepted. When it expires the round is settled and the game
+ * moves to "results": play is locked, the scoreboard is built once on the
+ * server, and every client is shown the same figures for a few seconds before
+ * the next round opens. The break is deliberate — reading what just happened
+ * should not be competing with the next round for the same seconds.
+ *
  * The pipeline below runs in a fixed order because the steps feed each other:
- * money settles before events, events move support, and only then is it
+ * opponents move, money settles, events move support, and only then is it
  * meaningful to recount leaders and projected seats.
  */
 declare(strict_types=1);
@@ -29,13 +36,16 @@ final class Rounds
         $cfg = $engine->rounds();
         $now = time();
         $game['round'] = $round;
+        $game['stage'] = 'playing';
         $game['roundStartedAt'] = $now;
         $game['roundEndsAt'] = $now + (int) $cfg['seconds'];
+        $game['nextRoundAt'] = 0;
 
         // Kept on the record so the lobby view can describe the clock without
         // needing the config loaded.
         $game['roundsTotal'] = (int) $cfg['total'];
         $game['roundSeconds'] = (int) $cfg['seconds'];
+        $game['intermissionSeconds'] = (int) $cfg['intermissionSeconds'];
 
         // turn tracks rounds one-for-one. Restrictions and investigations were
         // written against it before rounds existed and still read it.
@@ -81,9 +91,24 @@ final class Rounds
         if (($game['phase'] ?? '') !== 'election') {
             return false;
         }
+        // Play is locked for the whole results break, not merely until the
+        // clock hits zero — the scoreboard being shown is the same scoreboard
+        // a late move would invalidate.
+        if (($game['stage'] ?? 'playing') !== 'playing') {
+            return false;
+        }
         $now = $now ?? time();
         $grace = (int) ($engine->rounds()['graceSeconds'] ?? 0);
         return $now <= ((int) ($game['roundEndsAt'] ?? 0) + $grace);
+    }
+
+    /** Seconds left in the results break, or 0 when a round is running. */
+    public static function intermissionLeft(array $game, ?int $now = null): int
+    {
+        if (($game['stage'] ?? 'playing') !== 'results') {
+            return 0;
+        }
+        return max(0, (int) ($game['nextRoundAt'] ?? 0) - ($now ?? time()));
     }
 
     public static function isFinalRound(array $game, Campaign $engine): bool
@@ -105,11 +130,45 @@ final class Rounds
         $now = $now ?? time();
         $guard = 0;
 
-        while (($game['phase'] ?? '') === 'election'
-            && $now >= (int) ($game['roundEndsAt'] ?? 0)
-            && $guard++ < 40) {
-            $game = self::endRound($game, $engine, $election);
+        // Two things can be owed: a round that has finished playing and needs
+        // settling, and a results break that has run its course. A game left
+        // alone for five minutes may owe several of each, so keep going until
+        // nothing is due.
+        while (($game['phase'] ?? '') === 'election' && $guard++ < 60) {
+            $stage = $game['stage'] ?? 'playing';
+
+            if ($stage === 'playing' && $now >= (int) ($game['roundEndsAt'] ?? 0)) {
+                $game = self::endRound($game, $engine, $election);
+                continue;
+            }
+            if ($stage === 'results' && $now >= (int) ($game['nextRoundAt'] ?? 0)) {
+                $game = self::startNextRound($game, $engine, $election);
+                continue;
+            }
+            break;
         }
+        return $game;
+    }
+
+    /** Leave the results break and open the next round, or close the polls. */
+    public static function startNextRound(array $game, Campaign $engine, Election $election): array
+    {
+        $round = (int) ($game['round'] ?? 1);
+
+        if ($round >= (int) $engine->rounds()['total']) {
+            $result = $election->run($game);
+            $game['result'] = $result;
+            $game['phase'] = $result['outcome'] === 'majority' ? 'government' : 'hung';
+            $game['stage'] = 'final';
+            $game['roundEndsAt'] = time();
+            $game['nextRoundAt'] = 0;
+            $game['possibleCoalitions'] = $election->possibleCoalitions($result);
+            $game['updatedAt'] = time();
+            return $game;
+        }
+
+        $game = self::begin($game, $round + 1, $engine);
+        $game['updatedAt'] = time();
         return $game;
     }
 
@@ -130,6 +189,20 @@ final class Rounds
 
         $order = array_map('strval', array_keys($game['players']));
         sort($order); // deterministic regardless of join order
+
+        // 0. The opponents campaign. They move at the end of the round rather
+        // than at odd moments during it, so their spending lands in the same
+        // round as everybody else's and appears in the same results screen.
+        $aiMoves = [];
+        foreach ($order as $pid) {
+            $player = $game['players'][$pid];
+            if (empty($player['isAI']) || empty($player['partyId'])) {
+                continue;
+            }
+            [$player, $board, $moves] = AI::takeRound($player, $board, $engine, $game['id'], $round);
+            $game['players'][$pid] = $player;
+            $aiMoves[$pid] = $moves;
+        }
 
         // 1 + 2. Campaign effects have already been applied as each action was
         // played; what is still owed is money. Loans fall due here.
@@ -193,6 +266,14 @@ final class Rounds
             $game['players'][$pid] = $player;
         }
 
+        // 7. Which seats changed hands. Only the differences are worth
+        // showing: early rounds can settle a hundred seats at once, and a
+        // list of all 117 every round is a wall of text nobody reads.
+        $previous = self::leadersOf($game);
+        $current = self::currentLeaders($board);
+        $changes = self::diffLeaders($previous, $current);
+        $game['leaders'] = $current;
+
         // 8. A snapshot per round, so the constituency panel can draw how a
         // race moved rather than only where it ended up.
         $game['history'][] = [
@@ -209,19 +290,155 @@ final class Rounds
             array_shift($game['roundLog']);
         }
 
-        // 9. On to the next round, or to the count.
-        if ($round >= (int) $engine->rounds()['total']) {
-            $result = $election->run($game);
-            $game['result'] = $result;
-            $game['phase'] = $result['outcome'] === 'majority' ? 'government' : 'hung';
-            $game['possibleCoalitions'] = $election->possibleCoalitions($result);
-            $game['roundEndsAt'] = time();
-        } else {
-            $game = self::begin($game, $round + 1, $engine);
-        }
+        // 9. Build the scoreboard once, here, and hand every client the same
+        // one. A client that worked out its own standings could disagree with
+        // the player sitting next to it, which would make the whole screen
+        // untrustworthy.
+        $game['lastResult'] = self::buildResult($game, $engine, $round, $seats, $changes, $summaries, $aiMoves);
+
+        $game['leadParty'] = $game['lastResult']['leadParty'];
+
+        // 10. Into the results break. The next round opens when it expires.
+        //
+        // The break is measured from when the round actually ended, not from
+        // the moment we noticed it had. A game nobody touched for five minutes
+        // is settled by whichever request arrives next, and stamping the break
+        // from "now" would leave it stuck on a scoreboard nobody was there to
+        // read — one owed round at a time, forever.
+        $game['stage'] = 'results';
+        $game['nextRoundAt'] = (int) $game['roundEndsAt']
+            + (int) $engine->rounds()['intermissionSeconds'];
 
         $game['updatedAt'] = time();
         return $game;
+    }
+
+    /* -------------------------------------------------------- scoreboard */
+
+    /** Who leads each seat right now. */
+    public static function currentLeaders(array $board): array
+    {
+        $out = [];
+        foreach ($board as $key => $seat) {
+            $leader = Campaign::leaderOf($seat);
+            if ($leader !== null) {
+                $out[(string) $key] = $leader;
+            }
+        }
+        return $out;
+    }
+
+    /** The leader map as it stood after the previous round. */
+    public static function leadersOf(array $game): array
+    {
+        $leaders = $game['leaders'] ?? [];
+        return is_array($leaders) ? $leaders : (array) $leaders;
+    }
+
+    /**
+     * Seats that changed hands, as {seat, from, to}. A first round has no
+     * previous state to compare against, so nothing is reported as a change —
+     * every seat "changing" on the opening round would be meaningless.
+     */
+    public static function diffLeaders(array $previous, array $current): array
+    {
+        if (!$previous) {
+            return [];
+        }
+        $changes = [];
+        foreach ($current as $key => $to) {
+            $from = $previous[$key] ?? null;
+            if ($from !== null && $from !== $to) {
+                $changes[] = ['seat' => (int) $key, 'from' => $from, 'to' => $to];
+            }
+        }
+        usort($changes, static fn($a, $b) => $a['seat'] <=> $b['seat']);
+        return $changes;
+    }
+
+    /**
+     * The round's scoreboard: who is where, what moved, and what it means.
+     * Everything a client needs to draw the results screen without doing any
+     * arithmetic of its own.
+     */
+    public static function buildResult(
+        array $game,
+        Campaign $engine,
+        int $round,
+        array $seats,
+        array $changes,
+        array $summaries,
+        array $aiMoves
+    ): array {
+        $cfg = $engine->config()['scoreboard'];
+        $majority = (int) $engine->config()['election']['majority'];
+
+        // One row per playable party, whoever is playing it.
+        $byParty = [];
+        foreach ($game['players'] as $pid => $p) {
+            if (!empty($p['partyId'])) {
+                $byParty[(string) $p['partyId']] = $pid;
+            }
+        }
+
+        $standings = [];
+        foreach (Lobby::PARTIES as $partyId) {
+            $pid = $byParty[$partyId] ?? null;
+            $player = $pid !== null ? $game['players'][$pid] : null;
+            $summary = $pid !== null ? ($summaries[$pid] ?? null) : null;
+
+            $standings[] = [
+                'party' => $partyId,
+                'playerId' => $pid,
+                'candidateName' => $player['candidateName'] ?? null,
+                'portraitSeed' => $player['portraitSeed'] ?? null,
+                'isAI' => !empty($player['isAI']),
+                'seats' => (int) ($seats[$partyId] ?? 0),
+                'change' => $summary !== null ? (int) $summary['seatsChange'] : 0,
+                'heat' => $player !== null ? round((float) $player['heat'], 0) : 0,
+                'disqualified' => !empty($player['record']['disqualified']),
+                'moves' => $pid !== null ? ($aiMoves[$pid] ?? null) : null,
+            ];
+        }
+
+        usort($standings, static function ($a, $b) {
+            return $b['seats'] <=> $a['seats'] ?: strcmp($a['party'], $b['party']);
+        });
+
+        $leader = $standings[0];
+        $runnerUp = $standings[1] ?? null;
+        $gap = $runnerUp !== null ? $leader['seats'] - $runnerUp['seats'] : $leader['seats'];
+
+        // Did the lead change hands this round?
+        $previousLeader = $game['leadParty'] ?? null;
+        $newLeader = $previousLeader !== null
+            && $previousLeader !== $leader['party']
+            && $leader['seats'] > 0;
+
+        $shown = array_slice($changes, 0, (int) $cfg['maxSeatChangesShown']);
+
+        return [
+            'round' => $round,
+            'roundsTotal' => (int) $engine->rounds()['total'],
+            'isFinalRound' => $round >= (int) $engine->rounds()['total'],
+            'standings' => $standings,
+            'totalSeats' => array_sum($seats),
+            'majority' => $majority,
+
+            'leadParty' => $leader['party'],
+            'leadSeats' => $leader['seats'],
+            'leadOver' => $runnerUp['party'] ?? null,
+            'leadGap' => $gap,
+            'seatsNeeded' => max(0, $majority - $leader['seats']),
+            'newLeader' => $newLeader,
+            'previousLeader' => $previousLeader,
+            'closeRace' => $runnerUp !== null && $gap <= (int) $cfg['closeRaceSeats'],
+
+            'changes' => $shown,
+            'changeCount' => count($changes),
+            'changesHidden' => max(0, count($changes) - count($shown)),
+            'at' => time(),
+        ];
     }
 
     /** The shared board, tolerating the empty-object form JSON round-trips to. */

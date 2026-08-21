@@ -683,7 +683,8 @@ CMP.CAMPAIGN = {
     "total": 15,
     "seconds": 60,
     "graceSeconds": 2,
-    "actionsPerRound": 3
+    "actionsPerRound": 3,
+    "intermissionSeconds": 9
   },
   "finance": {
     "loan": {
@@ -877,11 +878,111 @@ CMP.CAMPAIGN = {
         "text": "Reporters have started asking where your money is coming from."
       }
     ]
+  },
+  "scoreboard": {
+    "closeRaceSeats": 5,
+    "maxSeatChangesShown": 8,
+    "majorityTarget": 59
+  },
+  "ai": {
+    "enabled": true,
+    "profiles": [
+      {
+        "id": "steady",
+        "label": "Steady",
+        "riskAppetite": 0.1,
+        "targetSpread": 6,
+        "borrowChance": 0.1,
+        "blurb": "Works the marginals and keeps out of trouble."
+      },
+      {
+        "id": "ambitious",
+        "label": "Ambitious",
+        "riskAppetite": 0.22,
+        "targetSpread": 10,
+        "borrowChance": 0.35,
+        "blurb": "Spends hard and takes the occasional gamble."
+      },
+      {
+        "id": "reckless",
+        "label": "Reckless",
+        "riskAppetite": 0.38,
+        "targetSpread": 16,
+        "borrowChance": 0.5,
+        "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
+      }
+    ],
+    "givenNames": [
+      "Arjun",
+      "Gurpreet",
+      "Manpreet",
+      "Harjit",
+      "Simran",
+      "Ravinder",
+      "Jaswinder",
+      "Kuldeep",
+      "Baljit",
+      "Amrit",
+      "Navjot",
+      "Parminder",
+      "Rajwant",
+      "Sukhbir",
+      "Tejinder",
+      "Inderjit",
+      "Charanjit",
+      "Davinder",
+      "Gagandeep",
+      "Harleen",
+      "Jasmeet",
+      "Karanveer",
+      "Lakhwinder",
+      "Mandeep",
+      "Narinder",
+      "Onkar",
+      "Pritam",
+      "Rupinder",
+      "Satwinder",
+      "Balwant"
+    ],
+    "surnames": [
+      "Singh",
+      "Kaur",
+      "Gill",
+      "Sidhu",
+      "Dhillon",
+      "Bajwa",
+      "Sandhu",
+      "Grewal",
+      "Brar",
+      "Randhawa",
+      "Sekhon",
+      "Cheema",
+      "Mann",
+      "Aulakh",
+      "Virk",
+      "Bains",
+      "Kalsi",
+      "Sohal",
+      "Chahal",
+      "Toor"
+    ],
+    "slogans": [
+      "Work, water and roads",
+      "A fair deal for every village",
+      "Punjab first, always",
+      "Jobs at home, not abroad",
+      "Clean hands, clear promises",
+      "The farmer decides",
+      "Schools before slogans",
+      "One Punjab, one future"
+    ],
+    "heatBackoff": 0.5
   }
 };
 
 CMP.STARTING_BUDGET = CMP.CAMPAIGN.startingBudget;
 CMP.ROUNDS = CMP.CAMPAIGN.rounds;
+CMP.SCOREBOARD = CMP.CAMPAIGN.scoreboard;
 CMP.FINANCE = CMP.CAMPAIGN.finance;
 CMP.EVENTS = CMP.CAMPAIGN.events;
 

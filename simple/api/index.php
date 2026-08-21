@@ -37,6 +37,7 @@ require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
 require __DIR__ . '/lib/Campaign.php';
 require __DIR__ . '/lib/Rounds.php';
+require __DIR__ . '/lib/AI.php';
 require __DIR__ . '/lib/Investigation.php';
 require __DIR__ . '/lib/Election.php';
 require __DIR__ . '/lib/Coalition.php';
@@ -450,6 +451,17 @@ switch (route()) {
             $g['history'] = [];
             $g['roundLog'] = [];
 
+            // Any party nobody claimed gets an opponent, so the scoreboard
+            // always has four competitors and a game with two people at the
+            // table is still an election rather than a two-horse race.
+            if (!empty($engine->config()['ai']['enabled'])) {
+                $slot = Lobby::MAX_PLAYERS;
+                foreach (Lobby::unclaimedParties($g) as $partyId) {
+                    $opponent = AI::newPlayer($slot--, $partyId, $g['id'], $engine);
+                    $g['players'][$opponent['id']] = $opponent;
+                }
+            }
+
             foreach ($g['players'] as $pid => $p) {
                 $partyId = (string) ($p['partyId'] ?? '');
                 $g['players'][$pid]['seatsLed'] = $partyId === ''
@@ -457,6 +469,13 @@ switch (route()) {
                     : $engine->seatsLed($board, $partyId);
                 $g['players'][$pid]['summary'] = null;
             }
+
+            // The opening leader map. Round one then has something to compare
+            // against, so its results screen reports real changes rather than
+            // announcing all 117 seats at once.
+            $g['leaders'] = Rounds::currentLeaders($board);
+            $g['leadParty'] = null;
+            $g['lastResult'] = null;
 
             return Rounds::begin($g, 1, $engine);
         });
@@ -481,7 +500,13 @@ switch (route()) {
             $player = $g['players'][$playerId];
 
             if (!Rounds::isLive($g, $engine)) {
-                throw new LobbyError('That round has closed. Wait for the next one.', 'round_over');
+                $waiting = ($g['stage'] ?? '') === 'results';
+                throw new LobbyError(
+                    $waiting
+                        ? 'The round is being counted. The next one opens shortly.'
+                        : 'That round has closed. Wait for the next one.',
+                    'round_over'
+                );
             }
             if (!empty($player['record']['disqualified'])) {
                 throw new LobbyError('You have been disqualified from this election.', 'disqualified');
@@ -548,6 +573,9 @@ switch (route()) {
         mutate($store, $game, $playerId, static function (array $g) use ($playerId, $amount, &$extra) {
             if (($g['phase'] ?? '') !== 'election') {
                 throw new LobbyError('You can only borrow during the campaign.', 'not_campaign');
+            }
+            if (($g['stage'] ?? '') === 'results') {
+                throw new LobbyError('The round is being counted. Try again when it opens.', 'round_over');
             }
             $engine = $GLOBALS['campaign'];
             [$player, $offer] = $engine->takeLoan(
@@ -621,6 +649,7 @@ switch (route()) {
             $result = $GLOBALS['election']->run($g);
             $g['result'] = $result;
             $g['phase'] = $result['outcome'] === 'majority' ? 'government' : 'hung';
+            $g['stage'] = 'final';
             $g['possibleCoalitions'] = $GLOBALS['election']->possibleCoalitions($result);
             return $g;
         });

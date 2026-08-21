@@ -49,6 +49,9 @@ const DATA = path.join(os.tmpdir(), 'cmp-rounds-test-' + Date.now());
    a single-threaded dev server, short enough that fifteen rounds is a minute
    and a half rather than fifteen. */
 const ROUND_SECONDS = 6;
+/* Long enough that every client polls the scoreboard at least twice, short
+   enough that fifteen breaks do not double the run. */
+const BREAK_SECONDS = 4;
 
 let pass = 0;
 const failures = [];
@@ -69,7 +72,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(DATA, { recursive: true });
 const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   cwd: ROOT,
-  env: { ...process.env, CMP_DATA_DIR: DATA, CMP_ROUND_SECONDS: String(ROUND_SECONDS) },
+  env: {
+    ...process.env,
+    CMP_DATA_DIR: DATA,
+    CMP_ROUND_SECONDS: String(ROUND_SECONDS),
+    CMP_INTERMISSION_SECONDS: String(BREAK_SECONDS),
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 process.on('exit', () => {
@@ -240,15 +248,38 @@ check(
   'every client agrees the campaign is 15 rounds',
   clients.every((c) => c.game().roundsTotal === 15)
 );
+check(
+  'the campaign opens in play, not on a scoreboard',
+  clients.every((c) => c.game().stage === 'playing'),
+  host.game().stage
+);
 
-/** The shared world, as one client currently sees it. */
+// Remembered now, compared at the end: a candidate's face must not change
+// mid-campaign, least of all after somebody reconnects.
+const openingSeeds = {};
+
+/**
+ * The shared world, as one client currently sees it. The scoreboard is part
+ * of it: four clients agreeing on the board but disagreeing about who is
+ * winning would be worse than showing no scoreboard at all.
+ */
 function worldOf(c) {
   const g = c.game();
   const counts = c.dom.window.CMP.campaign.seatCounts(g.support);
+  const r = g.lastResult;
   return {
     round: g.round,
     seats: counts,
     boardHash: JSON.stringify(g.support['73']),
+    scoreboard: r
+      ? JSON.stringify({
+          round: r.round,
+          order: r.standings.map((x) => x.party + ':' + x.seats),
+          lead: r.leadParty,
+          needed: r.seatsNeeded,
+          changes: r.changeCount,
+        })
+      : null,
   };
 }
 
@@ -268,11 +299,31 @@ async function act(c, label) {
   return true;
 }
 
+/**
+ * Try to spend during the results break. The server should refuse it: the
+ * scoreboard on screen is the one a late move would invalidate.
+ *
+ * The break is short, so by the time this lands the server may legitimately
+ * have opened the next round — in which case the move being accepted is
+ * correct, not a leak. The response carries the game's stage, so the two
+ * cases can be told apart instead of guessing from the clock.
+ */
+async function lateMove(c) {
+  const g = c.game();
+  const seat = Object.keys(g.support)[0];
+  const res = await c.dom.window.CMP.net.playAction('rally', Number(seat));
+  const stage = res && res.game ? res.game.stage : null;
+  return { leaked: !!(res && res.ok && stage === 'results'), stage: stage };
+}
+
 const ACTIONS = ['Public Rally', 'Door-to-Door Campaign', 'Apply for a Grant', 'Local Media Coverage'];
 
 let desyncs = 0;
 let roundsSeen = 0;
 let summariesSeen = 0;
+let boardsSeen = 0;
+let lockFailures = 0;
+let newLeaders = 0;
 let loanTaken = false;
 const roundLog = [];
 
@@ -309,11 +360,51 @@ for (let round = 1; round <= 15; round++) {
     }
   }
 
-  // Wait for the server to end this round and every client to notice.
+  // The clock runs out: the round settles and the scoreboard goes up.
+  const settled = await host.until(
+    'round ' + round + ' settles',
+    () => host.game().stage === 'results' || host.screen() === 'result',
+    (ROUND_SECONDS + 12) * 1000
+  );
+  if (!settled) {
+    check('round ' + round + ' settled on the server clock', false,
+      'stuck on ' + host.game().round + '/' + host.game().stage);
+    break;
+  }
+
+  if (host.screen() !== 'result') {
+    // Every client should land on the same scoreboard. They get there at
+    // their own polling pace, so what matters is that they converge — not
+    // that they arrive in the same instant.
+    const sawBoard = await host.until(
+      'scoreboard',
+      () => clients.every((c) => !!c.q('.round-results')),
+      10000
+    );
+    if (sawBoard) boardsSeen++;
+
+    const agreed = await host.until(
+      'same scoreboard',
+      () => {
+        const seen = clients.map((c) => (c.game().lastResult ? c.game().lastResult.round : null));
+        return seen.every((b) => b !== null && b === seen[0]);
+      },
+      10000
+    );
+    if (!agreed) desyncs++;
+
+    // The server, not the client, is what actually has to refuse a late move.
+    // A client that has not polled yet may still be showing its controls; the
+    // rule is that pressing them achieves nothing.
+    const late = await lateMove(host);
+    if (late.leaked) lockFailures++;
+  }
+
+  // The break runs out: the next round opens, or the count begins.
   const moved = await host.until(
     'round ' + round + ' ends',
     () => host.game().round > round || host.screen() === 'result',
-    (ROUND_SECONDS + 12) * 1000
+    (BREAK_SECONDS + 12) * 1000
   );
   if (!moved) {
     check('round ' + round + ' ended on the server clock', false, 'stuck on ' + host.game().round);
@@ -336,6 +427,13 @@ for (let round = 1; round <= 15; round++) {
 
   roundsSeen++;
   if (clients.some((c) => !!c.q('.summary-card'))) summariesSeen++;
+  const lastBoard = host.game().lastResult;
+  if (lastBoard && lastBoard.newLeader) newLeaders++;
+  if (lastBoard && !Object.keys(openingSeeds).length) {
+    lastBoard.standings.forEach((row) => {
+      openingSeeds[row.party] = row.portraitSeed;
+    });
+  }
   roundLog.push(
     'r' + round + ' -> ' + worlds[0].round +
     '  seats ' + CMPseats(worlds[0].seats) +
@@ -355,6 +453,37 @@ console.log('\n' + roundLog.map((l) => '     ' + l).join('\n'));
 check('the server drove all fifteen rounds', roundsSeen >= 14, roundsSeen + ' rounds observed');
 check('all four clients stayed in step throughout', desyncs === 0, desyncs + ' rounds out of step');
 check('round summaries were shown', summariesSeen > 0, summariesSeen + ' rounds reported');
+check('the scoreboard appeared between rounds', boardsSeen >= roundsSeen - 1,
+  boardsSeen + ' of ' + roundsSeen + ' breaks');
+check('nobody could act while the round was being counted', lockFailures === 0,
+  lockFailures + ' breaks with live controls');
+
+/* The scoreboard, as the last round left it. */
+const finalBoard = host.game().lastResult;
+check('the scoreboard names four candidates', finalBoard.standings.length === 4);
+check('every candidate has a name', finalBoard.standings.every((x) => !!x.candidateName),
+  JSON.stringify(finalBoard.standings.map((x) => x.candidateName)));
+check('every candidate has a portrait seed', finalBoard.standings.every((x) => !!x.portraitSeed));
+check('with four people playing there are no opponents to add',
+  finalBoard.standings.filter((x) => x.isAI).length === 0,
+  finalBoard.standings.filter((x) => x.isAI).length + ' AI');
+check('and every candidate is one of the four humans',
+  finalBoard.standings.every((x) => !!x.playerId));
+check('the standings are ranked by seats',
+  finalBoard.standings.every((x, i, a) => i === 0 || a[i - 1].seats >= x.seats));
+check('the leader is the top of the standings',
+  finalBoard.leadParty === finalBoard.standings[0].party);
+check('the seats-needed figure matches the leader',
+  finalBoard.seatsNeeded === Math.max(0, finalBoard.majority - finalBoard.standings[0].seats));
+console.log('     leader changed hands in ' + newLeaders + ' of ' + roundsSeen + ' rounds');
+
+const seedsNow = {};
+finalBoard.standings.forEach((x) => {
+  seedsNow[x.party] = x.portraitSeed;
+});
+check('portraits never changed during the campaign',
+  Object.keys(seedsNow).every((party) => seedsNow[party] === openingSeeds[party]),
+  JSON.stringify(seedsNow) + ' vs ' + JSON.stringify(openingSeeds));
 check('the host took a loan during the campaign', loanTaken);
 
 if (loanTaken) {

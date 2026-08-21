@@ -46,6 +46,7 @@ for (const f of [
   'js/data/actions.js',
   'js/engine/rng.js',
   'js/engine/campaign.js',
+  'js/engine/ai.js',
   'js/state.js',
 ]) {
   vm.runInContext(fs.readFileSync(path.join(APP, f), 'utf8'), sandbox, { filename: f });
@@ -184,6 +185,9 @@ check('a fourth move in one round is refused', outOfMoves.ok === false);
 check('and says so plainly', outOfMoves.reason === 'No moves left this round', outOfMoves.reason);
 check('money is not the reason', CMP.campaign.remaining(moveCapped) > CMP.getAction('rally').cost);
 CMP.campaign.endRound(moveCapped);
+check('the results break refuses moves outright',
+  CMP.campaign.canPlay(moveCapped, 'rally', 73).ok === false);
+CMP.campaign.startNextRound(moveCapped);
 check('the next round restores them', CMP.campaign.actionsLeft(moveCapped) === moveCap);
 
 const spentBefore = drain.spent;
@@ -347,8 +351,12 @@ const runner = freshGame();
 const cashAtStart = runner.cash;
 CMP.campaign.play(runner, 'rally', 73, rolls);
 const firstEnd = CMP.campaign.endRound(runner);
-check('the round advances', runner.round === 2, String(runner.round));
+check('the round settles into a results break', runner.stage === 'results', runner.stage);
 check('the round is not the last one', firstEnd.finished === false);
+check('the break has a scoreboard on it', !!runner.lastResult);
+check('the scoreboard ranks all four parties', runner.lastResult.standings.length === 4);
+CMP.campaign.startNextRound(runner);
+check('the break ending opens the next round', runner.round === 2, String(runner.round));
 check('history gains a snapshot', runner.history.length === 1);
 check('the snapshot holds all 117 seats', Object.keys(runner.history[0].board).length === 117);
 check(
@@ -363,9 +371,18 @@ check(
 check('a new round resets the spend counter', runner.roundSpent === 0);
 check('and gives a fresh clock', CMP.campaign.secondsLeft(runner) > 55);
 
+// A round now settles into a results break, and the next round opens when
+// that break ends. Both steps are needed to move a campaign along.
+function runRound(g) {
+  const settled = CMP.campaign.endRound(g);
+  if (settled.finished) return true;
+  CMP.campaign.startNextRound(g);
+  return false;
+}
+
 let guardRounds = 0;
 let finished = false;
-while (!finished && guardRounds++ < 40) finished = CMP.campaign.endRound(runner).finished;
+while (!finished && guardRounds++ < 40) finished = runRound(runner);
 check('the campaign closes after fifteen rounds', runner.round === 15, String(runner.round));
 check('and reports that it finished', finished === true);
 check('with fifteen snapshots of history', runner.history.length === 15, String(runner.history.length));
@@ -611,7 +628,7 @@ function playStrategy(kind, seed) {
         consequencePick: rand(),
       });
     }
-    if (CMP.campaign.endRound(gg).finished) break;
+    if (runRound(gg)) break;
   }
   return { seats: CMP.campaign.seatsLed(gg), heat: gg.heat, spent: gg.spent };
 }
@@ -758,6 +775,94 @@ check('a player who can afford a fine pays it in full',
   rich.cashBefore + ' - ' + rich.fineCharged + ' = ' + rich.cashAfter);
 check('and takes no substitute penalty for it', rich.note === '' || !rich.note, rich.note);
 
+section('The scoreboard reports the round honestly');
+
+/*
+ * The leaderboard, seat changes and the leader banner are worked out once and
+ * shipped whole, so this is where they are checked. A real campaign rarely
+ * changes leader — an incumbent bloc holding ninety-four seats tends to keep
+ * leading — so the interesting cases are built directly rather than waited for.
+ */
+const boardGame = freshGame();
+CMP.campaign.play(boardGame, 'rally', 73, { outcome: 0.2, consequence: 0.99, consequencePick: 0.5 });
+CMP.campaign.endRound(boardGame);
+
+const board1 = boardGame.lastResult;
+check('a settled round produces a scoreboard', !!board1);
+check('it names all four playable parties', board1.standings.length === 4);
+check('it ranks them by seats',
+  board1.standings.every((r, i, a) => i === 0 || a[i - 1].seats >= r.seats));
+check('the leader is the top of the ranking', board1.leadParty === board1.standings[0].party);
+check('the leader gap matches the top two',
+  board1.leadGap === board1.standings[0].seats - board1.standings[1].seats);
+check('seats needed counts up to the majority',
+  board1.seatsNeeded === Math.max(0, board1.majority - board1.standings[0].seats));
+check('every candidate carries a portrait seed',
+  board1.standings.every((r) => !!r.portraitSeed));
+check('the player is not marked as an opponent',
+  board1.standings.filter((r) => !r.isAI).length === 1);
+check('three opponents fill the other parties',
+  board1.standings.filter((r) => r.isAI).length === 3);
+// The opening leader map is recorded when the campaign starts, so round one
+// has a real baseline and reports the seats that actually moved during it —
+// rather than announcing all 117 as though every one had changed hands.
+check('the first round reports only the seats that moved',
+  board1.changeCount < 117 && board1.changeCount >= 0,
+  board1.changeCount + ' of 117');
+check('and each one names a different holder before and after',
+  board1.changes.every((c) => c.from !== c.to));
+
+/* A second round can change hands, and the diff must find exactly those. */
+CMP.campaign.startNextRound(boardGame);
+const beforeLeaders = JSON.parse(JSON.stringify(boardGame.leaders));
+for (let i = 0; i < 3; i++) {
+  CMP.campaign.play(boardGame, 'lastpush', 40 + i, { outcome: 0.05, consequence: 0.99, consequencePick: 0.5 });
+}
+CMP.campaign.endRound(boardGame);
+const board2 = boardGame.lastResult;
+
+const expected = Object.keys(boardGame.leaders).filter(
+  (k) => beforeLeaders[k] && beforeLeaders[k] !== boardGame.leaders[k]
+);
+check('the second round reports the seats that changed hands',
+  board2.changeCount === expected.length,
+  board2.changeCount + ' reported, ' + expected.length + ' actually changed');
+check('each change names who held it and who holds it now',
+  board2.changes.every((c) => c.from && c.to && c.from !== c.to && c.seat > 0));
+check('the shown list is capped',
+  board2.changes.length <= CMP.CAMPAIGN.scoreboard.maxSeatChangesShown);
+check('and the rest are counted rather than silently dropped',
+  board2.changesHidden === Math.max(0, board2.changeCount - board2.changes.length));
+
+/*
+ * The leader banner. A real campaign rarely changes leader — an incumbent
+ * bloc holding ninety-four seats tends to keep leading — so the previous
+ * leader is set to somebody else and the round replayed. That is exactly the
+ * comparison the banner makes.
+ */
+check('no leader change is announced when the leader holds',
+  board2.newLeader === false, String(board2.newLeader));
+
+CMP.campaign.startNextRound(boardGame);
+const trueLeader = boardGame.lastResult.leadParty;
+const pretender = CMP.PLAYABLE_PARTIES.map((p) => p.id).find((id) => id !== trueLeader);
+boardGame.leadParty = pretender;
+CMP.campaign.play(boardGame, 'rally', 12, { outcome: 0.3, consequence: 0.99, consequencePick: 0.5 });
+CMP.campaign.endRound(boardGame);
+const board3 = boardGame.lastResult;
+
+check('a change of leader is announced when it happens',
+  board3.newLeader === true && board3.leadParty !== pretender,
+  board3.leadParty + ' took over from ' + board3.previousLeader);
+check('and it says who lost the lead', board3.previousLeader === pretender, board3.previousLeader);
+
+/* The close-race warning fires on the configured margin, and not otherwise. */
+check('a close race is flagged only when the top two are near',
+  board3.closeRace === (board3.leadGap <= CMP.CAMPAIGN.scoreboard.closeRaceSeats),
+  'gap ' + board3.leadGap + ', threshold ' + CMP.CAMPAIGN.scoreboard.closeRaceSeats);
+check('the totals on the scoreboard add up to the board',
+  board3.totalSeats === CMP.TOTAL_SEATS, String(board3.totalSeats));
+
 section('Money must not decide the game');
 
 /*
@@ -818,7 +923,7 @@ function campaignFor(name, seed) {
         outcome: rand(), consequence: rand(), consequencePick: rand(),
       });
     }
-    if (CMP.campaign.endRound(g).finished) break;
+    if (runRound(g)) break;
   }
 
   const result = CMP.campaign.runElection(g);

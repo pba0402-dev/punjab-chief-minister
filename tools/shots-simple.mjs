@@ -115,17 +115,45 @@ const SCENES = {
 
   // Fourteen rounds played out here, then the shell's own clock is run down
   // so the count starts the way it does in a real game.
+  // A round settling: the scoreboard, seat changes and the position panel.
+  // Built straight from the engine and handed to the shell mid-break, rather
+  // than raced against the app's own clock.
+  'round-results':
+    "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<6;r++){" +
+    "  for(var m=0;m<3;m++){" +
+    "    CMP.campaign.play(g,'rally',(r*11+m*7)%117+1," +
+    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<5)CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');",
+
   'election-count':
     "var g=CMP.state.startElection({partyId:'aap'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
     "for(var r=0;r<14;r++){" +
-    "  CMP.campaign.play(g,'rally',(r*7)%117+1,{outcome:0.3,consequence:0.9,consequencePick:0.5});" +
-    "  CMP.campaign.endRound(g);" +
+    "  for(var m=0;m<3;m++){" +
+    "    CMP.campaign.play(g,'rally',(r*7+m*23)%117+1," +
+    "      {outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);CMP.campaign.startNextRound(g);" +
     "}" +
     "CMP.app.setGame(g);CMP.app.goTo('election');" +
     "var t=setInterval(function(){" +
-    "  if(CMP.app.getScreen()==='result'){clearInterval(t);return;}" +
-    "  CMP.app.getGame().roundEndsAt=Date.now()-1000;" +
+    "  if(CMP.app.getScreen()==='result'){" +
+    "    clearInterval(t);" +
+    "    var b=document.querySelectorAll('button');" +
+    "    for(var i=0;i<b.length;i++){" +
+    "      if(/Show the result/.test(b[i].textContent))b[i].click();" +
+    "    }" +
+    "    return;" +
+    "  }" +
+    "  var gg=CMP.app.getGame();" +
+    "  gg.roundEndsAt=Date.now()-1000;gg.nextRoundAt=Date.now()-1000;" +
     "},150);",
 };
 

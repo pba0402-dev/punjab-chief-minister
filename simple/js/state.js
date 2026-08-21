@@ -16,7 +16,7 @@ window.CMP = window.CMP || {};
 CMP.state = (function () {
   'use strict';
 
-  var VERSION = 3;
+  var VERSION = 4;
 
   /** A blank campaign, before the player has filled anything in. */
   function create() {
@@ -70,6 +70,22 @@ CMP.state = (function () {
       // One snapshot of the whole board per round, so a constituency can show
       // how its race moved rather than only where it ended up.
       history: [],
+      seatTrend: [],
+
+      // The scoreboard, and what it is compared against.
+      stage: 'playing',
+      nextRoundAt: 0,
+      leaders: {},
+      leadParty: null,
+      lastResult: null,
+      intermissionLeft: 0,
+
+      // A fictional candidate portrait, fixed for the whole game.
+      portraitSeed: null,
+
+      // The parties nobody is playing get opponents, so the scoreboard always
+      // has four competitors and a solo game is still an election.
+      opponents: [],
 
       turn: 1,
       seed: null,
@@ -165,8 +181,21 @@ CMP.state = (function () {
     game.mode = draft.mode || 'solo';
     game.seed = draft.seed || CMP.rng.newSeed();
     game.screen = 'election';
+    game.portraitSeed = draft.portraitSeed || (game.seed + ':you');
     seedSupport(game);
     game.seatsWon = CMP.campaign.seatsLed(game);
+
+    // An opponent for every party the player did not take.
+    game.opponents = CMP.ai.opponentsFor(game.partyId, game.seed);
+    var counts = CMP.campaign.seatCounts(game.support);
+    game.opponents.forEach(function (o) {
+      o.seatsLed = counts[o.partyId] || 0;
+      o.seatsBefore = o.seatsLed;
+    });
+
+    // The opening leader map, so round one reports real changes rather than
+    // announcing all 117 seats at once.
+    game.leaders = CMP.campaign.currentLeaders(game.support);
     CMP.campaign.beginRound(game, 1);
     game.updatedAt = Date.now();
     return game;
@@ -182,6 +211,7 @@ CMP.state = (function () {
       typeof game.spent === 'number' &&
       typeof game.cash === 'number' &&
       typeof game.round === 'number' &&
+      Array.isArray(game.opponents) &&
       typeof game.heat === 'number' &&
       game.support &&
       typeof game.support === 'object'

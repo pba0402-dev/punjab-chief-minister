@@ -517,9 +517,21 @@ if (/Hung Assembly/.test(verdict)) {
     check('an offer can be proposed', !!proposeBtn && !proposeBtn.disabled);
   }
 } else {
-  check('a Chief Minister is named', !!host.q('.verdict-name'),
-    host.q('.verdict-name') ? host.q('.verdict-name').textContent : 'none');
+  // A majority now ends on a winner card with the candidate's portrait
+  // beside their name, rather than a bare line of text.
+  const winner = host.q('.winner-name');
+  check('a Chief Minister is named', !!winner, winner ? winner.textContent : 'none');
+  check('and shown with their portrait', !!host.q('.winner-card .portrait'));
 }
+
+check('the final standings are a leaderboard with faces',
+  host.qq('.final-board .board-row').length === 4,
+  host.qq('.final-board .board-row').length + ' rows');
+check('every finalist has a drawn portrait',
+  host.qq('.final-board .portrait').length === 4);
+check('the count reports every seat declared',
+  /117 of 117 seats counted/.test(host.q('.subtitle').textContent),
+  host.q('.subtitle').textContent);
 
 /* ---------------------------------------------------------------- reconnect */
 

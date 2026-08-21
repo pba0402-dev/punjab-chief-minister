@@ -163,9 +163,19 @@ CMP.campaign = (function () {
   }
 
   function roundIsLive(game) {
+    // Play is locked for the whole results break, not merely until the clock
+    // hits zero — the scoreboard on screen is the one a late move would
+    // invalidate.
+    if (game.stage === 'results') return false;
     if (!game.roundEndsAt) return true;
     var grace = (CMP.ROUNDS.graceSeconds || 0) * 1000;
     return Date.now() <= game.roundEndsAt + grace;
+  }
+
+  /** Seconds left of the results break, or 0 while a round is running. */
+  function intermissionLeft(game, now) {
+    if (!game || game.stage !== 'results') return 0;
+    return Math.max(0, Math.ceil((game.nextRoundAt - (now || Date.now())) / 1000));
   }
 
   function isFinalRound(game) {
@@ -179,10 +189,15 @@ CMP.campaign = (function () {
    */
   function beginRound(game, round) {
     game.round = round;
+    game.stage = 'playing';
     game.turn = round;
     game.roundsTotal = CMP.ROUNDS.total;
     game.roundSeconds = CMP.ROUNDS.seconds;
     game.roundEndsAt = Date.now() + CMP.ROUNDS.seconds * 1000;
+    game.nextRoundAt = 0;
+    (game.opponents || []).forEach(function (o) {
+      o.roundActions = 0;
+    });
     game.roundSpent = 0;
     game.roundGained = 0;
     game.roundActions = 0;
@@ -372,14 +387,35 @@ CMP.campaign = (function () {
       events: [],
     };
 
+    // The opponents campaign. They move at the end of the round rather than
+    // at odd moments during it, so their spending lands in the same round as
+    // the player's and appears in the same results screen.
+    var aiMoves = {};
+    (game.opponents || []).forEach(function (opponent) {
+      aiMoves[opponent.partyId] = CMP.ai.takeRound(opponent, game, game.round);
+    });
+
     settleLoans(game, summary);
+    (game.opponents || []).forEach(function (opponent) {
+      settleLoansFor(game, opponent, { repayments: [] });
+    });
 
     var rand = CMP.rng.create(game.seed + ':round:' + game.round);
     var event = rollEvent(game, rand);
     if (event) summary.events.push(event);
 
-    game.heat = clamp(game.heat - (config().heat.coolPerRound || 0), 0, config().heat.max);
-    game.seatsWon = seatsLed(game);
+    var cool = config().heat.coolPerRound || 0;
+    game.heat = clamp(game.heat - cool, 0, config().heat.max);
+    (game.opponents || []).forEach(function (o) {
+      o.heat = clamp(o.heat - cool, 0, config().heat.max);
+    });
+
+    var counts = seatCounts(game.support);
+    game.seatsWon = counts[game.partyId] || 0;
+    (game.opponents || []).forEach(function (o) {
+      o.seatsBefore = o.seatsLed || 0;
+      o.seatsLed = counts[o.partyId] || 0;
+    });
 
     summary.cashAfter = game.cash;
     summary.cashChange = game.cash - open.cash;
@@ -394,15 +430,217 @@ CMP.campaign = (function () {
     game.summary = summary;
     game.history.push({
       round: game.round,
-      seats: seatCounts(game.support),
+      seats: counts,
       board: JSON.parse(JSON.stringify(game.support)),
     });
+    game.seatTrend = game.history.map(function (h) {
+      return { round: h.round, seats: h.seats };
+    });
 
-    var finished = isFinalRound(game);
-    if (!finished) beginRound(game, game.round + 1);
+    // Which seats changed hands. Only the differences are worth reporting:
+    // early rounds can settle a hundred seats at once, and a list of all 117
+    // every round is a wall nobody reads.
+    var previous = game.leaders || {};
+    var current = currentLeaders(game.support);
+    game.lastResult = buildResult(game, counts, diffLeaders(previous, current), aiMoves);
+    game.leaders = current;
+    game.leadParty = game.lastResult.leadParty;
+
+    // Into the results break. The shell opens the next round when it expires.
+    game.stage = 'results';
+    game.nextRoundAt = Date.now() + CMP.ROUNDS.intermissionSeconds * 1000;
     game.updatedAt = Date.now();
 
-    return { summary: summary, finished: finished };
+    return { summary: summary, finished: isFinalRound(game) };
+  }
+
+  /** Leave the results break and open the next round, or close the polls. */
+  function startNextRound(game) {
+    if (isFinalRound(game)) {
+      game.stage = 'final';
+      return { finished: true };
+    }
+    beginRound(game, game.round + 1);
+    game.updatedAt = Date.now();
+    return { finished: false };
+  }
+
+  /* -------------------------------------------------------- scoreboard */
+
+  /** Who leads each seat right now. */
+  function currentLeaders(support) {
+    var out = {};
+    Object.keys(support).forEach(function (key) {
+      var ranked = standings(support[key]);
+      if (ranked.length) out[key] = ranked[0].partyId;
+    });
+    return out;
+  }
+
+  /**
+   * Seats that changed hands. A first round has no previous state to compare
+   * against, so nothing is reported — every seat "changing" on the opening
+   * round would be meaningless.
+   */
+  function diffLeaders(previous, current) {
+    if (!previous || !Object.keys(previous).length) return [];
+    var changes = [];
+    Object.keys(current).forEach(function (key) {
+      var from = previous[key];
+      if (from && from !== current[key]) {
+        changes.push({ seat: Number(key), from: from, to: current[key] });
+      }
+    });
+    changes.sort(function (a, b) {
+      return a.seat - b.seat;
+    });
+    return changes;
+  }
+
+  /**
+   * The round's scoreboard: who is where, what moved, and what it means.
+   * The same shape the server builds, so one screen draws both.
+   */
+  function buildResult(game, counts, changes, aiMoves) {
+    var cfg = CMP.CAMPAIGN.scoreboard;
+    var majority = config().election.majority;
+
+    var standingsRows = CMP.PLAYABLE_PARTIES.map(function (party) {
+      var mine = party.id === game.partyId;
+      var opponent = mine ? null : findOpponent(game, party.id);
+      var actor = mine ? game : opponent;
+      var before = mine
+        ? (game.roundOpen ? game.roundOpen.seats : 0)
+        : (opponent ? opponent.seatsBefore || 0 : 0);
+
+      return {
+        party: party.id,
+        playerId: mine ? 'you' : (opponent ? opponent.id : null),
+        candidateName: mine ? game.candidateName : (opponent ? opponent.candidateName : null),
+        portraitSeed: mine ? game.portraitSeed : (opponent ? opponent.portraitSeed : null),
+        isAI: !mine,
+        seats: counts[party.id] || 0,
+        change: (counts[party.id] || 0) - before,
+        heat: actor ? Math.round(actor.heat || 0) : 0,
+        disqualified: !!(actor && actor.disqualified),
+        moves: mine ? null : (aiMoves[party.id] || null),
+      };
+    }).sort(function (a, b) {
+      return b.seats - a.seats || (a.party < b.party ? -1 : 1);
+    });
+
+    var leader = standingsRows[0];
+    var runnerUp = standingsRows[1] || null;
+    var gap = runnerUp ? leader.seats - runnerUp.seats : leader.seats;
+    var previousLeader = game.leadParty || null;
+    var shown = changes.slice(0, cfg.maxSeatChangesShown);
+
+    return {
+      round: game.round,
+      roundsTotal: CMP.ROUNDS.total,
+      isFinalRound: isFinalRound(game),
+      standings: standingsRows,
+      totalSeats: Object.keys(game.support).length,
+      majority: majority,
+
+      leadParty: leader.party,
+      leadSeats: leader.seats,
+      leadOver: runnerUp ? runnerUp.party : null,
+      leadGap: gap,
+      seatsNeeded: Math.max(0, majority - leader.seats),
+      newLeader: !!previousLeader && previousLeader !== leader.party && leader.seats > 0,
+      previousLeader: previousLeader,
+      closeRace: !!runnerUp && gap <= cfg.closeRaceSeats,
+
+      changes: shown,
+      changeCount: changes.length,
+      changesHidden: Math.max(0, changes.length - shown.length),
+      at: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  function findOpponent(game, partyId) {
+    var list = game.opponents || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].partyId === partyId) return list[i];
+    }
+    return null;
+  }
+
+  /* ------------------------------------------------- acting for others */
+
+  /**
+   * The fields an action can move. An opponent keeps its own money, heat and
+   * log; the board it campaigns on is the game's, shared with everyone else.
+   */
+  var ACTOR_FIELDS = [
+    'cash', 'spent', 'roundSpent', 'roundActions', 'roundGained',
+    'granted', 'raised', 'borrowed', 'repaid', 'interestPaid', 'finesPaid',
+    'heat', 'defaults', 'borrowingBlocked', 'restrictedUntilTurn',
+  ];
+
+  /**
+   * Run one of the engine's own functions as somebody other than the player.
+   *
+   * The engine was written with the player's game object as its subject, which
+   * is the right shape for solo play. Rather than thread an actor through
+   * every function, this lends the engine a view: the shared board and the
+   * game's seed, with the actor's own purse and record. Whatever the action
+   * moved is copied back afterwards. Arrays are shared by reference, so the
+   * board, the action log and the loan book are the actor's real ones.
+   */
+  function asActor(game, actor, fn) {
+    var view = {
+      support: game.support,
+      partyId: actor.partyId,
+      seed: game.seed,
+      round: game.round,
+      turn: game.turn,
+      roundsTotal: game.roundsTotal,
+      budget: actor.budget,
+      actions: actor.actions,
+      loans: actor.loans,
+      history: [],
+    };
+    ACTOR_FIELDS.forEach(function (k) {
+      view[k] = actor[k];
+    });
+
+    var out = fn(view);
+
+    ACTOR_FIELDS.forEach(function (k) {
+      if (view[k] !== undefined) actor[k] = view[k];
+    });
+    return out;
+  }
+
+  /** Play one action for an opponent. Returns the report, or null. */
+  function playAs(game, actor, actionId, target, rolls) {
+    var res = asActor(game, actor, function (view) {
+      return play(view, actionId, target, rolls);
+    });
+    return res && res.ok ? res.report : null;
+  }
+
+  /** Quote a loan for an opponent, at a given round. */
+  function loanOfferFor(actor, amount, round) {
+    return asActor({ support: {}, seed: '', round: round }, actor, function (view) {
+      return loanOffer(view, amount);
+    });
+  }
+
+  /** Take a loan for an opponent. */
+  function takeLoanFor(actor, amount, round) {
+    return asActor({ support: {}, seed: '', round: round }, actor, function (view) {
+      return takeLoan(view, amount);
+    });
+  }
+
+  /** Settle an opponent's loans, exactly as the player's are settled. */
+  function settleLoansFor(game, actor, summary) {
+    return asActor(game, actor, function (view) {
+      return settleLoans(view, summary);
+    });
   }
 
   /* ------------------------------------------------------ resolution */
@@ -638,11 +876,17 @@ CMP.campaign = (function () {
 
     var rows = Object.keys(totals)
       .map(function (id) {
+        // Opponents are candidates too. A result screen that named only the
+        // player and listed three party names would read as though nobody
+        // else had stood.
+        var opponent = findOpponent(game, id);
         return {
           party: id,
           seats: totals[id],
-          playerId: id === game.partyId ? 'solo' : null,
-          candidate: id === game.partyId ? game.candidateName : null,
+          playerId: id === game.partyId ? 'solo' : (opponent ? opponent.id : null),
+          candidate: id === game.partyId
+            ? game.candidateName
+            : (opponent ? opponent.candidateName : null),
           slot: id === game.partyId ? 1 : null,
           disqualified: false,
         };
@@ -760,6 +1004,10 @@ CMP.campaign = (function () {
     play: play,
     beginRound: beginRound,
     endRound: endRound,
+    startNextRound: startNextRound,
+    intermissionLeft: intermissionLeft,
+    currentLeaders: currentLeaders,
+    diffLeaders: diffLeaders,
     secondsLeft: secondsLeft,
     roundIsLive: roundIsLive,
     isFinalRound: isFinalRound,
@@ -770,6 +1018,10 @@ CMP.campaign = (function () {
     seatCounts: seatCounts,
     averageSupport: averageSupport,
     runElection: runElection,
+    playAs: playAs,
+    loanOfferFor: loanOfferFor,
+    takeLoanFor: takeLoanFor,
+    settleLoansFor: settleLoansFor,
     money: money,
     heatLevel: heatLevel,
     ratingFor: ratingFor,

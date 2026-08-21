@@ -2,8 +2,12 @@
 
 Choose a party, name your candidate, and fight a fifteen-round campaign across
 all 117 Punjab assembly constituencies. Each round lasts sixty seconds and
-gives you three moves. Spend your grant, borrow against it if you dare, and try
-to be leading 59 seats when the polls close. Solo or with up to three friends.
+gives you three moves; when the clock runs out the seats are recounted and an
+election-night scoreboard shows where everyone stands. Spend your grant, borrow
+against it if you dare, and try to be leading 59 seats when the polls close.
+
+Solo or with up to three friends — any party nobody takes is played by an
+opponent, so the scoreboard always has four candidates on it.
 
 > A fictional strategy game. Constituency names, numbers and districts are real
 > public information. Everything else is invented. It is not a prediction of any
@@ -21,14 +25,17 @@ From the repository root:
 
 ```
 npm run serve               # php -S on http://127.0.0.1:8080 (multiplayer needs PHP)
-npm run test:all            # all six suites below
-npm run test:campaign       # engine parity, rounds, loans, funding, balance
+npm run test:all            # all seven suites below
+npm run test:campaign       # engine parity, rounds, loans, funding, scoreboard
 npm run test:v1             # solo flow, rounds, borrowing and the count
 npm run test:api            # the multiplayer API
 npm run test:systems        # incumbents, elections, coalitions, investigations
 npm run test:mp             # four browsers in one lobby, start to result
+npm run test:ai             # two humans, two opponents, portraits, reconnection
 npm run test:rounds         # four browsers through all fifteen rounds
 npm run measure:board       # opening-board balance across 60 games
+npm run balance:ai          # are the opponents a real contest?
+npm run shots:portraits     # render a grid of candidate portraits
 node tools/balance-money.mjs 40   # does money decide the game?
 npm run shots:v1            # render at 1400 / 768 / 390 / 360 px
 npm run shots:lobby         # render the multiplayer screens
@@ -65,25 +72,116 @@ poll every 2.5s, so a round ends within a second or two of expiry, and nothing
 depends on a cron job the host may not have. If everyone closed their laptop,
 the round ends the moment one of them comes back.
 
+A round has two stages. While it is **playing**, the clock runs and moves are
+accepted. When it expires the round settles into **results**: play is locked,
+the scoreboard is built once on the server, and everyone reads the same figures
+for a few seconds before the next round opens. The break is deliberate —
+reading what just happened should not compete with the next round for the same
+seconds.
+
 ### What happens when a round ends
 
 In this order, because the steps feed each other:
 
-1. Loans falling due are repaid — or defaulted on.
-2. At most one random event per player, most rounds none.
-3. Events move the shared board.
-4. Leaders and projected seats are recounted from the settled board.
+1. The opponents campaign, so their spending lands in the same round as
+   everybody else's.
+2. Loans falling due are repaid — or defaulted on.
+3. At most one random event per player, most rounds none.
+4. Events move the shared board.
 5. Political heat cools slightly.
-6. A snapshot of all 117 seats is added to the history.
-7. The game is saved.
-8. The next round opens — or, after round 15, the polls close and the count
-   begins.
+6. Leaders and projected seats are recounted from the settled board.
+7. The new leader map is compared against the old one to find the seats that
+   changed hands.
+8. A snapshot of all 117 seats is added to the history.
+9. The scoreboard is built and the game saved.
+10. Play stays locked for the results break, then the next round opens — or,
+    after round 15, the polls close and the count begins.
 
-Each player then sees a summary of what the round did to them: money spent,
+Each player also sees a summary of what the round did to *them*: money spent,
 money raised, cash in hand, debt outstanding, support change, seats gained or
-lost, heat change, and any events. It sits **in** the page rather than over it —
-the next round is already running by the time it appears, and a modal that had
-to be dismissed would spend a player's seconds for them.
+lost, heat change, and any events. It sits in the page rather than over it, so
+it can be read alongside the scoreboard rather than dismissed to reach it.
+
+## The scoreboard
+
+Every round ends on an election-night screen: four candidates ranked by
+projected seats, each with their face, their party and what the round did to
+them, over a bar with the majority marked on it.
+
+Under the leaderboard:
+
+- **Seat changes** — only the constituencies that changed hands, named, with
+  who held them and who holds them now. Early rounds can settle forty seats at
+  once and a list of all 117 every round is a wall nobody reads; the
+  differences are the news. A long list is capped and the remainder counted,
+  never silently dropped.
+- **Biggest movements** — who gained and who lost ground, at a glance.
+- **Current position** — the leader's seats against the majority, how many more
+  they need, and how far ahead of second place they are.
+- **New leader** and **close race** banners, when either is true.
+- **View election history** — the whole campaign as a table, round by round.
+  Offered rather than shown: fifteen rows of five numbers is reference
+  material, not headline news.
+
+Every figure on that screen is worked out **once, on the server**, and shipped
+whole. Nothing on the client counts anything. Four people watching the same
+round see the same numbers, because they are literally the same numbers — a
+scoreboard where two players disagree about the score is worse than no
+scoreboard at all. `npm run test:rounds` checks exactly this after every one of
+the fifteen rounds, across four browser windows.
+
+## Opponents
+
+Any party nobody claims is played by an opponent, so the scoreboard always has
+four competitors and a solo game is still an election rather than a walkover.
+
+They play by exactly the same rules: the same actions, the same costs, the same
+weighted outcome tables, the same heat, the same consequences, the same three
+moves a round, the same starting grant. They get no extra information and no
+extra money. What separates them is temperament — **steady**, **ambitious** or
+**reckless** — which sets how much risk each takes, how tightly it targets and
+how readily it borrows, so three rivals in a solo game do not all play alike.
+
+Their names are drawn per game from a pool of ordinary Punjabi given names and
+surnames combined freely — 600 combinations, so a new game feels different.
+They are invented candidates like the players' own, and none of the pools is
+built from real officeholders.
+
+### Are they a real contest?
+
+`npm run balance:ai` plays whole campaigns of one human against three
+opponents, rotating which party the human takes and pairing every board so the
+same map is played from all four seats. Over 48 campaigns:
+
+| | mean seats | won | heat | defaults |
+| --- | --- | --- | --- | --- |
+| human (safe moves, never borrows) | 32.8 | 12/48 | 5 | 0 |
+| opponents | 28.0 | 36/48 | 57 | 0 |
+
+Same party, human against opponent: the human is ahead by about **4 seats**.
+One of four players winning 12 games in 48 is exactly their share, so an
+attentive player is slightly better than an opponent and beaten roughly three
+games in four — which is what having three rivals should feel like. The three
+temperaments finish differently (ambitious 40, steady 28, reckless 23), so the
+risk system means something for them too.
+
+## Candidate portraits
+
+Every candidate has a face on the scoreboard, so four players are told apart at
+a glance rather than by reading four party codes.
+
+The portraits are **drawn, never photographed** — small vector illustrations
+built from a seed: a face shape, a skin tone, a turban or hair, a beard,
+sometimes glasses, sometimes the lines of an older face. That is a deliberate
+choice rather than a shortcut. A photographic portrait of a fictional candidate
+would sooner or later resemble somebody real, and this game already puts real
+sitting MLAs on screen as reference; a drawn face can never be mistaken for one
+of them, and nothing here is derived from any real person's likeness.
+
+The seed is assigned once, when a player sits down, and stored with the game.
+The same seed always draws the same face — in round one, in round fifteen, and
+after a disconnection and a rejoin. `npm run shots:portraits` renders a grid of
+them to look at.
 
 ## One board, four players
 
@@ -249,6 +347,11 @@ building underneath, and the verdict is withheld until it finishes — showing i
 above a count in progress would give the ending away. There is a control to
 skip to the end.
 
+The final screen ends the way every round ended: the winner with their portrait
+and the office they have taken, then the same leaderboard with all four
+candidates' faces, then the seat-by-seat table. A hung assembly says so and
+moves to coalition talks.
+
 - **59 or more** — majority government, and that candidate becomes Chief
   Minister of Punjab.
 - **Nobody reaches 59** — hung assembly, and coalition talks open.
@@ -376,6 +479,7 @@ no rewrite rules are needed on any host.
 | `ready` | ready up or stand down |
 | `start` | host only — deals the board and opens round 1 |
 | `campaign` | play one move; the server rolls the outcome |
+| `state` | also carries the round's scoreboard, identical for everyone |
 | `loan` | quote a loan, or take one |
 | `history` | how one seat's race has moved, round by round |
 | `report` | report a rival to the oversight system |
@@ -418,7 +522,12 @@ in `index.php` that constructs the store.
   every move, and needs no server; multiplayer state lives on the server, saved
   under lock on every change
 
-Not built yet, on purpose: AI opponents for the parties no human is playing.
+- **Round results** — between rounds, an election-night scoreboard: four
+  candidates with portraits ranked by projected seats, the seats that changed
+  hands, the biggest movements, and how far the leader is from a majority
+
+Everything in the brief is built. The obvious next things would be more than
+four players, and refreshing the MLA data before the next state election.
 
 ## Files
 
@@ -434,6 +543,7 @@ simple/
     data/geometry.js         GENERATED: map shapes and hex tiles
     engine/rng.js            seeded randomness
     engine/campaign.js       campaign rules for solo play: moves, money, rounds
+    engine/ai.js             opponents for solo play
     state.js                 the game object, validation, starting a campaign
     storage.js               localStorage save/load behind a tiny adapter
     ui/dom.js                element helper + Indian currency formatting
@@ -443,6 +553,8 @@ simple/
     ui/multiplayer.js        create game / join game
     ui/lobby.js              the four-player lobby
     ui/round.js              round clock, projection, the bank and the dialogs
+    ui/portrait.js           drawn candidate portraits, from a seed
+    ui/scoreboard.js         the leaderboard, seat changes and round results
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: real MLA above, game race below
     ui/oversight.js          rivals, reporting and your own record
@@ -455,7 +567,8 @@ simple/
     lib/Code.php             game code generation
     lib/Lobby.php            lobby rules, pure functions
     lib/Campaign.php         the same campaign rules, server-authoritative
-    lib/Rounds.php           the round clock and the round-end pipeline
+    lib/Rounds.php           the round clock, round-end pipeline and scoreboard
+    lib/AI.php               opponents for the parties nobody is playing
     lib/Election.php         election day and the verdict
     lib/Coalition.php        coalition proposals and terms
     lib/Investigation.php    reports, evidence, findings and penalties

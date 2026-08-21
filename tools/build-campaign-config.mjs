@@ -40,6 +40,24 @@ const r = config.rounds || {};
 if (!(r.total > 0)) problems.push('rounds.total must be positive');
 if (!(r.seconds > 0)) problems.push('rounds.seconds must be positive');
 if (!(r.actionsPerRound > 0)) problems.push('rounds.actionsPerRound must be positive');
+if (!(r.intermissionSeconds > 0)) problems.push('rounds.intermissionSeconds must be positive');
+
+/* The scoreboard and the opponents. */
+const sb = config.scoreboard || {};
+if (!(sb.closeRaceSeats > 0)) problems.push('scoreboard.closeRaceSeats must be positive');
+if (!(sb.maxSeatChangesShown > 0)) problems.push('scoreboard.maxSeatChangesShown must be positive');
+
+const ai = config.ai || {};
+if (!Array.isArray(ai.profiles) || !ai.profiles.length) problems.push('ai.profiles missing');
+for (const prof of ai.profiles || []) {
+  if (!(prof.riskAppetite >= 0 && prof.riskAppetite <= 1)) {
+    problems.push('ai profile ' + prof.id + ': riskAppetite must be 0..1');
+  }
+  if (!(prof.targetSpread > 0)) problems.push('ai profile ' + prof.id + ': targetSpread must be positive');
+}
+if (!Array.isArray(ai.givenNames) || ai.givenNames.length < 8) problems.push('ai.givenNames too short');
+if (!Array.isArray(ai.surnames) || ai.surnames.length < 4) problems.push('ai.surnames too short');
+if (!Array.isArray(ai.slogans) || !ai.slogans.length) problems.push('ai.slogans missing');
 
 const loan = (config.finance || {}).loan || {};
 if (!(loan.interestRate > 0)) problems.push('finance.loan.interestRate must be positive');
@@ -98,6 +116,7 @@ CMP.CAMPAIGN = ${JSON.stringify(clean, null, 2)};
 
 CMP.STARTING_BUDGET = CMP.CAMPAIGN.startingBudget;
 CMP.ROUNDS = CMP.CAMPAIGN.rounds;
+CMP.SCOREBOARD = CMP.CAMPAIGN.scoreboard;
 CMP.FINANCE = CMP.CAMPAIGN.finance;
 CMP.EVENTS = CMP.CAMPAIGN.events;
 
@@ -142,6 +161,9 @@ console.log(
   'loans: ' + Math.round(loan.interestRate * 100) + '% due after ' +
   loan.repayAfterRounds + ' rounds, none after round ' + loan.noBorrowingAfterRound
 );
+console.log('opponents: ' + ai.profiles.map((p) => p.id).join(', ') +
+  ', ' + ai.givenNames.length * ai.surnames.length + ' possible names');
+console.log('intermission: ' + r.intermissionSeconds + 's between rounds');
 console.log('events: ' + (config.events.list || []).length +
   ' at ' + Math.round(config.events.chancePerRound * 100) + '% a round');
 console.log('consequences: ' + config.consequences.length);

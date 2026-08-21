@@ -389,23 +389,59 @@ check('and how many more are needed',
   /Needs \d+ more seat|Majority reached/.test(q(dom, '.projection').textContent),
   q(dom, '.projection').textContent.slice(0, 50));
 
-/** Run the clock out and let the shell's round watcher pick it up. */
-async function endRound(d) {
+/**
+ * Run a round out and let the shell pick it up. A round now has two stages:
+ * the clock expires and the round settles into the results break, then the
+ * break expires and the next round opens. This drives both.
+ */
+async function settleRound(d) {
   d.window.CMP.app.getGame().roundEndsAt = Date.now() - 1000;
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 60));
     if (d.window.CMP.app.getScreen() === 'result') return;
-    if (d.window.CMP.app.getGame().roundEndsAt > Date.now()) return;
+    if (d.window.CMP.app.getGame().stage === 'results') return;
+  }
+}
+
+async function endRound(d) {
+  await settleRound(d);
+  const g = d.window.CMP.app.getGame();
+  if (d.window.CMP.app.getScreen() === 'result') return;
+  g.nextRoundAt = Date.now() - 1000;
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 60));
+    if (d.window.CMP.app.getScreen() === 'result') return;
+    if (d.window.CMP.app.getGame().stage === 'playing') return;
   }
 }
 
 let solo = dom.window.CMP.app.getGame();
 await playCard(dom, 'Public Rally');
 const spentInRound1 = dom.window.CMP.app.getGame().spent;
-await endRound(dom);
 
+/* The clock expires: the round settles and the scoreboard goes up. */
+await settleRound(dom);
 solo = dom.window.CMP.app.getGame();
-check('the clock running out ends the round', solo.round === 2, 'round ' + solo.round);
+check('the clock running out settles the round', solo.stage === 'results', solo.stage);
+check('the scoreboard appears', !!q(dom, '.round-results'));
+check('it ranks all four candidates', qq(dom, '.board-row').length === 4,
+  qq(dom, '.board-row').length + ' rows');
+check('every candidate has a drawn portrait', qq(dom, '.board-row .portrait').length === 4);
+check('play is locked while the round is counted',
+  !q(dom, '.action-card') && !q(dom, '.panel-tab'));
+check('a seat-change section is shown', /Seat changes/.test(q(dom, '.round-results').textContent));
+check('the leader position is stated',
+  /more seats? needed|Majority reached/.test(q(dom, '.position').textContent),
+  q(dom, '.position').textContent.slice(0, 60));
+
+/* The break expires: the next round opens. */
+solo.nextRoundAt = Date.now() - 1000;
+for (let i = 0; i < 40 && dom.window.CMP.app.getGame().stage !== 'playing'; i++) {
+  await new Promise((r) => setTimeout(r, 60));
+}
+solo = dom.window.CMP.app.getGame();
+check('the break ending opens the next round', solo.round === 2, 'round ' + solo.round);
+check('play is possible again', !!q(dom, '.action-card'));
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));

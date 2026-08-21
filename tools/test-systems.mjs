@@ -33,6 +33,7 @@ const ROOT = path.join(HERE, '..', 'simple');
 const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/api/index.php';
 const ROUND_SECONDS = 8;
+const BREAK_SECONDS = 2;
 const DATA = path.join(os.tmpdir(), 'cmp-sys-test-' + Date.now());
 
 let pass = 0;
@@ -57,7 +58,12 @@ const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   // and one check below needs a fresh round rather than a sixty-second wait.
   // Eight seconds is short enough to wait for and long enough that no section
   // here runs out of campaign underneath itself.
-  env: { ...process.env, CMP_DATA_DIR: DATA, CMP_ROUND_SECONDS: String(ROUND_SECONDS) },
+  env: {
+    ...process.env,
+    CMP_DATA_DIR: DATA,
+    CMP_ROUND_SECONDS: String(ROUND_SECONDS),
+    CMP_INTERMISSION_SECONDS: String(BREAK_SECONDS),
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 process.on('exit', () => {
@@ -321,7 +327,9 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
     // The risky moves above used this round's allowance, so wait for the next
     // round before checking that safe campaigning is still open to them —
     // otherwise the refusal would be about moves, not about the restriction.
-    await sleep((ROUND_SECONDS + 2) * 1000);
+    // A round now settles into a short results break before the next one
+    // opens, so wait out both.
+    await sleep((ROUND_SECONDS + BREAK_SECONDS + 2) * 1000);
     const safe = await J('campaign', { ...tc, actionId: 'outreach', constituency: 50 });
     check('but safe campaigning still works', safe.ok === true, safe.error);
     const stillBlocked = await J('campaign', { ...tc, actionId: 'deal', constituency: 51 });

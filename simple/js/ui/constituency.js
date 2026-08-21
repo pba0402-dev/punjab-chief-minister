@@ -197,6 +197,40 @@ CMP.ui.constituency = (function () {
   }
 
   /**
+   * Who held this seat when the last round was settled, and whether it has
+   * changed hands since. The leader map is the same one the scoreboard's seat
+   * changes are diffed from, so the two can never disagree.
+   */
+  function changeLine(game, number, lead) {
+    var previous = (game.leaders || {})[String(number)];
+    if (!previous) {
+      return el('p', {
+        class: 'seat-change seat-change-none',
+        text: 'No round has been settled yet, so there is nothing to compare against.',
+      });
+    }
+
+    if (previous === lead.partyId) {
+      return el('p', { class: 'seat-change seat-change-held' }, [
+        el('strong', { text: CMP.getParty(previous).short }),
+        ' held this seat through the last round.',
+      ]);
+    }
+
+    var from = CMP.getParty(previous);
+    var to = CMP.getParty(lead.partyId);
+    return el('p', {
+      class: 'seat-change seat-change-flip',
+      style: { '--from': from.colour, '--to': to.colour },
+    }, [
+      el('span', { class: 'seat-change-kicker', text: 'Changed hands' }),
+      el('span', { class: 'change-from', text: from.short }),
+      el('span', { class: 'change-arrow', text: '→' }),
+      el('span', { class: 'change-to', style: { background: to.colour, color: to.ink || '#fff' }, text: to.short }),
+    ]);
+  }
+
+  /**
    * The full panel for one seat.
    * `opts.showActions` adds a footer the caller can hang buttons on.
    * `opts.players` is the roster, and `opts.history` the round-by-round board.
@@ -308,6 +342,7 @@ CMP.ui.constituency = (function () {
           })
         ),
         candidateTable(game, lead.ranked, opts.players),
+        changeLine(game, number, lead),
         el('div', { class: 'projected' }, [
           el('span', { class: 'stat-label', text: 'Projected Winner' }),
           el('span', {

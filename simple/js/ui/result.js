@@ -112,6 +112,12 @@ CMP.ui.result = (function () {
       paint();
     }
 
+    /** How far the count has got, for the "117 of 117 counted" line. */
+    function countedLine() {
+      var total = view.result.totalSeats;
+      return total + ' of ' + total + ' seats counted';
+    }
+
     /** Running totals from the seats declared so far. */
     function runningTotals() {
       var totals = {};
@@ -220,6 +226,60 @@ CMP.ui.result = (function () {
 
     /* ------------------------------------------------------ sections */
 
+    /** The portrait seed for whoever played a party, if anyone did. */
+    function portraitSeedFor(partyId) {
+      for (var i = 0; i < view.players.length; i++) {
+        var p = view.players[i];
+        if (!p.empty && p.partyId === partyId && p.portraitSeed) return p.portraitSeed;
+      }
+      return null;
+    }
+
+    /**
+     * The final standings as a leaderboard with faces, so the election ends
+     * the way every round ended rather than dropping to a bare table.
+     */
+    function finalBoard() {
+      var result = view.result;
+      var standings = result.standings
+        .filter(function (row) {
+          return row.party !== 'oth';
+        })
+        .map(function (row) {
+          return {
+            party: row.party,
+            playerId: row.playerId,
+            candidateName: row.candidate,
+            portraitSeed: portraitSeedFor(row.party),
+            isAI: isAIParty(row.party),
+            seats: row.seats,
+            change: 0,
+            disqualified: !!row.disqualified,
+          };
+        });
+
+      var mine = me();
+      return el('div', { class: 'final-board' }, [
+        CMP.ui.scoreboard.leaderboard(
+          {
+            standings: standings,
+            majority: result.majority,
+            totalSeats: result.totalSeats,
+          },
+          mine ? mine.partyId : null,
+          {}
+        ),
+      ]);
+    }
+
+    function isAIParty(partyId) {
+      for (var i = 0; i < view.players.length; i++) {
+        var p = view.players[i];
+        if (!p.empty && p.partyId === partyId) return !!p.isAI;
+      }
+      return false;
+    }
+
     function resultTable() {
       var result = view.result;
       return el('div', { class: 'result-block' }, [
@@ -289,18 +349,29 @@ CMP.ui.result = (function () {
 
       if (result.outcome === 'majority' && result.winner) {
         var winnerIsYou = me() && result.winner.playerId === me().id;
+        var party = CMP.getParty(result.winner.party);
+        var seed = portraitSeedFor(result.winner.party);
+
         return el('div', { class: 'verdict ' + (winnerIsYou ? 'verdict-win' : 'verdict-lose') }, [
           el('span', { class: 'verdict-kicker', text: 'Majority Government' }),
           el('h1', { class: 'verdict-title', text: result.winner.seats + ' of ' + result.totalSeats }),
-          el('div', { class: 'verdict-office' }, [
-            el('span', { class: 'stat-label', text: 'Chief Minister of Punjab' }),
-            el('strong', { class: 'verdict-name', text: result.winner.candidate || '—' }),
-            el('span', {
-              class: 'verdict-party',
-              style: { color: CMP.getParty(result.winner.party).colour },
-              text: CMP.getParty(result.winner.party).name,
-            }),
+
+          el('div', {
+            class: 'winner-card',
+            style: { '--party': party.colour, '--party-ink': party.ink || '#fff' },
+          }, [
+            seed ? CMP.ui.portrait.render(seed, 92, result.winner.candidate) : null,
+            el('div', { class: 'winner-body' }, [
+              el('span', { class: 'winner-kicker', text: 'Chief Minister of Punjab' }),
+              el('strong', { class: 'winner-name', text: result.winner.candidate || party.name }),
+              el('span', { class: 'winner-party', text: party.name }),
+              el('span', {
+                class: 'winner-seats',
+                text: result.winner.seats + ' seats · majority ' + result.majority,
+              }),
+            ]),
           ]),
+
           el('p', {
             class: 'verdict-congrats',
             text: winnerIsYou
@@ -313,7 +384,10 @@ CMP.ui.result = (function () {
       return el('div', { class: 'verdict verdict-hung' }, [
         el('span', { class: 'verdict-kicker', text: 'Hung Assembly' }),
         el('h1', { class: 'verdict-title', text: 'No party reached ' + result.majority }),
-        el('p', { class: 'verdict-congrats', text: 'Begin coalition negotiations.' }),
+        el('p', {
+          class: 'verdict-congrats',
+          text: 'No party has a majority. Government formation moves to coalition talks.',
+        }),
       ]);
     }
 
@@ -514,7 +588,8 @@ CMP.ui.result = (function () {
         el('div', {}, [
           el('h1', { class: 'title title-sm', text: 'Punjab Assembly Election' }),
           el('p', { class: 'subtitle' }, [
-            el('strong', { text: view.result.totalSeats + ' seats · majority ' + view.result.majority }),
+            el('strong', { text: counting ? view.result.totalSeats + ' seats · majority ' +
+              view.result.majority : countedLine() }),
           ]),
         ]),
         el('button', {
@@ -538,6 +613,7 @@ CMP.ui.result = (function () {
           header,
           verdictBanner(),
           notice ? el('p', { class: 'notice notice-' + notice.tone, text: notice.text }) : null,
+          finalBoard(),
           resultTable(),
           coalitionSection(),
         ]),

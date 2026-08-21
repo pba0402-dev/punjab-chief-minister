@@ -732,10 +732,12 @@
   },
   "rounds": {
     "_comment": [
-      "Fifteen rounds of sixty seconds. The clock is authoritative on the server:",
-      "roundStartedAt is a server timestamp and every response carries the server",
-      "time, so clients compute the remaining seconds from that rather than from",
-      "their own clock. A refresh therefore picks the round up where it stands.",
+      "Fifteen rounds of sixty seconds, with a short results break between them.",
+      "",
+      "The clock is authoritative on the server: roundStartedAt is a server",
+      "timestamp and every response carries the server time, so clients compute the",
+      "remaining seconds from that rather than from their own clock. A refresh",
+      "therefore picks the round up where it stands.",
       "",
       "Rounds advance lazily: whichever request arrives first after the clock runs",
       "out processes the round end, under the same lock as everything else. With",
@@ -749,12 +751,17 @@
       "it, a round rewards whoever clicks fastest, and a large purse converts",
       "straight into support at the speed of the mouse. Three moves a round means",
       "forty-five moves a campaign for everybody, so the question stops being how",
-      "much you can spend and becomes which three seats are worth it this minute."
+      "much you can spend and becomes which three seats are worth it this minute.",
+      "",
+      "intermissionSeconds is the results break. Play is locked while it runs, so",
+      "the scoreboard is not competing with the next round for the same seconds —",
+      "reading what just happened is part of the game, not a tax on it."
     ],
     "total": 15,
     "seconds": 60,
     "graceSeconds": 2,
-    "actionsPerRound": 3
+    "actionsPerRound": 3,
+    "intermissionSeconds": 9
   },
   "finance": {
     "_comment": [
@@ -997,5 +1004,131 @@
     "and choosing the right seat to aim at still matters more than the size of",
     "the cheque. Bad outcomes spread the same way: a media campaign that goes",
     "wrong goes wrong in public."
-  ]
+  ],
+  "scoreboard": {
+    "_comment": [
+      "Thresholds for the round-results screen. All display, no rules.",
+      "",
+      "closeRaceSeats decides when the top two are worth calling a close race.",
+      "Set it too high and every round looks like a photo finish, which stops",
+      "meaning anything; too low and genuinely tight elections pass unremarked.",
+      "",
+      "maxSeatChangesShown caps the list of constituencies that changed hands.",
+      "Early rounds can flip forty seats at once, and a wall of them is worse",
+      "than a count — the rest are summarised as a total."
+    ],
+    "closeRaceSeats": 5,
+    "maxSeatChangesShown": 8,
+    "majorityTarget": 59
+  },
+  "ai": {
+    "_comment": [
+      "Opponents for the parties nobody is playing, so the scoreboard always has",
+      "four competitors and a solo game is still an election.",
+      "",
+      "The AI plays by exactly the same rules as a human: the same actions, the",
+      "same costs, the same weighted outcomes, the same heat, the same three",
+      "moves a round, the same consequences when it runs hot. It has no extra",
+      "information and no extra money. What differs between the profiles is",
+      "temperament — how much risk it will take and how tightly it targets — so",
+      "the three opponents in a solo game do not all play the same way.",
+      "",
+      "Names are drawn at random per game from the pools below. They are ordinary",
+      "Punjabi given names and surnames combined freely; any resemblance to a",
+      "particular living politician would be coincidence, and none of the pools",
+      "is built from real officeholders."
+    ],
+    "enabled": true,
+    "profiles": [
+      {
+        "id": "steady",
+        "label": "Steady",
+        "riskAppetite": 0.1,
+        "targetSpread": 6,
+        "borrowChance": 0.1,
+        "blurb": "Works the marginals and keeps out of trouble."
+      },
+      {
+        "id": "ambitious",
+        "label": "Ambitious",
+        "riskAppetite": 0.22,
+        "targetSpread": 10,
+        "borrowChance": 0.35,
+        "blurb": "Spends hard and takes the occasional gamble."
+      },
+      {
+        "id": "reckless",
+        "label": "Reckless",
+        "riskAppetite": 0.38,
+        "targetSpread": 16,
+        "borrowChance": 0.5,
+        "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
+      }
+    ],
+    "givenNames": [
+      "Arjun",
+      "Gurpreet",
+      "Manpreet",
+      "Harjit",
+      "Simran",
+      "Ravinder",
+      "Jaswinder",
+      "Kuldeep",
+      "Baljit",
+      "Amrit",
+      "Navjot",
+      "Parminder",
+      "Rajwant",
+      "Sukhbir",
+      "Tejinder",
+      "Inderjit",
+      "Charanjit",
+      "Davinder",
+      "Gagandeep",
+      "Harleen",
+      "Jasmeet",
+      "Karanveer",
+      "Lakhwinder",
+      "Mandeep",
+      "Narinder",
+      "Onkar",
+      "Pritam",
+      "Rupinder",
+      "Satwinder",
+      "Balwant"
+    ],
+    "surnames": [
+      "Singh",
+      "Kaur",
+      "Gill",
+      "Sidhu",
+      "Dhillon",
+      "Bajwa",
+      "Sandhu",
+      "Grewal",
+      "Brar",
+      "Randhawa",
+      "Sekhon",
+      "Cheema",
+      "Mann",
+      "Aulakh",
+      "Virk",
+      "Bains",
+      "Kalsi",
+      "Sohal",
+      "Chahal",
+      "Toor"
+    ],
+    "slogans": [
+      "Work, water and roads",
+      "A fair deal for every village",
+      "Punjab first, always",
+      "Jobs at home, not abroad",
+      "Clean hands, clear promises",
+      "The farmer decides",
+      "Schools before slogans",
+      "One Punjab, one future"
+    ],
+    "heatBackoff": 0.5
+  }
 }

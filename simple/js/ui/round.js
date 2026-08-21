@@ -132,6 +132,18 @@ CMP.ui.round = (function () {
     }
 
     function paintClock() {
+      // During the results break the clock is not counting anything down for
+      // the player to act on, so it says what is happening instead of showing
+      // a frozen 0:00 they might read as a bug.
+      if (game && game.stage === 'results') {
+        clockNode.textContent = 'Counting';
+        clockNode.classList.remove('is-low');
+        clockNode.classList.add('is-counting');
+        fillNode.style.width = '100%';
+        return;
+      }
+      clockNode.classList.remove('is-counting');
+
       var left = secondsLeft();
       var total = (game && game.roundSeconds) || CMP.ROUNDS.seconds;
       var mins = Math.floor(left / 60);
@@ -184,7 +196,11 @@ CMP.ui.round = (function () {
       // Moves are the real currency of a round: three of them, however deep
       // the purse, so the choice is which three rather than how many.
       var cap = CMP.ROUNDS.actionsPerRound || 0;
-      if (cap > 0) {
+      if (game.stage === 'results') {
+        mount(movesNode, [
+          el('span', { class: 'round-moves-label', text: 'Round closed' }),
+        ]);
+      } else if (cap > 0) {
         var used = Math.min(cap, game.roundActions || 0);
         mount(movesNode, [
           el(

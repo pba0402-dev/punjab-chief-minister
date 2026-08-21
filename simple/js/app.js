@@ -57,15 +57,33 @@ CMP.app = (function () {
     if (soloTimer !== null) return;
     soloTimer = window.setInterval(function () {
       if (!game || game.mode === 'multiplayer' || screen !== 'election') return;
-      if (CMP.campaign.secondsLeft(game) > 0) return;
 
-      var res = CMP.campaign.endRound(game);
-      CMP.storage.save(game);
-
-      if (res.finished) {
-        finishSoloElection();
+      // Between rounds the scoreboard is up and play is locked. The next
+      // round opens when the break runs out, exactly as it does on the server.
+      if (game.stage === 'results') {
+        game.intermissionLeft = CMP.campaign.intermissionLeft(game);
+        if (game.intermissionLeft > 0) {
+          if (electionView) electionView.render(game);
+          return;
+        }
+        var next = CMP.campaign.startNextRound(game);
+        CMP.storage.save(game);
+        if (next.finished) {
+          finishSoloElection();
+          return;
+        }
+        if (electionView) electionView.render(game);
         return;
       }
+
+      if (CMP.campaign.secondsLeft(game) > 0) return;
+
+      // The round settles and the scoreboard goes up. The player's own
+      // summary appears alongside it, because that is the moment they are
+      // reading what the round did.
+      CMP.campaign.endRound(game);
+      game.intermissionLeft = CMP.campaign.intermissionLeft(game);
+      CMP.storage.save(game);
       if (electionView) {
         electionView.render(game);
         showSummary(game.summary);
@@ -109,6 +127,7 @@ CMP.app = (function () {
       result: game.result,
       coalition: null,
       possibleCoalitions: [],
+      seatTrend: game.seatTrend || [],
       players: [
         {
           empty: false,
@@ -118,12 +137,34 @@ CMP.app = (function () {
           partyId: game.partyId,
           candidateName: game.candidateName,
           slogan: game.slogan,
+          portraitSeed: game.portraitSeed,
           seatsLed: game.seatsWon,
           cash: game.cash,
           spent: game.spent,
           heat: game.heat,
         },
-      ],
+      ].concat(
+        // The opponents belong on the final scoreboard too — a result screen
+        // that named only the human would be a strange way to end a
+        // four-way election.
+        (game.opponents || []).map(function (o, i) {
+          return {
+            empty: false,
+            id: o.id,
+            slot: i + 2,
+            isYou: false,
+            isAI: true,
+            partyId: o.partyId,
+            candidateName: o.candidateName,
+            slogan: o.slogan,
+            portraitSeed: o.portraitSeed,
+            seatsLed: o.seatsLed,
+            cash: o.cash,
+            spent: o.spent,
+            heat: o.heat,
+          };
+        })
+      ),
     };
 
     electionView = null;
@@ -483,14 +524,24 @@ CMP.app = (function () {
     if (mine.actions) game.actions = mine.actions;
   }
 
-  /** The shared board and the round clock, straight from the server. */
+  /**
+   * The shared board, the round clock and the round's scoreboard, straight
+   * from the server. The scoreboard in particular is taken whole and never
+   * recomputed here — four clients working out their own standings could
+   * disagree with each other, which would make the whole screen untrustworthy.
+   */
   function applyServerGame(view) {
     if (!game || !view) return;
     if (view.board && typeof view.board === 'object') game.support = view.board;
     if (view.incumbency) game.incumbency = view.incumbency;
+    if (view.leaders) game.leaders = view.leaders;
     game.round = view.round || 1;
     game.roundsTotal = view.roundsTotal || CMP.ROUNDS.total;
     game.roundSeconds = view.roundSeconds || CMP.ROUNDS.seconds;
+    game.stage = view.stage || 'playing';
+    game.lastResult = view.lastResult || null;
+    game.intermissionLeft = view.intermissionLeft || 0;
+    game.seatTrend = view.seatTrend || [];
   }
 
   function lastServerReport(mine) {

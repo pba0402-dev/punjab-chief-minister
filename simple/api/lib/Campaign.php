@@ -42,11 +42,11 @@ final class Campaign
     /**
      * The round clock as configured.
      *
-     * CMP_ROUND_SECONDS shortens a round, and exists so the test suite can
-     * play all fifteen rounds against a real server in under a minute rather
-     * than a quarter of an hour. Nothing sets it in production, and if it were
-     * ever set the only effect would be faster rounds — no rule changes with
-     * it.
+     * CMP_ROUND_SECONDS and CMP_INTERMISSION_SECONDS shorten a round and the
+     * results break, and exist so the test suite can play all fifteen rounds
+     * against a real server in under a minute rather than a quarter of an
+     * hour. Nothing sets them in production, and if they were ever set the
+     * only effect would be a faster clock — no rule changes with either.
      */
     public function rounds(): array
     {
@@ -54,6 +54,10 @@ final class Campaign
         $override = getenv('CMP_ROUND_SECONDS');
         if ($override !== false && (int) $override > 0) {
             $rounds['seconds'] = (int) $override;
+        }
+        $break = getenv('CMP_INTERMISSION_SECONDS');
+        if ($break !== false && (int) $break > 0) {
+            $rounds['intermissionSeconds'] = (int) $break;
         }
         return $rounds;
     }
