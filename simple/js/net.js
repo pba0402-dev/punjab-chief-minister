@@ -139,6 +139,29 @@ CMP.net = (function () {
     }));
   }
 
+  /**
+   * Ask the bank what a loan of this size would cost. A quote changes
+   * nothing on the server, so the confirmation screen can show exact terms
+   * before the player commits to them.
+   */
+  function loanQuote(amount) {
+    return request('loan', authed({ amount: amount, quote: true }));
+  }
+
+  /** Take the loan. The server re-checks the terms before granting it. */
+  function takeLoan(amount) {
+    return request('loan', authed({ amount: amount }));
+  }
+
+  /**
+   * How one seat's race has moved, round by round. Fetched on demand rather
+   * than polled, because fifteen full boards would dwarf everything else in
+   * the response.
+   */
+  function seatHistory(constituency) {
+    return request('history', authed({ constituency: constituency }), 'GET');
+  }
+
   /** Report a rival. Each player may report each rival once. */
   function report(accusedId, reason) {
     return request('report', authed({ accusedId: accusedId, reason: reason }));
@@ -225,6 +248,9 @@ CMP.net = (function () {
     setParty: setParty,
     setDetails: setDetails,
     playAction: playAction,
+    loanQuote: loanQuote,
+    takeLoan: takeLoan,
+    seatHistory: seatHistory,
     report: report,
     declare: declare,
     coalition: coalition,

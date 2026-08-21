@@ -1,0 +1,750 @@
+/* ------------------------------------------------------------------
+   Rounds, the projection, the bank and the dialogs.
+   Loaded after systems.css, before map.css.
+   ------------------------------------------------------------------ */
+
+/* The good/bad pair the campaign log and rating chips already use, named
+   here so the round screens do not each pick their own green and red. */
+:root {
+  --warm-good: #8fdcae;
+  --warm-bad: #f19281;
+}
+
+/* ------------------------------------------------------------- the clock */
+
+.round-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(232, 184, 74, 0.06), transparent 60%),
+    var(--ink-2);
+}
+
+.round-bar-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.round-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.round-label strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0;
+  color: var(--cream);
+}
+.round-final {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(214, 92, 63, 0.16);
+  color: var(--warm-bad);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.round-clock {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+  line-height: 1;
+}
+/* The last ten seconds are worth noticing without being shouted at. */
+.round-clock.is-low { color: var(--wheat); }
+.round-clock.is-out { color: var(--muted-2); }
+
+.round-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(246, 241, 231, 0.09);
+  overflow: hidden;
+}
+.round-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wheat);
+  transition: width 0.25s linear;
+}
+.round-clock.is-low + .round-track .round-fill { background: var(--wheat-deep); }
+
+.round-steps {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.round-pip {
+  flex: 1 1 0;
+  min-width: 6px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(246, 241, 231, 0.12);
+}
+.round-pip.is-done { background: rgba(232, 184, 74, 0.5); }
+.round-pip.is-now { background: var(--cream); }
+
+/* -------------------------------------------------------- the projection */
+
+.projection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 15px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+
+.projection-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.projection-need {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--wheat);
+}
+.projection-need.is-clear { color: var(--warm-good); }
+
+.projection-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.projection-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 34px;
+  align-items: center;
+  gap: 10px;
+}
+.projection-party {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.projection-row.is-you .projection-party { color: var(--cream); }
+.projection-track {
+  height: 12px;
+  border-radius: 4px;
+  background: rgba(246, 241, 231, 0.07);
+  overflow: hidden;
+}
+.projection-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--party);
+  transition: width 0.4s ease;
+}
+.projection-seats {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+  color: var(--muted);
+}
+.projection-row.is-you .projection-seats { color: var(--cream); }
+
+.projection-note {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted-2);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------- money */
+
+.stat-debt .stat-value { color: var(--warm-bad); }
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+.breakdown-rows { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+.breakdown-row dt { color: var(--muted); }
+.breakdown-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.breakdown-row dd.is-in { color: var(--warm-good); }
+.breakdown-row dd.is-out { color: var(--muted-2); }
+
+.breakdown-totals {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-soft);
+}
+.breakdown-total { display: flex; flex-direction: column; gap: 3px; }
+.breakdown-total strong {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.breakdown-total.is-debt strong { color: var(--warm-bad); }
+
+/* ---------------------------------------------------------------- bank */
+
+.bank {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+
+.bank-figures { display: flex; gap: 22px; flex-wrap: wrap; }
+.bank-figure { display: flex; flex-direction: column; gap: 3px; }
+.bank-figure-value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.bank-figure.is-debt .bank-figure-value { color: var(--warm-bad); }
+
+.loan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.loan-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  background: var(--ink-3);
+  font-size: 0.84rem;
+}
+.loan-item.is-due { border-color: rgba(214, 92, 63, 0.5); }
+.loan-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.loan-due { color: var(--muted-2); }
+.loan-item.is-due .loan-due { color: var(--warm-bad); }
+
+.bank-borrow { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+.bank-amounts { display: flex; gap: 6px; flex-wrap: wrap; }
+.bank-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bank-chip:hover { border-color: var(--wheat-deep); color: var(--cream); }
+.bank-chip.is-active {
+  border-color: var(--wheat);
+  background: rgba(232, 184, 74, 0.14);
+  color: var(--cream);
+}
+.bank-chip:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+
+.bank-terms { margin: 0; font-size: 0.82rem; color: var(--muted); line-height: 1.55; }
+.bank-terms.is-refused { color: var(--warm-bad); }
+.bank-blocked {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(214, 92, 63, 0.4);
+  background: rgba(214, 92, 63, 0.09);
+  color: var(--warm-bad);
+  font-size: 0.86rem;
+}
+
+/* ------------------------------------------------------------- dialogs */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 6, 4, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  width: min(460px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.dialog-danger { border-color: rgba(214, 92, 63, 0.45); }
+
+.dialog-eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.dialog-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  text-wrap: balance;
+}
+.dialog-body { margin: 0; color: var(--muted); line-height: 1.6; font-size: 0.92rem; }
+.dialog-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-3);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.dialog-danger .dialog-note { color: var(--wheat); }
+
+.dialog-lines { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.dialog-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+.dialog-line dt { color: var(--muted); }
+.dialog-line dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.dialog-line.is-strong {
+  padding-top: 7px;
+  border-top: 1px solid var(--line-soft);
+}
+.dialog-line.is-strong dd { font-size: 1.05rem; color: var(--wheat); }
+
+.dialog-buttons {
+  display: flex;
+  gap: 9px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------ round summary */
+
+/* In the page, not over it: the next round is already running by the time
+   this appears, and a modal would spend a player's seconds for them. */
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 16px 18px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--wheat-deep);
+  background:
+    linear-gradient(180deg, rgba(232, 184, 74, 0.08), transparent 55%),
+    var(--ink-2);
+}
+.summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.summary-title {
+  margin: 3px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+.summary-close {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.summary-close:hover { color: var(--cream); border-color: var(--wheat-deep); }
+.summary-close:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
+
+.sum-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--line-soft);
+}
+.sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 13px;
+  background: var(--ink-3);
+  font-size: 0.9rem;
+}
+.sum-label { color: var(--muted); }
+.sum-value { display: inline-flex; align-items: baseline; gap: 9px; }
+.sum-value strong { font-variant-numeric: tabular-nums; }
+.sum-value strong.is-debt { color: var(--warm-bad); }
+
+.sum-delta {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-2);
+}
+.sum-delta.is-good { color: var(--warm-good); }
+.sum-delta.is-bad { color: var(--warm-bad); }
+
+.sum-block { display: flex; flex-direction: column; gap: 7px; }
+.sum-block-title {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.sum-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sum-list li {
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--line);
+  background: var(--ink-3);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.sum-list li.is-good { border-left-color: var(--warm-good); }
+.sum-list li.is-bad { border-left-color: var(--warm-bad); }
+.sum-list li strong { color: var(--cream); }
+.sum-seats { color: var(--muted-2); font-style: italic; }
+
+@media (max-width: 720px) {
+  .round-clock { font-size: 1.4rem; }
+  .projection-row { grid-template-columns: 38px 1fr 30px; }
+  .bank-figures { gap: 16px; }
+  .dialog { padding: 18px; }
+}
+
+/* ------------------------------------------- candidates and seat history */
+
+.candidates {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.candidates th {
+  padding: 0 0 7px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+.candidates td {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  vertical-align: baseline;
+}
+.candidates tr:last-child td { border-bottom: 0; }
+.candidates .is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.candidates tr.is-leading td { color: var(--cream); }
+.candidates tr.is-you .candidate-name { color: var(--cream); font-weight: 600; }
+.candidate-name { display: flex; align-items: baseline; gap: 7px; }
+.candidates .race-dot { margin-right: 6px; }
+
+.history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 15px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+}
+.history-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.history-axis { stroke: var(--line); stroke-width: 1; }
+.history-line {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.72;
+}
+.history-line.is-you { stroke-width: 2.6; opacity: 1; }
+.history-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: var(--muted-2);
+}
+.history-empty { margin: 0; font-size: 0.82rem; color: var(--muted-2); }
+
+/* --------------------------------------------------------- the count */
+
+.count-live {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(600px 300px at 50% 0%, rgba(232, 184, 74, 0.07), transparent 70%),
+    var(--ink-2);
+}
+
+.count-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.count-progress {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  margin-right: auto;
+}
+
+.count-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(246, 241, 231, 0.09);
+  overflow: hidden;
+}
+.count-fill {
+  display: block;
+  height: 100%;
+  background: var(--wheat);
+  transition: width 0.1s linear;
+}
+
+.count-bars { display: flex; flex-direction: column; gap: 6px; }
+.count-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+}
+.count-party { font-size: 0.76rem; font-weight: 700; color: var(--muted); }
+.count-bar {
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(246, 241, 231, 0.07);
+  overflow: hidden;
+}
+.count-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--party);
+  transition: width 0.12s linear;
+}
+.count-seats {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.count-row.is-past .count-party,
+.count-row.is-past .count-seats { color: var(--cream); }
+
+.count-majority { margin: 0; font-size: 0.76rem; color: var(--muted-2); }
+
+.count-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.count-seat {
+  display: grid;
+  grid-template-columns: 42px 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-3);
+  font-size: 0.84rem;
+}
+.count-ac { color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.count-name { color: var(--cream); }
+.count-winner {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--party);
+  color: var(--party-ink, #fff);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.count-margin { color: var(--muted-2); font-size: 0.74rem; }
+
+@media (max-width: 720px) {
+  .count-seat { grid-template-columns: 36px 1fr auto; }
+  .count-margin { display: none; }
+}
+
+/* --------------------------------------------------- layout adjustments */
+
+/* The clock is the one thing a player needs at every moment of a
+   sixty-second round, so it stays put while the rest of the screen scrolls. */
+.round-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+
+/* A fifth tab arrived with the money screen and the row stopped fitting on a
+   phone. Wrapping keeps every tab reachable; a scrolling row would hide the
+   last one behind an edge with nothing to say it was there. */
+.panel-tabs { flex-wrap: wrap; row-gap: 2px; }
+
+@media (max-width: 480px) {
+  .panel-tab { font-size: 0.8rem; padding-left: 9px; padding-right: 9px; }
+}
+
+/* ------------------------------------------------- a compact campaign head */
+
+/* Once a campaign is running, the masthead is the least useful thing on
+   screen and the actions are the most. At full size the title, the party card
+   and the figures filled the first viewport on their own, leaving a player
+   scrolling for the buttons with the clock running. Everything above the
+   tabs is tightened so the campaign itself starts on the first screen. */
+
+.screen-election .election-head { gap: 12px; margin-bottom: 18px; }
+.screen-election .election-head .title-sm { font-size: 1.5rem; }
+.screen-election .election-head .subtitle { margin-top: 2px; font-size: 0.8rem; }
+
+.screen-election .campaign-card {
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-left-width: 4px;
+}
+.screen-election .campaign-flag {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+}
+.screen-election .campaign-body {
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.screen-election .campaign-party { font-size: 0.66rem; }
+.screen-election .campaign-name { font-size: 1.05rem; }
+.screen-election .campaign-slogan { font-size: 0.84rem; }
+
+.screen-election .election-inner { gap: 14px; }
+.screen-election .stat { padding: 11px 14px; }
+.screen-election .stat-value { font-size: 1.25rem; }
+
+@media (max-width: 720px) {
+  .screen-election .election-head .title-sm { font-size: 1.25rem; }
+  .screen-election .campaign-slogan { display: none; }
+}
+
+/* Moves left in the round: the real budget of a sixty-second turn. */
+.round-moves {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  margin-left: 16px;
+}
+.round-pips { display: inline-flex; gap: 3px; }
+.move-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--wheat-deep);
+  background: var(--wheat);
+}
+.move-pip.is-used { background: none; border-color: var(--line); }
+.round-moves-label { font-size: 0.72rem; color: var(--muted-2); }
+
+@media (max-width: 560px) {
+  .round-moves { margin-left: 10px; }
+  .round-moves-label { display: none; }
+}
+
+.report-reach {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted-2);
+  line-height: 1.5;
+}
+
+.declare-block { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.declare-note { margin: 0; font-size: 0.84rem; color: var(--muted-2); text-align: center; }
+
+/* The campaign log gained a round column. */
+.log-row { grid-template-columns: 30px 1.3fr 1fr auto 62px; }
+.log-round {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .log-row {
+    grid-template-columns: 30px 1fr auto;
+    grid-template-areas: "round action result" "round where cost";
+  }
+  .log-round { grid-area: round; align-self: center; }
+}

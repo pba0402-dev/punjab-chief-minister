@@ -286,10 +286,18 @@ check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
 check("the host's own party is shown", /Aam Aadmi Party/.test(onElection(host)));
 check('the host sees their candidate', /Simran Kaur Gill/.test(onElection(host)));
-check('the campaign panel renders', host.qq('.action-card').length === 8);
+check('the campaign panel renders', host.qq('.action-card').length === 10,
+  host.qq('.action-card').length + ' cards');
 check('a target constituency is chosen', !!host.q('.target-name'));
 check('all 117 seats are reachable from the picker',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
+check('the round clock is showing', !!host.q('.round-clock'));
+check('it opens on round 1 of 15', /Round\s*1\s*of\s*15/.test(host.q('.round-bar').textContent),
+  host.q('.round-bar').textContent.slice(0, 40));
+check('projected seats are shown', !!host.q('.projection'));
+check('and the panel says how many more are needed',
+  /Needs \d+ more seat|Majority reached/.test(host.q('.projection').textContent),
+  host.q('.projection').textContent.slice(0, 60));
 
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);
@@ -319,11 +327,12 @@ function statOf(client, label) {
 for (const c of players) {
   check(
     c.label + ' starts on ₹5,00,00,000',
-    statOf(c, 'Election Budget') === '₹5,00,00,000',
-    statOf(c, 'Election Budget')
+    statOf(c, 'Cash in Hand') === '₹5,00,00,000',
+    statOf(c, 'Cash in Hand')
   );
+  check(c.label + ' starts with no debt', statOf(c, 'Debt') === '—', statOf(c, 'Debt'));
 }
-check('the host sees a campaign panel', host.qq('.action-card').length === 8);
+check('the host sees a campaign panel', host.qq('.action-card').length === 10);
 check('four safe and four risky actions', host.qq('.action-card.action-safe').length === 4);
 check('political heat starts at zero', /0 \/ 100/.test(host.q('.heat-card').textContent));
 
@@ -334,6 +343,11 @@ const hostCard = host.qq('.action-card').find((c) => {
   return n && n.textContent === 'Underground Deal';
 });
 host.click(hostCard);
+await sleep(60);
+// Spending money asks first, so agree to it the way a player would.
+const hostGo = host.q('.dialog-buttons .btn-danger, .dialog-buttons .btn-primary');
+check('spending asks for confirmation first', !!hostGo);
+host.click(hostGo);
 const hostSpent = await host.until('spent', () => statOf(host, 'Spent') !== '₹0', 12000);
 check('the host can spend', hostSpent, statOf(host, 'Spent'));
 check(
@@ -341,7 +355,7 @@ check(
   statOf(host, 'Spent') === host.dom.window.CMP.ui.money.format(dealCost),
   statOf(host, 'Spent')
 );
-check('the remaining budget dropped', statOf(host, 'Remaining Budget') !== '₹5,00,00,000');
+check('the cash in hand dropped', statOf(host, 'Cash in Hand') !== '₹5,00,00,000');
 check('a risky action raised the host heat', !/^0 \//.test(host.q('.heat-value').textContent),
   host.q('.heat-value').textContent);
 check('the outcome is reported to the host', !!host.q('.report'));
@@ -349,8 +363,8 @@ check('the outcome is reported to the host', !!host.q('.report'));
 // Give the other clients a poll or two to refresh, then confirm they are untouched.
 await sleep(3500);
 for (const c of [players[1], players[2], players[3]]) {
-  check(c.label + " budget is untouched by the host's spending",
-    statOf(c, 'Remaining Budget') === '₹5,00,00,000', statOf(c, 'Remaining Budget'));
+  check(c.label + " cash is untouched by the host's spending",
+    statOf(c, 'Cash in Hand') === '₹5,00,00,000', statOf(c, 'Cash in Hand'));
   check(c.label + ' heat is untouched', /0 \/ 100/.test(c.q('.heat-card').textContent));
 }
 
@@ -360,12 +374,14 @@ const p2Card = players[1].qq('.action-card').find((c) => {
   return n && n.textContent === 'Public Rally';
 });
 players[1].click(p2Card);
+await sleep(60);
+players[1].click(players[1].q('.dialog-buttons .btn-primary, .dialog-buttons .btn-danger'));
 const p2Spent = await players[1].until('spent', () => statOf(players[1], 'Spent') !== '₹0', 12000);
 check('player 2 can spend their own money', p2Spent);
 check(
   'the two players have different amounts left',
-  statOf(host, 'Remaining Budget') !== statOf(players[1], 'Remaining Budget'),
-  statOf(host, 'Remaining Budget') + ' vs ' + statOf(players[1], 'Remaining Budget')
+  statOf(host, 'Cash in Hand') !== statOf(players[1], 'Cash in Hand'),
+  statOf(host, 'Cash in Hand') + ' vs ' + statOf(players[1], 'Cash in Hand')
 );
 
 /* --------------------------------------------- constituency + oversight */
@@ -440,11 +456,29 @@ check('the evidence score is never sent to the browser',
 section('Closing the polls');
 host.click(tabButton(host, 'Campaign'));
 check('only the host is offered the declare button',
-  !!host.button('CLOSE THE POLLS') && !players[1].button('CLOSE THE POLLS'));
+  !!host.button('Close the polls now') && !players[1].button('Close the polls now'));
+check('everyone is told the polls close on their own',
+  /close automatically after round 15|final round/i.test(host.q('.declare-note').textContent),
+  host.q('.declare-note').textContent);
 
-host.click(host.button('CLOSE THE POLLS'));
+host.click(host.button('Close the polls now'));
+await sleep(80);
+// Ending a campaign early for four people is worth a confirmation.
+check('closing early asks first', !!host.q('.dialog'));
+host.click(host.q('.dialog-buttons .btn-danger, .dialog-buttons .btn-primary'));
 const hostResult = await host.until('result', () => !!host.q('.screen-result'), 25000);
 check('the host reaches the result screen', hostResult);
+
+// The seats are declared one at a time before the verdict. That is covered
+// properly in tools/test-rounds.mjs; here, jump to the end.
+check('the count starts before the verdict', !!host.q('.count-live'));
+const skipCount = (c) => {
+  const b = c.qq('button').find((n) => /Show the result/.test(n.textContent));
+  if (b) c.click(b);
+};
+skipCount(host);
+await sleep(200);
+
 check('the result names the election', /Punjab Election Result/.test(host.text()));
 check('every party is listed', host.qq('.result-row').length >= 4, String(host.qq('.result-row').length));
 check('the seat totals are shown', /Total/.test(host.q('.result-totals').textContent));
@@ -457,6 +491,8 @@ check('the declared seats add to 117', seatSum === 117, String(seatSum));
 
 const others = await players[2].until('result', () => !!players[2].q('.screen-result'), 25000);
 check('the other players are carried to the result too', others);
+players.forEach(skipCount);
+await sleep(200);
 
 const verdict = host.q('.verdict-kicker').textContent;
 console.log('     verdict: ' + verdict);
@@ -519,6 +555,9 @@ const returningText = () =>
 check('their party is still INC',
   returning.dom.window.CMP.app.getGame().partyId === 'inc',
   returning.dom.window.CMP.app.getGame().partyId);
+// They arrive with the count still running, exactly as a late joiner would.
+skipCount(returning);
+await sleep(200);
 check('their candidate survived', /Ravinder Singh Bajwa/.test(returningText()));
 
 /* ---------------------------------------------------------------- a 5th */

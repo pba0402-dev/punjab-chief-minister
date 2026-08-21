@@ -24,6 +24,14 @@ CMP.ui.result = (function () {
     var notice = null;
     var draft = { partnerId: '', chiefMinisterId: '', cabinet: '', policy: '', resources: '' };
 
+    // Counting state. A result that lands complete in one frame tells you the
+    // number but not the evening; declaring the seats in order gives the count
+    // somewhere to build, and a player something to watch.
+    var counting = false;
+    var declared = 0;
+    var countTimer = null;
+    var seatOrder = [];
+
     var root = el('section', { class: 'screen screen-result' });
 
     function me() {
@@ -63,6 +71,151 @@ CMP.ui.result = (function () {
         if (res.game) update(res.game);
         CMP.net.refresh();
       });
+    }
+
+    /* ------------------------------------------------------ counting */
+
+    var SEATS_PER_TICK = 3;
+    var TICK_MS = 90;
+
+    function startCount() {
+      if (!view || !view.result || !view.result.perSeat) return;
+      seatOrder = Object.keys(view.result.perSeat)
+        .map(Number)
+        .sort(function (a, b) {
+          return a - b;
+        });
+      counting = true;
+      declared = 0;
+      tick();
+      paint();
+    }
+
+    function tick() {
+      if (countTimer !== null) window.clearTimeout(countTimer);
+      countTimer = window.setTimeout(function () {
+        declared = Math.min(seatOrder.length, declared + SEATS_PER_TICK);
+        if (declared >= seatOrder.length) {
+          finishCount();
+          return;
+        }
+        paintCount();
+        tick();
+      }, TICK_MS);
+    }
+
+    function finishCount() {
+      if (countTimer !== null) window.clearTimeout(countTimer);
+      countTimer = null;
+      counting = false;
+      declared = seatOrder.length;
+      paint();
+    }
+
+    /** Running totals from the seats declared so far. */
+    function runningTotals() {
+      var totals = {};
+      CMP.PARTIES.forEach(function (p) {
+        totals[p.id] = 0;
+      });
+      for (var i = 0; i < declared; i++) {
+        var seat = view.result.perSeat[String(seatOrder[i])];
+        if (seat && seat.winner) totals[seat.winner] = (totals[seat.winner] || 0) + 1;
+      }
+      return totals;
+    }
+
+    function seatName(number) {
+      for (var i = 0; i < CMP.CONSTITUENCIES.length; i++) {
+        if (CMP.CONSTITUENCIES[i].number === Number(number)) return CMP.CONSTITUENCIES[i].name;
+      }
+      return 'AC ' + number;
+    }
+
+    var countNode = el('div', { class: 'count-live' });
+
+    /** Repaint only the counting block, so the whole screen does not flicker. */
+    function paintCount() {
+      var result = view.result;
+      var totals = runningTotals();
+      var rows = CMP.PARTIES.map(function (p) {
+        return { party: p, seats: totals[p.id] || 0 };
+      }).sort(function (a, b) {
+        return b.seats - a.seats;
+      });
+
+      var recent = [];
+      for (var i = Math.max(0, declared - 6); i < declared; i++) {
+        var number = seatOrder[i];
+        var seat = result.perSeat[String(number)];
+        var party = CMP.getParty(seat.winner);
+        recent.unshift(
+          el('li', { class: 'count-seat' }, [
+            el('span', { class: 'count-ac', text: '#' + number }),
+            el('span', { class: 'count-name', text: seatName(number) }),
+            el('span', {
+              class: 'count-winner',
+              style: { '--party': party.colour, '--party-ink': party.ink },
+              text: party.short,
+            }),
+            el('span', {
+              class: 'count-margin',
+              text: seat.margin < 2 ? 'held by ' + seat.margin.toFixed(1) : '',
+            }),
+          ])
+        );
+      }
+
+      mount(countNode, [
+        el('div', { class: 'count-head' }, [
+          el('span', { class: 'stat-label', text: 'Counting' }),
+          el('strong', {
+            class: 'count-progress',
+            text: declared + ' of ' + seatOrder.length + ' declared',
+          }),
+          el('button', {
+            class: 'btn btn-quiet btn-small',
+            type: 'button',
+            text: 'Show the result',
+            onclick: finishCount,
+          }),
+        ]),
+        el('div', { class: 'count-track' }, [
+          el('span', {
+            class: 'count-fill',
+            style: { width: (declared / seatOrder.length) * 100 + '%' },
+          }),
+        ]),
+        el(
+          'div',
+          { class: 'count-bars' },
+          rows.map(function (row) {
+            var past = row.seats >= result.majority;
+            return el(
+              'div',
+              {
+                class: 'count-row' + (past ? ' is-past' : ''),
+                style: { '--party': row.party.colour },
+              },
+              [
+                el('span', { class: 'count-party', text: row.party.short }),
+                el('span', { class: 'count-bar' }, [
+                  el('span', {
+                    class: 'count-bar-fill',
+                    style: { width: (row.seats / result.totalSeats) * 100 + '%' },
+                  }),
+                ]),
+                el('span', { class: 'count-seats', text: String(row.seats) }),
+              ]
+            );
+          })
+        ),
+        el('p', {
+          class: 'count-majority',
+          text: result.majority + ' seats needed for a majority.',
+        }),
+        el('ul', { class: 'count-list' }, recent),
+      ]);
     }
 
     /* ------------------------------------------------------ sections */
@@ -357,22 +510,32 @@ CMP.ui.result = (function () {
         return;
       }
 
+      var header = el('header', { class: 'election-head-top' }, [
+        el('div', {}, [
+          el('h1', { class: 'title title-sm', text: 'Punjab Assembly Election' }),
+          el('p', { class: 'subtitle' }, [
+            el('strong', { text: view.result.totalSeats + ' seats · majority ' + view.result.majority }),
+          ]),
+        ]),
+        el('button', {
+          class: 'btn btn-quiet',
+          type: 'button',
+          text: 'Menu',
+          onclick: opts.onMenu,
+        }),
+      ]);
+
+      // While the count runs, the verdict is deliberately withheld — showing
+      // it above a count in progress would give the ending away.
+      if (counting) {
+        mount(root, [el('div', { class: 'result-inner' }, [header, countNode])]);
+        paintCount();
+        return;
+      }
+
       mount(root, [
         el('div', { class: 'result-inner' }, [
-          el('header', { class: 'election-head-top' }, [
-            el('div', {}, [
-              el('h1', { class: 'title title-sm', text: 'Punjab Assembly Election' }),
-              el('p', { class: 'subtitle' }, [
-                el('strong', { text: view.result.totalSeats + ' seats · majority ' + view.result.majority }),
-              ]),
-            ]),
-            el('button', {
-              class: 'btn btn-quiet',
-              type: 'button',
-              text: 'Menu',
-              onclick: opts.onMenu,
-            }),
-          ]),
+          header,
           verdictBanner(),
           notice ? el('p', { class: 'notice notice-' + notice.tone, text: notice.text }) : null,
           resultTable(),
@@ -382,11 +545,34 @@ CMP.ui.result = (function () {
     }
 
     function update(next) {
+      var first = !view;
       view = next;
+
+      // Count the seats in the first time we see a result, and only then.
+      // A poll arriving mid-count must not restart it.
+      if (first && view && view.result && view.result.perSeat) {
+        startCount();
+        return;
+      }
+      if (counting) return;
       paint();
     }
 
-    return { root: root, update: update, setNotice: setNotice };
+    function stop() {
+      if (countTimer !== null) window.clearTimeout(countTimer);
+      countTimer = null;
+    }
+
+    return {
+      root: root,
+      update: update,
+      setNotice: setNotice,
+      stop: stop,
+      skipCount: finishCount,
+      isCounting: function () {
+        return counting;
+      },
+    };
   }
 
   return { create: create };

@@ -17,8 +17,15 @@
  *   POST ?action=details {candidateName, slogan, budget}
  *   POST ?action=ready   {ready}
  *   POST ?action=start             -> host only
+ *   POST ?action=campaign {actionId, constituency}
+ *   POST ?action=loan    {amount}  -> quote with {quote:true}
+ *   GET  ?action=history {constituency}
  *   POST ?action=leave
  *   GET  ?action=health
+ *
+ * The round clock runs on this side. Every authenticated request settles any
+ * rounds whose time has run out before it does anything else, so a client that
+ * has been asleep cannot act in a round that finished five minutes ago.
  *
  * Auth: every call after create/join sends playerId + token, issued once and
  * kept by the client so a refresh or a dropped connection can reconnect.
@@ -29,6 +36,7 @@ require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
 require __DIR__ . '/lib/Campaign.php';
+require __DIR__ . '/lib/Rounds.php';
 require __DIR__ . '/lib/Investigation.php';
 require __DIR__ . '/lib/Election.php';
 require __DIR__ . '/lib/Coalition.php';
@@ -214,7 +222,7 @@ function authenticate(FileStore $store): array
  * A mutator that throws LobbyError leaves the game unchanged but still records
  * the heartbeat, and the reason is reported to the caller.
  */
-function mutate(FileStore $store, array $game, string $playerId, callable $fn): void
+function mutate(FileStore $store, array $game, string $playerId, callable $fn, ?array &$extra = null): void
 {
     $error = null;
 
@@ -223,6 +231,12 @@ function mutate(FileStore $store, array $game, string $playerId, callable $fn): 
             return null;
         }
         $g['players'][$playerId]['lastSeen'] = time();
+
+        // Settle anything the clock owes before this request is considered.
+        // Doing it here, under the lock, means every route sees a game whose
+        // round number is correct — including the route that is about to
+        // refuse an action for arriving too late.
+        $g = Rounds::advanceIfDue($g, $GLOBALS['campaign'], $GLOBALS['election']);
 
         try {
             $result = $fn($g);
@@ -249,7 +263,10 @@ function mutate(FileStore $store, array $game, string $playerId, callable $fn): 
         ], $error->status);
     }
 
-    send(['ok' => true, 'game' => Lobby::publicView($updated, $playerId)]);
+    send(array_merge(
+        ['ok' => true, 'game' => Lobby::publicView($updated, $playerId)],
+        $extra ?? []
+    ));
 }
 
 /* ---------------------------------------------------------------- routing */
@@ -417,25 +434,31 @@ switch (route()) {
                 throw new LobbyError($reason, 'not_ready');
             }
             $g['phase'] = 'election';
-            $g['turn'] = 1;
 
-            // Deal every player their own copy of the opening map, seeded per
-            // game so all four see the same political landscape.
+            // Deal the opening map once. Everyone campaigns on this same
+            // board, so a rally in Moga shows up on all four screens rather
+            // than only in the results.
             $engine = $GLOBALS['campaign'];
-            $numbers = $GLOBALS['constituencyNumbers'];
-            $parties = Lobby::GAME_PARTIES;
             [$board, $incumbency] = $engine->seedSupport(
-                $numbers,
-                $parties,
+                $GLOBALS['constituencyNumbers'],
+                Lobby::GAME_PARTIES,
                 $g['id'],
                 $GLOBALS['incumbentParties']
             );
+            $g['board'] = $board;
             $g['incumbency'] = $incumbency;
+            $g['history'] = [];
+            $g['roundLog'] = [];
+
             foreach ($g['players'] as $pid => $p) {
-                $g['players'][$pid]['support'] = $board;
-                $g['players'][$pid]['seatsLed'] = $engine->seatsLed($g['players'][$pid]);
+                $partyId = (string) ($p['partyId'] ?? '');
+                $g['players'][$pid]['seatsLed'] = $partyId === ''
+                    ? 0
+                    : $engine->seatsLed($board, $partyId);
+                $g['players'][$pid]['summary'] = null;
             }
-            return $g;
+
+            return Rounds::begin($g, 1, $engine);
         });
     }
 
@@ -457,6 +480,9 @@ switch (route()) {
             $engine = $GLOBALS['campaign'];
             $player = $g['players'][$playerId];
 
+            if (!Rounds::isLive($g, $engine)) {
+                throw new LobbyError('That round has closed. Wait for the next one.', 'round_over');
+            }
             if (!empty($player['record']['disqualified'])) {
                 throw new LobbyError('You have been disqualified from this election.', 'disqualified');
             }
@@ -470,7 +496,8 @@ switch (route()) {
                 );
             }
 
-            $blocked = $engine->blockedReason($player, $actionId, $target);
+            $board = Rounds::boardOf($g);
+            $blocked = $engine->blockedReason($player, $board, $actionId, $target);
             if ($blocked !== null) {
                 throw new LobbyError($blocked, 'blocked');
             }
@@ -478,14 +505,79 @@ switch (route()) {
             // The server rolls, so no client can pick its own outcome.
             $rolls = Campaign::rollsFor($g['id'] . ':' . $playerId, (int) ($player['rollCount'] ?? 0));
             $player['rollCount'] = (int) ($player['rollCount'] ?? 0) + 1;
+            $player['round'] = (int) $g['round'];
 
-            [$player, $report] = $engine->play($player, $actionId, $target, $rolls);
-            $player['seatsLed'] = $engine->seatsLed($player);
+            [$player, $board, $report] = $engine->play($player, $board, $actionId, $target, $rolls);
+
+            $g['board'] = $board;
+            $counts = $engine->seatCounts($board);
+            foreach ($g['players'] as $otherId => $other) {
+                $pid = (string) ($other['partyId'] ?? '');
+                $g['players'][$otherId]['seatsLed'] = $pid === '' ? 0 : (int) ($counts[$pid] ?? 0);
+            }
+            $player['seatsLed'] = (int) ($counts[(string) $player['partyId']] ?? 0);
 
             $g['players'][$playerId] = $player;
             $g['lastReport'] = $report;
             return $g;
         });
+    }
+
+    /* -------------------------------------------------------------- loan */
+    case 'loan': {
+        [$game, $playerId] = authenticate($store);
+        $amount = (int) input('amount', 0);
+        $quoteOnly = filter_var(input('quote', false), FILTER_VALIDATE_BOOLEAN);
+
+        // A quote changes nothing. The confirmation screen asks for one first
+        // so it can never show terms the server would go on to refuse.
+        if ($quoteOnly) {
+            $game = Rounds::advanceIfDue($game, $campaign, $election);
+            send([
+                'ok' => true,
+                'offer' => $campaign->loanOffer(
+                    $game['players'][$playerId],
+                    $amount,
+                    (int) ($game['round'] ?? 1)
+                ),
+                'game' => Lobby::publicView($game, $playerId),
+            ]);
+        }
+
+        $extra = [];
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $amount, &$extra) {
+            if (($g['phase'] ?? '') !== 'election') {
+                throw new LobbyError('You can only borrow during the campaign.', 'not_campaign');
+            }
+            $engine = $GLOBALS['campaign'];
+            [$player, $offer] = $engine->takeLoan(
+                $g['players'][$playerId],
+                $amount,
+                (int) ($g['round'] ?? 1)
+            );
+            if (!$offer['ok']) {
+                throw new LobbyError($offer['error'], 'loan_refused');
+            }
+            $g['players'][$playerId] = $player;
+            $extra = ['offer' => $offer];
+            return $g;
+        }, $extra);
+    }
+
+    /* ----------------------------------------------------------- history */
+    case 'history': {
+        [$game, $playerId] = authenticate($store);
+        $number = (int) input('constituency', 0);
+        if ($number <= 0) {
+            fail('Which constituency?', 400, 'bad_constituency');
+        }
+        // Fifteen full boards is far more than a poll should carry, so a
+        // seat's history is fetched only when somebody opens that seat.
+        send([
+            'ok' => true,
+            'constituency' => $number,
+            'history' => Rounds::seatHistory($game, (string) $number),
+        ]);
     }
 
     /* ------------------------------------------------------------ report */

@@ -10,6 +10,11 @@
  *
  * The screen does not resolve anything itself: it calls opts.play(), which is
  * the local engine in solo and the server in multiplayer.
+ *
+ * A campaign runs for fifteen rounds of sixty seconds. The clock at the top is
+ * the server's in multiplayer, and everything that spends money asks for
+ * confirmation first — the round is short, and a mis-click should not be the
+ * reason a campaign runs out of cash.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -29,7 +34,12 @@ CMP.ui.election = (function () {
     var busy = false;
 
     var statsNode = el('div', { class: 'stat-row stat-row-4' });
+    var projectionNode = el('div', { class: 'projection-slot' });
     var heatNode = el('div', { class: 'heat-card' });
+    var fundingNode = el('div', { class: 'action-grid' });
+    var breakdownNode = el('div', { class: 'breakdown-slot' });
+    var bankSlot = el('div', { class: 'bank-slot' });
+    var moneyNode = el('div', { class: 'money-slot' });
     var targetNode = el('div', { class: 'target-card' });
     var reportNode = el('div', { class: 'report-slot' });
     var safeNode = el('div', { class: 'action-grid' });
@@ -44,18 +54,67 @@ CMP.ui.election = (function () {
     var campaignNode = el('div', { class: 'campaign-slot' });
     var declareNode = el('div', { class: 'declare-slot' });
 
+    var roundView = CMP.ui.round.create({});
+    var summaryNode = el('div', { class: 'summary-slot' });
+
     var root = el('section', { class: 'screen screen-election' }, [
       el('div', { class: 'election-inner' }, [
         headNode,
+        roundView.root,
+        summaryNode,
         statsNode,
+        projectionNode,
         heatNode,
         tabsNode,
         reportNode,
         campaignNode,
+        moneyNode,
         mapNode,
         seatNode,
         oversightNode,
         declareNode,
+      ]),
+    ]);
+
+    // The money tab: where the campaign's cash came from, what is owed, and
+    // the two ways of raising more.
+    var bankView = CMP.ui.bank.create({
+      onBorrow: function (amount) {
+        // Borrowing moves cash and debt, both of which are shown at the top
+        // of the screen, so repaint the whole panel rather than just the bank.
+        return Promise.resolve(opts.borrow(amount)).then(function (res) {
+          if (res && res.ok) render(res.game || game);
+          return res;
+        });
+      },
+      onNotice: function (text) {
+        setNotice(text);
+      },
+    });
+    CMP.ui.dom.mount(bankSlot, [bankView.root]);
+
+    CMP.ui.dom.mount(moneyNode, [
+      el('div', { class: 'lobby-section' }, [
+        el('h2', { class: 'block-title', text: 'Where the money stands' }),
+        breakdownNode,
+      ]),
+      el('div', { class: 'lobby-section' }, [
+        el('div', { class: 'group-head' }, [
+          el('h2', { class: 'block-title', text: 'Bank' }),
+          el('span', {
+            class: 'group-note',
+            text: Math.round(CMP.FINANCE.loan.interestRate * 100) + '% interest, due after ' +
+              CMP.FINANCE.loan.repayAfterRounds + ' rounds.',
+          }),
+        ]),
+        bankSlot,
+      ]),
+      el('div', { class: 'lobby-section' }, [
+        el('div', { class: 'group-head' }, [
+          el('h2', { class: 'block-title', text: 'Raising Funds' }),
+          el('span', { class: 'group-note', text: 'One honest route, one that is not.' }),
+        ]),
+        fundingNode,
       ]),
     ]);
 
@@ -88,6 +147,8 @@ CMP.ui.election = (function () {
     var tab = 'campaign';
     var oversight = null;
     var mapView = null;
+    var seatHistory = {};   // multiplayer: seat number -> fetched history
+    var lastRound = 0;
 
     function setTab(next) {
       tab = next;
@@ -97,6 +158,7 @@ CMP.ui.election = (function () {
     function paintTabs() {
       var tabs = [
         { id: 'campaign', label: 'Campaign' },
+        { id: 'money', label: 'Money' },
         { id: 'map', label: 'Map' },
         { id: 'seat', label: 'Constituency' },
       ];
@@ -117,6 +179,7 @@ CMP.ui.election = (function () {
       );
 
       campaignNode.style.display = tab === 'campaign' ? '' : 'none';
+      moneyNode.style.display = tab === 'money' ? '' : 'none';
       mapNode.style.display = tab === 'map' ? '' : 'none';
       seatNode.style.display = tab === 'seat' ? '' : 'none';
       oversightNode.style.display = tab === 'rivals' ? '' : 'none';
@@ -145,9 +208,55 @@ CMP.ui.election = (function () {
       mapView.render(game, selected);
     }
 
+    /**
+     * The roster, for the candidate table. Multiplayer takes it from the
+     * server view; solo is a roster of one.
+     */
+    function roster() {
+      var view = opts.getServerView && opts.getServerView();
+      if (view && view.players) {
+        return view.players
+          .filter(function (p) {
+            return !p.empty && p.partyId;
+          })
+          .map(function (p) {
+            return { partyId: p.partyId, candidateName: p.candidateName, isYou: p.isYou };
+          });
+      }
+      return [{ partyId: game.partyId, candidateName: game.candidateName, isYou: true }];
+    }
+
+    /**
+     * A seat's round-by-round history. Solo has it locally; multiplayer
+     * fetches it once per seat, because fifteen full boards is far more than
+     * a poll every couple of seconds should be carrying.
+     */
+    function historyFor(number) {
+      if (game.mode !== 'multiplayer') {
+        return (game.history || []).map(function (h) {
+          return { round: h.round, support: h.board[number] };
+        }).filter(function (h) {
+          return !!h.support;
+        });
+      }
+
+      var key = String(number);
+      if (Object.prototype.hasOwnProperty.call(seatHistory, key)) return seatHistory[key];
+
+      seatHistory[key] = [];
+      CMP.net.seatHistory(number).then(function (res) {
+        if (!res.ok) return;
+        seatHistory[String(res.constituency)] = res.history || [];
+        if (tab === 'seat' && Number(selected) === Number(res.constituency)) paintSeatDetail();
+      });
+      return seatHistory[key];
+    }
+
     function paintSeatDetail() {
       mount(seatNode, [
         CMP.ui.constituency.render(game, selected, {
+          players: roster(),
+          history: historyFor(selected),
           footer: el('button', {
             class: 'btn btn-xl',
             type: 'button',
@@ -183,18 +292,40 @@ CMP.ui.election = (function () {
       var serverView = opts.getServerView();
       if (!serverView) return;
 
+      // The campaign ends itself after the last round. This is the host's
+      // option to stop early, so it says so rather than implying the count
+      // will not happen without them.
+      var left = (game.roundsTotal || CMP.ROUNDS.total) - (game.round || 1);
+
       mount(declareNode, [
         el('div', { class: 'declare-block' }, [
+          el('p', { class: 'declare-note', text: left > 0
+            ? left + ' round' + (left === 1 ? '' : 's') + ' left. Polls close automatically after round ' +
+              (game.roundsTotal || CMP.ROUNDS.total) + '.'
+            : 'This is the final round. The count begins when the clock runs out.' }),
           serverView.youAreHost
             ? el('button', {
-                class: 'btn btn-primary btn-xl',
+                class: 'btn btn-quiet',
                 type: 'button',
-                text: 'CLOSE THE POLLS AND COUNT',
+                text: 'Close the polls now',
                 onclick: function () {
-                  if (opts.onDeclare) opts.onDeclare();
+                  CMP.ui.dialog
+                    .confirm({
+                      eyebrow: 'Host',
+                      title: 'End the campaign early?',
+                      body: left > 0
+                        ? 'There are still ' + left + ' rounds to play. Closing now counts the ' +
+                          'seats as they stand, for everybody.'
+                        : 'The seats will be counted as they stand.',
+                      confirmLabel: 'Close the polls',
+                      danger: true,
+                    })
+                    .then(function (yes) {
+                      if (yes && opts.onDeclare) opts.onDeclare();
+                    });
                 },
               })
-            : el('p', { class: 'muted', text: 'The host will close the polls when everyone is done.' }),
+            : null,
         ]),
       ]);
     }
@@ -257,14 +388,51 @@ CMP.ui.election = (function () {
       ]);
     }
 
+    /**
+     * Cash and debt are two separate figures and stay separate. A player
+     * carrying two crore of borrowing is not two crore richer, and the top of
+     * the screen should never suggest otherwise.
+     */
     function paintStats() {
-      var remaining = CMP.campaign.remaining(game);
+      var cash = CMP.campaign.remaining(game);
+      var debt = CMP.campaign.debtOf(game);
+      var due = nextDue();
+
       mount(statsNode, [
-        stat('Election Budget', money.format(game.budget), money.words(game.budget)),
+        stat('Cash in Hand', money.format(cash), money.words(cash), 'stat-remaining'),
         stat('Spent', money.format(game.spent), pctOf(game.spent, game.budget)),
-        stat('Remaining Budget', money.format(remaining), money.words(remaining), 'stat-remaining'),
+        stat(
+          'Debt',
+          debt ? money.format(debt) : '—',
+          due ? 'due end of round ' + due : 'nothing owed',
+          debt ? 'stat-debt' : ''
+        ),
         stat('Seats Led', String(game.seatsWon), 'majority ' + game.majority, 'stat-highlight'),
       ]);
+    }
+
+    /** The round the earliest outstanding loan falls due, if any. */
+    function nextDue() {
+      var rounds = (game.loans || [])
+        .filter(function (l) {
+          return !l.settled;
+        })
+        .map(function (l) {
+          return l.dueRound;
+        });
+      return rounds.length ? Math.min.apply(null, rounds) : null;
+    }
+
+    function paintProjection() {
+      mount(projectionNode, [
+        CMP.ui.round.projection(game, CMP.campaign.seatCounts(game.support)),
+      ]);
+    }
+
+    function paintMoney() {
+      mount(breakdownNode, [CMP.ui.bank.breakdown(game)]);
+      bankView.render(game);
+      mount(fundingNode, CMP.actionsByGroup('funding').map(actionCard));
     }
 
     function pctOf(part, whole) {
@@ -444,7 +612,30 @@ CMP.ui.election = (function () {
                     text: '+' + Math.round(lastReport.heatAfter - lastReport.heatBefore) + ' heat',
                   })
                 : null,
+              lastReport.funds
+                ? el('span', { class: 'delta up', text: money.words(lastReport.funds) + ' in' })
+                : null,
             ]),
+
+            // A costly action moves seats the player did not aim at, so say
+            // which ones — otherwise the board appears to shift on its own.
+            lastReport.reach && lastReport.reach.length
+              ? el('p', {
+                  class: 'report-reach',
+                  text:
+                    'Also felt in ' +
+                    lastReport.reach.length +
+                    (lastReport.reach.length === 1 ? ' other seat: ' : ' other seats: ') +
+                    lastReport.reach
+                      .slice(0, 4)
+                      .map(function (n) {
+                        var d = seatDef(n);
+                        return d ? d.name : '#' + n;
+                      })
+                      .join(', ') +
+                    (lastReport.reach.length > 4 ? ' and others.' : '.'),
+                })
+              : null,
             lastReport.consequence
               ? el('div', { class: 'consequence' }, [
                   el('strong', { text: lastReport.consequence.label }),
@@ -477,9 +668,13 @@ CMP.ui.election = (function () {
         recent.map(function (a) {
           var def = a.constituency ? seatDef(a.constituency) : null;
           return el('div', { class: 'log-row log-' + a.group }, [
+            el('span', { class: 'log-round', text: a.round ? 'R' + a.round : '' }),
             el('span', { class: 'log-action', text: a.label }),
             el('span', { class: 'log-where', text: def ? def.name : '—' }),
-            el('span', { class: 'log-cost', text: money.words(a.cost) }),
+            el('span', {
+              class: 'log-cost',
+              text: a.funds ? '+' + money.words(a.funds) : money.words(a.cost) || '—',
+            }),
             el('span', {
               class: 'log-result ' + (a.support > 0 ? 'up' : a.support < 0 ? 'down' : ''),
               text: a.support ? (a.support > 0 ? '+' : '') + a.support.toFixed(1) + '%' : '—',
@@ -588,6 +783,11 @@ CMP.ui.election = (function () {
 
     /* ------------------------------------------------------ actions */
 
+    /**
+     * Everything that spends money is confirmed first. The dialog states the
+     * cost and what it leaves behind, and for a risky move it says plainly
+     * that the result is not knowable — but never the odds themselves.
+     */
     function runAction(action) {
       if (busy) return;
       var check = CMP.campaign.canPlay(game, action.id, selected);
@@ -595,6 +795,34 @@ CMP.ui.election = (function () {
         setNotice(check.reason);
         return;
       }
+
+      var cash = CMP.campaign.remaining(game);
+      var def = action.needsConstituency ? seatDef(selected) : null;
+      var risky = action.group === 'risky' || action.id === 'underground';
+
+      CMP.ui.dialog
+        .confirm({
+          eyebrow: def ? def.name + ' · #' + def.number : 'Campaign-wide',
+          title: action.label + '?',
+          body: action.blurb,
+          lines: [
+            { label: 'Cost', value: money.words(action.cost) || '₹0' },
+            { label: 'Cash after', value: money.words(Math.max(0, cash - action.cost)) || '₹0', strong: true },
+            { label: 'Risk', value: action.riskLabel },
+            { label: 'Expected effect', value: action.impactLabel },
+          ],
+          note: risky
+            ? 'The result is not certain, and this will raise your political heat.'
+            : null,
+          danger: risky,
+          confirmLabel: 'Go ahead',
+        })
+        .then(function (yes) {
+          if (yes) send(action);
+        });
+    }
+
+    function send(action) {
       busy = true;
       paintActions();
 
@@ -609,6 +837,7 @@ CMP.ui.election = (function () {
           notice = null;
           lastReport = res.report;
           render(res.game || game);
+          paintMoney();
         },
         function () {
           busy = false;
@@ -620,14 +849,23 @@ CMP.ui.election = (function () {
 
     /* ------------------------------------------------------ public */
 
-    function render(next) {
+    function render(next, secondsFromServer) {
       game = next;
       if (selected === null || !game.support[selected]) selected = pickDefaultSeat();
+
+      // A finished round adds a point to every seat's history.
+      if (game.round !== lastRound) {
+        lastRound = game.round;
+        seatHistory = {};
+      }
       paintHead();
+      roundView.render(game, secondsFromServer);
       paintStats();
+      paintProjection();
       paintHeat();
       paintTarget();
       paintActions();
+      paintMoney();
       paintReport();
       paintLog();
       paintTabs();
@@ -638,6 +876,14 @@ CMP.ui.election = (function () {
     return {
       root: root,
       render: render,
+      /** Show what the round just did. Replaces any summary still on screen. */
+      showSummary: function (summary) {
+        var card = CMP.ui.round.summary(game, summary);
+        mount(summaryNode, card ? [card] : []);
+      },
+      stop: function () {
+        roundView.stop();
+      },
       setReport: function (report) {
         lastReport = report;
         paintReport();

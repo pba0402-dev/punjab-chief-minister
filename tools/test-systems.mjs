@@ -32,6 +32,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', 'simple');
 const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/api/index.php';
+const ROUND_SECONDS = 8;
 const DATA = path.join(os.tmpdir(), 'cmp-sys-test-' + Date.now());
 
 let pass = 0;
@@ -51,7 +52,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(DATA, { recursive: true });
 const php = spawn('php', ['-S', '127.0.0.1:' + PORT, '-t', ROOT], {
   cwd: ROOT,
-  env: { ...process.env, CMP_DATA_DIR: DATA },
+  // Short rounds. This suite is about incumbents, investigations and
+  // coalitions rather than the clock, but a round only allows so many moves,
+  // and one check below needs a fresh round rather than a sixty-second wait.
+  // Eight seconds is short enough to wait for and long enough that no section
+  // here runs out of campaign underneath itself.
+  env: { ...process.env, CMP_DATA_DIR: DATA, CMP_ROUND_SECONDS: String(ROUND_SECONDS) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 process.on('exit', () => {
@@ -133,12 +139,16 @@ const view1 = g1.started.game;
 check('the election starts', view1.phase === 'election');
 
 const me1 = view1.players.find((p) => p.isYou);
-check('the board is dealt', Object.keys(me1.support).length === 117);
+check('the board is dealt', Object.keys(view1.board).length === 117);
+check('and it is one board everyone shares', !me1.support,
+  'players should not carry their own copy');
+check('the round clock has started', view1.round === 1 && view1.secondsLeft > 0,
+  'round ' + view1.round + ', ' + view1.secondsLeft + 's left');
 
 // The party holding a seat should usually lead it at the start.
 let holderLeads = 0;
 for (const seat of inc) {
-  const s = me1.support[String(seat.number)];
+  const s = view1.board[String(seat.number)];
   const leader = Object.entries(s).sort((a, b) => b[1] - a[1])[0][0];
   const holder = ['aap', 'inc', 'bjp', 'sad'].includes(seat.party.toLowerCase())
     ? seat.party.toLowerCase()
@@ -151,7 +161,7 @@ for (const seat of inc) {
 const holderCounts = [holderLeads];
 for (let s = 0; s < 7; s++) {
   const gx = await startGame(['aap', 'inc', 'bjp', 'sad']);
-  const board = gx.started.game.players.find((p) => p.isYou).support;
+  const board = gx.started.game.board;
   let n = 0;
   for (const seat of inc) {
     const row = board[String(seat.number)];
@@ -220,74 +230,69 @@ console.log('     finding: ' + acc2.investigations[0].outcomeLabel);
 check('the evidence score is never sent to clients',
   !JSON.stringify(r2.game).includes('"evidence"'));
 
-/* --------------------------------------------- an innocent player */
+/* ------------------------------------------- reports are not verdicts */
 
 section('Reports are not verdicts');
-let cleared = 0;
-let convicted = 0;
-for (let i = 0; i < 24; i++) {
-  const g = await startGame(['aap', 'inc', 'bjp', 'sad']);
-  const target = g.started.game.players.find((p) => p.slot === 4).id;
-  // Three reporters, but the accused has done nothing at all.
-  await J('report', { ...g.creds[0], accusedId: target, reason: 'other' });
-  await J('report', { ...g.creds[1], accusedId: target, reason: 'other' });
-  const res = await J('report', { ...g.creds[2], accusedId: target, reason: 'other' });
-  const acc = res.game.players.find((p) => p.id === target);
-  const last = (acc.investigations || []).slice(-1)[0];
-  if (last && last.outcomeId === 'cleared') cleared++;
-  else convicted++;
-}
-console.log('     clean player, ganged up on: ' + cleared + ' cleared / ' + convicted + ' penalised of 24');
-check('a clean player is often cleared despite reports', cleared >= 8, cleared + ' of 24');
-check('but reporting is not pointless either', convicted >= 1, convicted + ' of 24');
-check('a clean player is never disqualified outright',
-  true, 'checked below');
 
-/* ------------------------------------------------ a guilty player */
+/*
+ * How the evidence score shifts the odds is sampled in test-campaign.mjs,
+ * which can put a player in any state it likes and take hundreds of samples in
+ * the time three HTTP round-trips take here. What is worth checking through
+ * the real API is that the whole path works: three reports open an inquiry, a
+ * finding comes back, and the score behind it never leaves the server.
+ */
+const gv = await startGame(['aap', 'inc', 'bjp', 'sad']);
+const clean = gv.started.game.players.find((p) => p.slot === 4).id;
+await J('report', { ...gv.creds[0], accusedId: clean, reason: 'other' });
+await J('report', { ...gv.creds[1], accusedId: clean, reason: 'other' });
+const verdictRes = await J('report', { ...gv.creds[2], accusedId: clean, reason: 'other' });
+const accV = verdictRes.game.players.find((p) => p.id === clean);
+const finding = (accV.investigations || []).slice(-1)[0];
 
-section('Evidence shifts the odds');
-let dirtyCleared = 0;
-let dirtyPenalised = 0;
-for (let i = 0; i < 24; i++) {
-  const g = await startGame(['aap', 'inc', 'bjp', 'sad']);
-  const target = g.started.game.players.find((p) => p.slot === 4).id;
-  const tc = g.creds[3];
-  // This one has been running very hot.
-  for (let k = 0; k < 6; k++) {
-    await J('campaign', { ...tc, actionId: 'deal', constituency: 10 + k });
-  }
-  await J('report', { ...g.creds[0], accusedId: target, reason: 'influence' });
-  const res = await J('report', { ...g.creds[1], accusedId: target, reason: 'spending' });
-  const acc = res.game.players.find((p) => p.id === target);
-  const last = (acc.investigations || []).slice(-1)[0];
-  if (last && last.outcomeId === 'cleared') dirtyCleared++;
-  else dirtyPenalised++;
-}
-console.log('     player with six risky actions: ' + dirtyCleared + ' cleared / ' + dirtyPenalised + ' penalised of 24');
-check('a player who has been reckless is penalised more often than a clean one',
-  dirtyPenalised > convicted, dirtyPenalised + ' vs ' + convicted);
-check('even so, they are sometimes cleared', dirtyCleared >= 1, dirtyCleared + ' of 24');
+check('an inquiry opened and resolved', !!finding, JSON.stringify(accV.investigations || []));
+check('the finding has a label a player can read', !!(finding && finding.outcomeLabel));
+check('the finding explains itself', !!(finding && finding.text && finding.text.length > 10));
+check('it records how many reports stood', finding && finding.reports >= 2, String(finding && finding.reports));
+check('a clean player is not automatically guilty',
+  !finding.disqualified, finding.outcomeId);
+check('the evidence score never leaves the server',
+  !JSON.stringify(verdictRes.game).includes('evidence'));
 
 /* ------------------------------------------------------- fines */
 
-section('Fines and budgets');
+section('Fines come out of cash');
 const gf = await startGame(['aap', 'inc', 'bjp', 'sad']);
 const poorId = gf.started.game.players.find((p) => p.slot === 4).id;
 const poor = gf.creds[3];
-// Spend almost everything, so any fine exceeds what is left.
-let guard = 0;
-while (guard++ < 60) {
+
+// A round allows a fixed number of moves, so this spends what one round
+// allows rather than emptying the purse in a burst. The case where a fine
+// exceeds what is in hand is covered deterministically in test-campaign.mjs,
+// which can put a player on any balance it likes; what matters here is that
+// the whole path through the real API keeps cash out of the negative.
+const capPerRound = 3;
+let spendGuard = 0;
+let refusal = null;
+while (spendGuard++ < capPerRound + 2) {
   const res = await J('campaign', { ...poor, actionId: 'lastpush', constituency: 20 });
-  if (!res.ok) break;
+  if (!res.ok) {
+    refusal = res.error;
+    break;
+  }
 }
 const before = (await G('state', poor)).game.players.find((p) => p.isYou);
-check('the purse is nearly empty', before.remaining < 2500000, '₹' + before.remaining);
+check('a round allows only so many moves', /No moves left this round/.test(refusal || ''), refusal);
+check('spending it moved real money', before.cash < before.budget, '₹' + before.cash);
 
 await J('report', { ...gf.creds[0], accusedId: poorId, reason: 'spending' });
 await J('report', { ...gf.creds[1], accusedId: poorId, reason: 'rules' });
 const after = (await G('state', poor)).game.players.find((p) => p.isYou);
-check('the budget never goes negative', after.remaining >= 0, String(after.remaining));
-check('spending never exceeds the budget', after.spent <= after.budget, after.spent + ' of ' + after.budget);
+check('cash never goes negative', after.cash >= 0, String(after.cash));
+check('a fine is taken from cash in hand', after.finesPaid <= before.cash,
+  after.finesPaid + ' fined against ' + before.cash + ' held');
+check('spending never exceeds what came in',
+  after.spent <= after.budget + after.borrowed + after.granted + after.raised,
+  after.spent + ' of ' + after.budget);
 
 /* --------------------------------------------------- restriction */
 
@@ -300,7 +305,9 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
   const g = await startGame(['aap', 'inc', 'bjp', 'sad']);
   const tid = g.started.game.players.find((p) => p.slot === 4).id;
   const tc = g.creds[3];
-  for (let k = 0; k < 7; k++) await J('campaign', { ...tc, actionId: 'deal', constituency: 30 + k });
+  // Three risky moves is a full round's allowance, and enough heat to make a
+  // restriction one of the likelier findings.
+  for (let k = 0; k < 3; k++) await J('campaign', { ...tc, actionId: 'deal', constituency: 30 + k });
   await J('report', { ...g.creds[0], accusedId: tid, reason: 'influence' });
   const res = await J('report', { ...g.creds[1], accusedId: tid, reason: 'influence' });
   const acc = res.game.players.find((p) => p.id === tid);
@@ -311,8 +318,16 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
     const blocked = await J('campaign', { ...tc, actionId: 'deal', constituency: 50 });
     check('a restricted player cannot use risky strategies', blocked.ok === false, blocked.error);
     check('the reason explains the restriction', /restriction/i.test(blocked.error || ''), blocked.error);
+    // The risky moves above used this round's allowance, so wait for the next
+    // round before checking that safe campaigning is still open to them —
+    // otherwise the refusal would be about moves, not about the restriction.
+    await sleep((ROUND_SECONDS + 2) * 1000);
     const safe = await J('campaign', { ...tc, actionId: 'outreach', constituency: 50 });
     check('but safe campaigning still works', safe.ok === true, safe.error);
+    const stillBlocked = await J('campaign', { ...tc, actionId: 'deal', constituency: 51 });
+    check('and the restriction outlives the round it started in',
+      stillBlocked.ok === false && /restriction/i.test(stillBlocked.error || ''),
+      stillBlocked.error);
   }
 }
 check('a campaign restriction can be imposed', restrictedSeen,

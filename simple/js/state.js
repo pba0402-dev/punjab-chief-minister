@@ -6,13 +6,17 @@
  *
  * Every player starts on the same budget from the config — it is never
  * entered by hand, and nothing here hard-codes the amount.
+ *
+ * Cash and debt are separate numbers throughout. Cash is what can be spent and
+ * never goes below zero; a loan puts money into cash but leaves a repayment
+ * standing, so a campaign can look well funded and still be in trouble.
  */
 window.CMP = window.CMP || {};
 
 CMP.state = (function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
 
   /** A blank campaign, before the player has filled anything in. */
   function create() {
@@ -24,8 +28,21 @@ CMP.state = (function () {
       candidateName: '',
       slogan: '',
 
+      // Money. budget is the opening grant and never changes; cash is what
+      // is actually in hand right now.
       budget: CMP.STARTING_BUDGET,
+      cash: CMP.STARTING_BUDGET,
       spent: 0,
+      borrowed: 0,
+      repaid: 0,
+      interestPaid: 0,
+      granted: 0,
+      raised: 0,
+      finesPaid: 0,
+      loans: [],
+      defaults: 0,
+      borrowingBlocked: false,
+
       heat: 0,
 
       seatsWon: 0,
@@ -37,6 +54,22 @@ CMP.state = (function () {
       incumbency: {},
       // Every action taken, newest last.
       actions: [],
+
+      // The round clock. In solo play the deadline is a local timestamp;
+      // multiplayer takes its clock from the server instead.
+      round: 1,
+      roundsTotal: CMP.ROUNDS.total,
+      roundSeconds: CMP.ROUNDS.seconds,
+      roundEndsAt: 0,
+      roundSpent: 0,
+      roundGained: 0,
+      roundActions: 0,
+      roundOpen: null,
+      summary: null,
+
+      // One snapshot of the whole board per round, so a constituency can show
+      // how its race moved rather than only where it ended up.
+      history: [],
 
       turn: 1,
       seed: null,
@@ -134,6 +167,7 @@ CMP.state = (function () {
     game.screen = 'election';
     seedSupport(game);
     game.seatsWon = CMP.campaign.seatsLed(game);
+    CMP.campaign.beginRound(game, 1);
     game.updatedAt = Date.now();
     return game;
   }
@@ -146,6 +180,8 @@ CMP.state = (function () {
       game.partyId &&
       CMP.getParty(game.partyId) &&
       typeof game.spent === 'number' &&
+      typeof game.cash === 'number' &&
+      typeof game.round === 'number' &&
       typeof game.heat === 'number' &&
       game.support &&
       typeof game.support === 'object'

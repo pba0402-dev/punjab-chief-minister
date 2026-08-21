@@ -19,6 +19,9 @@ CMP.app = (function () {
   var electionView = null; // live CMP.ui.election instance while campaigning
   var resultView = null; // live CMP.ui.result instance once the polls close
   var serverView = null; // the latest lobby/game view from the server
+  var paintedScreen = null; // the screen the page is currently showing
+  var soloTimer = null;  // solo round clock; multiplayer takes the server's
+  var shownRound = 0;    // the last round we showed a summary for
 
   function mount(node) {
     root = node;
@@ -32,6 +35,123 @@ CMP.app = (function () {
     game = next;
     if (game && (!options || options.save !== false)) CMP.storage.save(game);
     paint();
+  }
+
+  /* ------------------------------------------------------ the round clock */
+
+  /**
+   * Seconds left in the round, as the server sees it. Multiplayer defers to
+   * the server entirely; solo returns undefined so the panel uses its own
+   * local deadline instead.
+   */
+  function secondsFromServer() {
+    if (!game || game.mode !== 'multiplayer' || !serverView) return undefined;
+    return typeof serverView.secondsLeft === 'number' ? serverView.secondsLeft : undefined;
+  }
+
+  /**
+   * Solo has no server to end its rounds, so the shell watches the local
+   * deadline and runs the same pipeline the server would.
+   */
+  function startSoloClock() {
+    if (soloTimer !== null) return;
+    soloTimer = window.setInterval(function () {
+      if (!game || game.mode === 'multiplayer' || screen !== 'election') return;
+      if (CMP.campaign.secondsLeft(game) > 0) return;
+
+      var res = CMP.campaign.endRound(game);
+      CMP.storage.save(game);
+
+      if (res.finished) {
+        finishSoloElection();
+        return;
+      }
+      if (electionView) {
+        electionView.render(game);
+        showSummary(game.summary);
+      }
+    }, 500);
+  }
+
+  function stopSoloClock() {
+    if (soloTimer !== null) {
+      window.clearInterval(soloTimer);
+      soloTimer = null;
+    }
+  }
+
+  /** One summary per round, and never the same round twice. */
+  function showSummary(summary) {
+    if (!summary || summary.round === shownRound) return;
+    shownRound = summary.round;
+    if (electionView) electionView.showSummary(summary);
+  }
+
+  /**
+   * Solo reached the end of round fifteen: count the seats.
+   *
+   * The result screen was built for multiplayer and reads a server view, so
+   * solo hands it the same shape rather than growing a second renderer. There
+   * is no coalition offer here — there is nobody to negotiate with.
+   */
+  function finishSoloElection() {
+    game.result = CMP.campaign.runElection(game);
+    game.screen = 'result';
+    CMP.storage.save(game);
+    stopSoloClock();
+
+    serverView = {
+      code: null,
+      phase: game.result.outcome === 'majority' ? 'government' : 'hung',
+      solo: true,
+      round: game.round,
+      roundsTotal: game.roundsTotal,
+      result: game.result,
+      coalition: null,
+      possibleCoalitions: [],
+      players: [
+        {
+          empty: false,
+          id: 'solo',
+          slot: 1,
+          isYou: true,
+          partyId: game.partyId,
+          candidateName: game.candidateName,
+          slogan: game.slogan,
+          seatsLed: game.seatsWon,
+          cash: game.cash,
+          spent: game.spent,
+          heat: game.heat,
+        },
+      ],
+    };
+
+    electionView = null;
+    resultView = null;
+    screen = 'result';
+    paint();
+  }
+
+  /* ------------------------------------------------------ borrowing */
+
+  /**
+   * Take a loan. Solo settles it locally; multiplayer asks the server, which
+   * re-checks the terms — a client cannot lend itself money.
+   */
+  function borrow(amount) {
+    if (game && game.mode === 'multiplayer') {
+      return CMP.net.takeLoan(amount).then(function (res) {
+        if (!res.ok) return { ok: false, reason: res.error };
+        var mine = mineFrom(res.game);
+        if (mine) applyServerPlayer(mine);
+        return { ok: true, game: game };
+      });
+    }
+
+    var offer = CMP.campaign.takeLoan(game, amount);
+    if (!offer.ok) return Promise.resolve({ ok: false, reason: offer.error });
+    CMP.storage.save(game);
+    return Promise.resolve({ ok: true, game: game });
   }
 
   /* ------------------------------------------------------ lobby wiring */
@@ -121,11 +241,11 @@ CMP.app = (function () {
     if (!res.ok || !game || game.mode !== 'multiplayer') return;
     serverView = res.game;
 
-    // The incumbency map is the same board for everybody.
-    if (res.game.incumbency) game.incumbency = res.game.incumbency;
+    applyServerGame(res.game);
 
     var mine = mineFrom(res.game);
     if (mine) applyServerPlayer(mine);
+
 
     // The host closing the polls moves everyone to the result together.
     if (res.game.phase === 'hung' || res.game.phase === 'government') {
@@ -139,7 +259,13 @@ CMP.app = (function () {
       return;
     }
 
-    if (screen === 'election' && electionView) electionView.render(game);
+    if (screen === 'election' && electionView) {
+      electionView.render(game, secondsFromServer());
+
+      // The server ends rounds, not us. When a round it finished shows up in
+      // our own record, that is the cue to say what it did.
+      if (mine && mine.summary) showSummary(mine.summary);
+    }
   }
 
   /** Host only: close the polls. The poll then carries everyone to the result. */
@@ -159,9 +285,9 @@ CMP.app = (function () {
   }
 
   /**
-   * The host pressed start. Version 1 hands every player the same election
-   * screen built from their own lobby entry; the shared campaign itself is
-   * the next version's job.
+   * The host pressed start. Everyone lands on the same board with the same
+   * round clock; what differs per player is their party, their money and
+   * what they choose to do with it.
    */
   function startMultiplayerElection(view) {
     var mine = null;
@@ -179,8 +305,9 @@ CMP.app = (function () {
     mp.slogan = mine.slogan;
     mp.screen = 'election';
     game = mp; // the server is the source of truth; nothing is saved locally
-    if (view.incumbency) game.incumbency = view.incumbency;
+    applyServerGame(view);
     applyServerPlayer(mine);
+    serverView = view;
     electionView = null;
     screen = 'election';
     paint();
@@ -202,14 +329,16 @@ CMP.app = (function () {
             goTo('home');
           },
           play: playAction,
+          borrow: borrow,
           getServerView: function () {
             return serverView;
           },
           onDeclare: declareResult,
         });
       }
-      electionView.render(game);
+      electionView.render(game, secondsFromServer());
       view = electionView.root;
+      if (game.mode !== 'multiplayer') startSoloClock();
     } else if (screen === 'result') {
       if (!resultView) {
         resultView = CMP.ui.result.create({
@@ -271,12 +400,24 @@ CMP.app = (function () {
 
     CMP.ui.dom.mount(root, [view]);
     document.body.dataset.screen = screen;
-    window.scrollTo(0, 0);
+
+    // Only on a genuine change of screen. The result screen repaints as
+    // coalition talks move, and jumping the page to the top each time would
+    // throw the reader out of whatever they were reading.
+    if (screen !== paintedScreen) {
+      paintedScreen = screen;
+      if (window.scrollTo) window.scrollTo(0, 0);
+    }
   }
 
   function goTo(name) {
     if (name !== 'lobby') stopLobby();
-    if (name !== 'election') electionView = null;
+    if (name !== 'election') {
+      stopSoloClock();
+      if (electionView) electionView.stop();
+      electionView = null;
+      shownRound = 0;
+    }
     if (name !== 'result') resultView = null;
     if (name !== 'election' && name !== 'result') {
       CMP.net.stopPolling(onElectionUpdate);
@@ -306,7 +447,7 @@ CMP.app = (function () {
     if (!res.ok) return { ok: false, reason: res.reason };
     game.seatsWon = CMP.campaign.seatsLed(game);
     CMP.storage.save(game);
-    return { ok: true, report: res.report, game: game };
+    return Promise.resolve({ ok: true, report: res.report, game: game });
   }
 
   function mineFrom(view) {
@@ -317,15 +458,39 @@ CMP.app = (function () {
     return null;
   }
 
-  /** Copy the server's authoritative figures onto the local view object. */
+  /**
+   * Copy the server's authoritative figures onto the local view object.
+   * Money, heat and the loan book are the server's word — the client never
+   * computes any of them for itself in multiplayer.
+   */
   function applyServerPlayer(mine) {
     if (!game || !mine) return;
     game.budget = mine.budget;
+    game.cash = mine.cash;
     game.spent = mine.spent;
+    game.borrowed = mine.borrowed;
+    game.repaid = mine.repaid;
+    game.interestPaid = mine.interestPaid;
+    game.granted = mine.granted;
+    game.raised = mine.raised;
+    game.finesPaid = mine.finesPaid;
+    game.defaults = mine.defaults;
+    game.borrowingBlocked = !!mine.borrowingBlocked;
     game.heat = mine.heat;
     game.seatsWon = mine.seatsLed;
-    if (mine.support) game.support = mine.support;
+    game.roundActions = mine.roundActions || 0;
+    if (mine.loans) game.loans = mine.loans;
     if (mine.actions) game.actions = mine.actions;
+  }
+
+  /** The shared board and the round clock, straight from the server. */
+  function applyServerGame(view) {
+    if (!game || !view) return;
+    if (view.board && typeof view.board === 'object') game.support = view.board;
+    if (view.incumbency) game.incumbency = view.incumbency;
+    game.round = view.round || 1;
+    game.roundsTotal = view.roundsTotal || CMP.ROUNDS.total;
+    game.roundSeconds = view.roundSeconds || CMP.ROUNDS.seconds;
   }
 
   function lastServerReport(mine) {

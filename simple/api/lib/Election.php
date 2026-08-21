@@ -5,10 +5,11 @@
  * Counts all 117 seats, decides whether anyone has a majority, and if not
  * opens the door to coalition talks.
  *
- * In multiplayer every player has been campaigning on their own copy of the
- * board, so the count merges them: for each seat, each party's support is
- * taken from the player who plays that party, and seats nobody plays keep the
- * baseline. That way one player's rally in Moga shows up in everybody's result.
+ * Every player campaigns on one shared board, so there is nothing to merge at
+ * the count: the standing in each seat on election morning is the standing all
+ * four players have been watching all game. What the count adds is noise, so a
+ * narrow lead is never a certainty, and the rule that a disqualified player
+ * wins nothing.
  */
 declare(strict_types=1);
 
@@ -24,18 +25,13 @@ final class Election
     }
 
     /**
-     * Merge every player's board into one, then decide each seat.
+     * Decide all 117 seats from the shared board.
      * Returns the full result: per-seat winners, party totals, and the verdict.
      */
     public function run(array $game): array
     {
-        $seatNumbers = [];
-        foreach ($game['players'] as $p) {
-            foreach (array_keys($p['support'] ?? []) as $k) {
-                $seatNumbers[$k] = true;
-            }
-        }
-        $seatNumbers = array_keys($seatNumbers);
+        $board = Rounds::boardOf($game);
+        $seatNumbers = array_map('intval', array_keys($board));
         sort($seatNumbers, SORT_NUMERIC);
 
         // Which player is playing which party.
@@ -56,7 +52,7 @@ final class Election
         }
 
         foreach ($seatNumbers as $number) {
-            $merged = $this->mergeSeat($game, $byParty, (string) $number);
+            $merged = $board[(string) $number];
 
             // A little noise, so a narrow lead is never a certainty.
             $final = [];
@@ -100,36 +96,6 @@ final class Election
         }
 
         return $this->verdict($game, $perSeat, $totals, $byParty);
-    }
-
-    /**
-     * One seat's support, taken from whoever is playing each party.
-     * Parties nobody plays fall back to the baseline board.
-     */
-    private function mergeSeat(array $game, array $byParty, string $number): array
-    {
-        $merged = [];
-        $fallback = null;
-
-        foreach ($game['players'] as $p) {
-            if (isset($p['support'][$number])) {
-                $fallback = $p['support'][$number];
-                break;
-            }
-        }
-        if ($fallback === null) {
-            return [];
-        }
-
-        foreach (Lobby::GAME_PARTIES as $party) {
-            if (isset($byParty[$party])) {
-                $owner = $game['players'][$byParty[$party]];
-                $merged[$party] = (float) ($owner['support'][$number][$party] ?? $fallback[$party] ?? 0);
-            } else {
-                $merged[$party] = (float) ($fallback[$party] ?? 0);
-            }
-        }
-        return $merged;
     }
 
     /** Turn seat totals into a government, a hung assembly, or neither. */

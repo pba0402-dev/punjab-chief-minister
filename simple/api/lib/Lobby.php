@@ -28,11 +28,27 @@ final class Lobby
         return [
             'id' => bin2hex(random_bytes(16)),
             'code' => $code,
-            'phase' => 'lobby', // lobby | election
+            'phase' => 'lobby', // lobby | election | counting | hung | government
             'maxPlayers' => self::MAX_PLAYERS,
             'minPlayers' => self::MIN_PLAYERS,
             'hostId' => null,
             'turn' => 0,
+
+            // The round clock. roundStartedAt is a server timestamp and every
+            // response carries the server's own time, so a client works out
+            // the seconds left from those two rather than trusting its own
+            // clock. A refresh mid-round therefore lands on the right second.
+            'round' => 0,
+            'roundStartedAt' => 0,
+            'roundEndsAt' => 0,
+
+            // One board, shared. Every player campaigns on the same map and
+            // sees the same leaders, which is the whole point of playing in
+            // the same room. What stays private is money, heat and what each
+            // player actually did.
+            'board' => (object) [],
+            'history' => [],
+            'roundLog' => [],
             'players' => [],
             'incumbency' => (object) [],
             'result' => null,
@@ -56,13 +72,29 @@ final class Lobby
 
             // Every player is granted the same purse. It is never entered by
             // hand, and it is theirs alone — nothing is pooled.
+            //
+            // Cash and debt are deliberately separate numbers. Cash is what
+            // can be spent and may never go below zero; borrowed money lands
+            // in cash but leaves a repayment standing against the player, so
+            // a rich-looking campaign can still be a campaign in trouble.
             'budget' => $startingBudget,
+            'cash' => $startingBudget,
             'spent' => 0,
+            'borrowed' => 0,
+            'repaid' => 0,
+            'interestPaid' => 0,
+            'granted' => 0,
+            'raised' => 0,
+            'finesPaid' => 0,
+            'loans' => [],
+            'defaults' => 0,
+
             'heat' => 0,
-            'support' => (object) [],
             'actions' => [],
+            'roundActions' => 0,
             'rollCount' => 0,
             'seatsLed' => 0,
+            'summary' => null,
 
             'ready' => false,
             'joinedAt' => $now,
@@ -185,6 +217,44 @@ final class Lobby
         return null;
     }
 
+    /** Everything a player still owes, principal and interest together. */
+    public static function debtOf(array $player): int
+    {
+        $owed = 0;
+        foreach (($player['loans'] ?? []) as $loan) {
+            if (empty($loan['settled'])) {
+                $owed += (int) $loan['repay'];
+            }
+        }
+        return $owed;
+    }
+
+    /**
+     * Seats currently led, per party. Everyone sees the same figures because
+     * everyone is looking at the same board.
+     */
+    public static function seatCounts(array $board): array
+    {
+        $counts = [];
+        foreach (self::GAME_PARTIES as $id) {
+            $counts[$id] = 0;
+        }
+        foreach ($board as $seat) {
+            $best = null;
+            $bestId = null;
+            foreach ($seat as $pid => $v) {
+                if ($best === null || $v > $best) {
+                    $best = $v;
+                    $bestId = $pid;
+                }
+            }
+            if ($bestId !== null) {
+                $counts[$bestId] = ($counts[$bestId] ?? 0) + 1;
+            }
+        }
+        return $counts;
+    }
+
     /**
      * The view sent to clients. Strips secrets, adds derived fields, and pads
      * the roster out to four slots so the lobby can show empty seats.
@@ -215,11 +285,29 @@ final class Lobby
                 'partyId' => $p['partyId'],
                 'candidateName' => $p['candidateName'],
                 'slogan' => $p['slogan'],
+                // Money, broken down. Cash and debt are separate numbers and
+                // stay separate all the way to the screen — a player carrying
+                // two crore of borrowing should never see it dressed up as
+                // two crore of budget.
                 'budget' => (int) ($p['budget'] ?? 0),
+                'cash' => (int) ($p['cash'] ?? 0),
                 'spent' => (int) ($p['spent'] ?? 0),
-                'remaining' => max(0, (int) ($p['budget'] ?? 0) - (int) ($p['spent'] ?? 0)),
+                'remaining' => (int) ($p['cash'] ?? 0),
+                'borrowed' => (int) ($p['borrowed'] ?? 0),
+                'repaid' => (int) ($p['repaid'] ?? 0),
+                'interestPaid' => (int) ($p['interestPaid'] ?? 0),
+                'granted' => (int) ($p['granted'] ?? 0),
+                'raised' => (int) ($p['raised'] ?? 0),
+                'finesPaid' => (int) ($p['finesPaid'] ?? 0),
+                'debt' => self::debtOf($p),
+                'loanCount' => count(array_filter(
+                    $p['loans'] ?? [],
+                    static fn($l) => empty($l['settled'])
+                )),
+                'defaults' => (int) ($p['defaults'] ?? 0),
                 'heat' => (float) ($p['heat'] ?? 0),
                 'seatsLed' => (int) ($p['seatsLed'] ?? 0),
+                'roundActions' => (int) ($p['roundActions'] ?? 0),
                 'ready' => (bool) $p['ready'],
                 'complete' => self::playerIsComplete($p),
 
@@ -235,18 +323,51 @@ final class Lobby
                 'youReported' => $viewerId !== null
                     && isset($p['record']['reportsAgainst'][$viewerId]),
             ];
-            // Only ever ship a player their own board and their own history.
+            // The board is shared, but what a player did to it is not. Only
+            // ever ship a player their own action log, their own loans and
+            // their own round summary — a rival's secret spending stays
+            // secret, which is the point of playing risky moves at all.
             if ($isYou) {
-                $entry['support'] = $p['support'] ?? (object) [];
                 $entry['actions'] = array_slice($p['actions'] ?? [], -12);
+                $entry['loans'] = array_values(array_filter(
+                    $p['loans'] ?? [],
+                    static fn($l) => empty($l['settled'])
+                ));
+                $entry['loanHistory'] = $p['loans'] ?? [];
+                $entry['summary'] = $p['summary'] ?? null;
+                $entry['borrowingBlocked'] = !empty($p['borrowingBlocked']);
             }
             $slots[] = $entry;
         }
+
+        $board = $game['board'] ?? [];
+        $board = is_array($board) ? $board : (array) $board;
+        $seats = self::seatCounts($board);
 
         return [
             'code' => $game['code'],
             'phase' => $game['phase'],
             'turn' => (int) $game['turn'],
+
+            // The clock, as the server sees it. Clients work out the seconds
+            // remaining from serverNow and roundEndsAt rather than from their
+            // own clock, so a machine set to the wrong time still plays the
+            // same round as everybody else.
+            'round' => (int) ($game['round'] ?? 0),
+            'roundsTotal' => (int) ($game['roundsTotal'] ?? 0),
+            'roundSeconds' => (int) ($game['roundSeconds'] ?? 0),
+            'roundStartedAt' => (int) ($game['roundStartedAt'] ?? 0),
+            'roundEndsAt' => (int) ($game['roundEndsAt'] ?? 0),
+            'secondsLeft' => max(0, (int) ($game['roundEndsAt'] ?? 0) - $now),
+            'serverNow' => $now,
+
+            // One board, seen by everyone.
+            'board' => $board ?: (object) [],
+            'projected' => $seats,
+            'seatTrend' => array_map(
+                static fn($h) => ['round' => (int) $h['round'], 'seats' => $h['seats']],
+                $game['history'] ?? []
+            ),
             'maxPlayers' => self::MAX_PLAYERS,
             'minPlayers' => self::MIN_PLAYERS,
             'playerCount' => count($game['players']),

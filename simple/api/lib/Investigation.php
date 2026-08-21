@@ -158,10 +158,16 @@ final class Investigation
         $outcome = $this->pickOutcome($evidence, $reports, $rolls['outcome']);
 
         // Announcing an investigation costs a little support on its own.
+        $board = Rounds::boardOf($game);
         $reaction = $this->config['publicReaction']['opened'];
-        $player = $this->applySupportHit($player, (float) $reaction['support'], (int) $reaction['seats']);
+        [$player, $board] = $this->applySupportHit(
+            $player,
+            $board,
+            (float) $reaction['support'],
+            (int) $reaction['seats']
+        );
 
-        [$player, $applied] = $this->applyOutcome($player, $outcome, $game);
+        [$player, $board, $applied] = $this->applyOutcome($player, $board, $outcome, $game);
 
         $record = [
             'id' => bin2hex(random_bytes(6)),
@@ -189,7 +195,15 @@ final class Investigation
         $player['record']['reportsAgainst'] = [];
 
         $game['players'][$accusedId] = $player;
+        $game['board'] = $board;
         $game['lastInvestigation'] = $record;
+
+        // Leaders moved, so everyone's projected seats moved with them.
+        $counts = $this->campaign->seatCounts($board);
+        foreach ($game['players'] as $pid => $p) {
+            $party = (string) ($p['partyId'] ?? '');
+            $game['players'][$pid]['seatsLed'] = $party === '' ? 0 : (int) ($counts[$party] ?? 0);
+        }
 
         return [$game, $record];
     }
@@ -224,30 +238,39 @@ final class Investigation
     }
 
     /** Apply a finding: money, heat, support, restriction, disqualification. */
-    private function applyOutcome(array $player, array $outcome, array $game): array
+    private function applyOutcome(array $player, array $board, array $outcome, array $game): array
     {
         $applied = ['fine' => 0, 'restrictTurns' => 0, 'disqualified' => false, 'note' => ''];
 
         if (!empty($outcome['fine'])) {
             $fine = (int) $outcome['fine'];
-            $remaining = $this->campaign->remaining($player);
+            $cash = (int) ($player['cash'] ?? 0);
 
-            if ($fine <= $remaining) {
-                // Fines come straight out of what is left to spend.
-                $player['spent'] = (int) $player['spent'] + $fine;
+            if ($fine <= $cash) {
+                // A fine is paid out of actual cash in hand, not out of an
+                // abstract allowance. Borrowed money is cash like any other,
+                // so a campaign running on credit can still be fined.
+                $player['cash'] = $cash - $fine;
+                $player['finesPaid'] = (int) ($player['finesPaid'] ?? 0) + $fine;
                 $applied['fine'] = $fine;
             } else {
-                // Never let a budget go negative: take what there is, then
-                // convert the shortfall into a different penalty.
-                $player['spent'] = (int) $player['budget'];
-                $applied['fine'] = $remaining;
+                // Never let cash go negative: take what there is, then convert
+                // the shortfall into a different penalty.
+                $player['cash'] = 0;
+                $player['finesPaid'] = (int) ($player['finesPaid'] ?? 0) + $cash;
+                $applied['fine'] = $cash;
                 $fallback = $this->config['insufficientFunds'];
                 $player['record']['restrictedUntilTurn'] = max(
                     (int) $player['record']['restrictedUntilTurn'],
                     (int) ($game['turn'] ?? 1) + (int) $fallback['restrictTurns']
                 );
                 $applied['restrictTurns'] = (int) $fallback['restrictTurns'];
-                $player = $this->applySupportHit($player, (float) $fallback['support'], (int) $fallback['seats']);
+                [$player, $board] = $this->applySupportHit(
+                    $player,
+                    $board,
+                    (float) $fallback['support'],
+                    (int) $fallback['seats']
+                );
                 $applied['note'] = $fallback['text'];
             }
         }
@@ -271,47 +294,53 @@ final class Investigation
         }
 
         if (!empty($outcome['support'])) {
-            $player = $this->applySupportHit($player, (float) $outcome['support'], (int) ($outcome['seats'] ?? 3));
+            [$player, $board] = $this->applySupportHit(
+                $player,
+                $board,
+                (float) $outcome['support'],
+                (int) ($outcome['seats'] ?? 3)
+            );
         }
 
-        return [$player, $applied];
+        return [$player, $board, $applied];
     }
 
     /** Move the player's support in their most contested seats. */
-    private function applySupportHit(array $player, float $delta, int $seats): array
+    private function applySupportHit(array $player, array $board, float $delta, int $seats): array
     {
-        if (!$delta || empty($player['support'])) {
-            return $player;
+        $partyId = (string) ($player['partyId'] ?? '');
+        if (!$delta || !$board || $partyId === '') {
+            return [$player, $board];
         }
 
         // Marginals first: that is where a swing actually changes the result.
-        $numbers = array_keys($player['support']);
-        usort($numbers, function ($a, $b) use ($player) {
-            return $this->marginOf($player, $a) <=> $this->marginOf($player, $b);
+        $numbers = array_map('strval', array_keys($board));
+        usort($numbers, function ($a, $b) use ($board, $partyId) {
+            return $this->marginOf($board, $partyId, $a) <=> $this->marginOf($board, $partyId, $b);
         });
 
         $count = min($seats, count($numbers));
         for ($i = 0; $i < $count; $i++) {
-            $k = (string) $numbers[$i];
-            $seat = $player['support'][$k];
-            $before = $seat[$player['partyId']] ?? 0;
-            $seat[$player['partyId']] = max(1.0, min(95.0, $before + $delta));
-            $player['support'][$k] = Campaign::normalise($seat);
+            $k = $numbers[$i];
+            $seat = $board[$k];
+            $before = $seat[$partyId] ?? 0;
+            $seat[$partyId] = max(1.0, min(95.0, $before + $delta));
+            $board[$k] = Campaign::normalise($seat);
         }
-        return $player;
+        return [$player, $board];
     }
 
     /** $number arrives as an int from array_keys, so accept either. */
-    private function marginOf(array $player, $number): float
+    private function marginOf(array $board, string $partyId, $number): float
     {
-        $seat = $player['support'][(string) $number] ?? [];
+        $seat = $board[(string) $number] ?? [];
         if (!$seat) {
             return 0.0;
         }
-        $mine = $seat[$player['partyId']] ?? 0;
+        $mine = $seat[$partyId] ?? 0;
         $best = 0;
         foreach ($seat as $pid => $v) {
-            if ($pid !== $player['partyId'] && $v > $best) {
+            if ($pid !== $partyId && $v > $best) {
                 $best = $v;
             }
         }

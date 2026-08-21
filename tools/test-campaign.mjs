@@ -112,14 +112,17 @@ const target = 73;
 const phpPlayer = {
   partyId: jsGame.partyId,
   budget: jsGame.budget,
+  cash: jsGame.cash,
   spent: 0,
   heat: 0,
-  support: JSON.parse(JSON.stringify(jsGame.support)),
+  granted: 0,
+  raised: 0,
   actions: [],
 };
+const phpBoard = JSON.parse(JSON.stringify(jsGame.support));
 const phpPlay = php(
   'play',
-  JSON.stringify({ player: phpPlayer, actionId: 'rally', target, rolls })
+  JSON.stringify({ player: phpPlayer, board: phpBoard, actionId: 'rally', target, rolls })
 );
 const jsPlay = CMP.campaign.play(jsGame, 'rally', target, rolls);
 
@@ -130,6 +133,7 @@ check(
   jsPlay.report.outcomeId + ' vs ' + phpPlay.report.outcomeId
 );
 check('same cost deducted', jsGame.spent === phpPlay.spent, jsGame.spent + ' vs ' + phpPlay.spent);
+check('same cash left', jsGame.cash === phpPlay.cash, jsGame.cash + ' vs ' + phpPlay.cash);
 check('same heat', jsGame.heat === phpPlay.heat, jsGame.heat + ' vs ' + phpPlay.heat);
 check(
   'same support in the target seat',
@@ -151,16 +155,36 @@ check('spending reduces the remaining budget', CMP.campaign.remaining(g) === CMP
 check('spent is recorded', g.spent === rally.cost);
 check('the action is recorded', g.actions.length === 1 && g.actions[0].actionId === 'rally');
 
-// Drain the purse and confirm the last unaffordable action is refused.
+// A round holds a fixed number of moves, so draining a purse takes a campaign
+// rather than a single burst of clicking.
 const drain = freshGame();
 let guard = 0;
-while (CMP.campaign.canPlay(drain, 'rally', 73).ok && guard++ < 200) {
+while (CMP.campaign.remaining(drain) >= rally.cost && guard++ < 400) {
+  if (CMP.campaign.actionsLeft(drain) <= 0) {
+    drain.roundActions = 0; // a fresh round, without waiting sixty seconds for it
+    continue;
+  }
   CMP.campaign.play(drain, 'rally', 73, { outcome: 0.5, consequence: 0.99, consequencePick: 0.5 });
 }
 check('a purse runs out', CMP.campaign.remaining(drain) < rally.cost, '₹' + CMP.campaign.remaining(drain));
+drain.roundActions = 0; // so the refusal below is about money, not moves
 const refused = CMP.campaign.canPlay(drain, 'rally', 73);
 check('an unaffordable action is refused', refused.ok === false);
 check('the reason reads "Insufficient Budget"', refused.reason === 'Insufficient Budget', refused.reason);
+
+const moveCapped = freshGame();
+const moveCap = CMP.ROUNDS.actionsPerRound;
+check('a round starts with every move available', CMP.campaign.actionsLeft(moveCapped) === moveCap);
+for (let i = 0; i < moveCap; i++) {
+  CMP.campaign.play(moveCapped, 'rally', 73, { outcome: 0.5, consequence: 0.99, consequencePick: 0.5 });
+}
+check('the moves run out', CMP.campaign.actionsLeft(moveCapped) === 0);
+const outOfMoves = CMP.campaign.canPlay(moveCapped, 'rally', 73);
+check('a fourth move in one round is refused', outOfMoves.ok === false);
+check('and says so plainly', outOfMoves.reason === 'No moves left this round', outOfMoves.reason);
+check('money is not the reason', CMP.campaign.remaining(moveCapped) > CMP.getAction('rally').cost);
+CMP.campaign.endRound(moveCapped);
+check('the next round restores them', CMP.campaign.actionsLeft(moveCapped) === moveCap);
 
 const spentBefore = drain.spent;
 const attempt = CMP.campaign.play(drain, 'rally', 73, rolls);
@@ -170,7 +194,8 @@ check('never overspends', drain.spent <= drain.budget, drain.spent + ' of ' + dr
 check(
   'PHP refuses an unaffordable action too',
   php('blocked', JSON.stringify({
-    player: { partyId: 'aap', budget: 1000, spent: 0, support: { 73: { aap: 30, inc: 30, bjp: 20, sad: 20 } }, actions: [] },
+    player: { partyId: 'aap', budget: 1000, cash: 1000, spent: 0, actions: [] },
+    board: { 73: { aap: 30, inc: 30, bjp: 20, sad: 20 } },
     actionId: 'rally',
     target: 73,
   })).reason === 'Insufficient Budget'
@@ -288,6 +313,271 @@ if (conseq.report.consequence) {
 
 /* ------------------------------------------------------------ balance */
 
+/* ------------------------------------------------------------ the clock */
+
+section('Fifteen rounds of sixty seconds');
+
+const clockGame = freshGame();
+check('opens on round 1', clockGame.round === 1);
+check('knows how many rounds there are', clockGame.roundsTotal === 15, String(clockGame.roundsTotal));
+check('a round is 60 seconds', clockGame.roundSeconds === 60, String(clockGame.roundSeconds));
+check(
+  'the clock starts near a full round',
+  CMP.campaign.secondsLeft(clockGame) > 55 && CMP.campaign.secondsLeft(clockGame) <= 60,
+  String(CMP.campaign.secondsLeft(clockGame))
+);
+check('a live round accepts actions', CMP.campaign.canPlay(clockGame, 'rally', 73).ok === true);
+
+const phpRounds = php('rounds');
+check(
+  'PHP reads the same round config',
+  phpRounds.total === clockGame.roundsTotal && phpRounds.seconds === clockGame.roundSeconds,
+  phpRounds.total + 'x' + phpRounds.seconds
+);
+
+// An expired round refuses actions, grace window included.
+const expired = freshGame();
+expired.roundEndsAt = Date.now() - (CMP.ROUNDS.graceSeconds + 5) * 1000;
+const late = CMP.campaign.canPlay(expired, 'rally', 73);
+check('an expired round refuses an action', late.ok === false);
+check('and says why', /round has closed/i.test(late.reason), late.reason);
+
+// Ending a round advances it, snapshots history, and closes after fifteen.
+const runner = freshGame();
+const cashAtStart = runner.cash;
+CMP.campaign.play(runner, 'rally', 73, rolls);
+const firstEnd = CMP.campaign.endRound(runner);
+check('the round advances', runner.round === 2, String(runner.round));
+check('the round is not the last one', firstEnd.finished === false);
+check('history gains a snapshot', runner.history.length === 1);
+check('the snapshot holds all 117 seats', Object.keys(runner.history[0].board).length === 117);
+check(
+  'the summary reports what was spent',
+  firstEnd.summary.spent === CMP.getAction('rally').cost,
+  String(firstEnd.summary.spent)
+);
+check(
+  'the summary reports cash correctly',
+  firstEnd.summary.cashBefore === cashAtStart && firstEnd.summary.cashAfter === runner.cash
+);
+check('a new round resets the spend counter', runner.roundSpent === 0);
+check('and gives a fresh clock', CMP.campaign.secondsLeft(runner) > 55);
+
+let guardRounds = 0;
+let finished = false;
+while (!finished && guardRounds++ < 40) finished = CMP.campaign.endRound(runner).finished;
+check('the campaign closes after fifteen rounds', runner.round === 15, String(runner.round));
+check('and reports that it finished', finished === true);
+check('with fifteen snapshots of history', runner.history.length === 15, String(runner.history.length));
+
+/* ------------------------------------------------------------ borrowing */
+
+section('Bank loans');
+
+const cfgLoan = CMP.FINANCE.loan;
+const borrower = freshGame();
+const quote = CMP.campaign.loanOffer(borrower, cfgLoan.minAmount);
+
+check('a loan can be quoted', quote.ok === true, quote.error || '');
+check(
+  'interest is ' + Math.round(cfgLoan.interestRate * 100) + '%',
+  quote.interest === Math.round(quote.amount * cfgLoan.interestRate),
+  String(quote.interest)
+);
+check(
+  'repayment falls ' + cfgLoan.repayAfterRounds + ' rounds later',
+  quote.dueRound === borrower.round + cfgLoan.repayAfterRounds,
+  String(quote.dueRound)
+);
+check('repayment is principal plus interest', quote.repay === quote.amount + quote.interest);
+
+const phpQuote = php(
+  'loan',
+  JSON.stringify({
+    player: { partyId: 'aap', cash: borrower.cash, loans: [], record: {} },
+    amount: cfgLoan.minAmount,
+    round: 1,
+  })
+);
+check(
+  'PHP quotes the same terms',
+  phpQuote.repay === quote.repay && phpQuote.dueRound === quote.dueRound,
+  phpQuote.repay + '/' + phpQuote.dueRound
+);
+
+const cashBeforeLoan = borrower.cash;
+const taken = CMP.campaign.takeLoan(borrower, cfgLoan.minAmount);
+check('taking a loan adds cash', borrower.cash === cashBeforeLoan + taken.amount);
+check('and records the debt separately', CMP.campaign.debtOf(borrower) === taken.repay);
+check('cash and debt are different numbers', borrower.cash !== CMP.campaign.debtOf(borrower));
+
+// The debt limit holds, however many loans are taken.
+const stacker = freshGame();
+let loops = 0;
+while (CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).ok && loops++ < 30) {
+  CMP.campaign.takeLoan(stacker, cfgLoan.minAmount);
+}
+check('several loans can be held at once', stacker.loans.length > 1, String(stacker.loans.length));
+check(
+  'the debt limit is never passed',
+  CMP.campaign.debtOf(stacker) <= cfgLoan.debtLimit,
+  CMP.campaign.debtOf(stacker) + ' of ' + cfgLoan.debtLimit
+);
+check(
+  'and borrowing past it is refused with a reason',
+  /debt limit/i.test(CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).error || '')
+);
+check(
+  'one maximum loan also fits inside the limit',
+  CMP.campaign.loanOffer(freshGame(), cfgLoan.maxAmount).ok === true
+);
+
+// Borrowing late is refused, because the bill would land after election day.
+const lateBorrow = freshGame();
+lateBorrow.round = cfgLoan.noBorrowingAfterRound + 1;
+check(
+  'borrowing too late is refused',
+  CMP.campaign.loanOffer(lateBorrow, cfgLoan.minAmount).ok === false
+);
+
+// Repayment on time.
+const payer = freshGame();
+CMP.campaign.takeLoan(payer, cfgLoan.minAmount);
+const owed = CMP.campaign.debtOf(payer);
+const cashBeforeDue = payer.cash;
+payer.round = payer.loans[0].dueRound;
+const paidSummary = { repayments: [] };
+CMP.campaign.settleLoans(payer, paidSummary);
+check('a loan is repaid when it falls due', payer.cash === cashBeforeDue - owed, String(payer.cash));
+check('the debt clears', CMP.campaign.debtOf(payer) === 0);
+check('and the summary says so', paidSummary.repayments.length === 1 && !paidSummary.repayments[0].defaulted);
+
+// Defaulting.
+const defaulter = freshGame();
+CMP.campaign.takeLoan(defaulter, cfgLoan.maxAmount);
+defaulter.cash = 0;
+defaulter.round = defaulter.loans[0].dueRound;
+const defSummary = { repayments: [] };
+CMP.campaign.settleLoans(defaulter, defSummary);
+check('a player who cannot pay defaults', defSummary.repayments[0].defaulted === true);
+check('cash never goes negative', defaulter.cash === 0, String(defaulter.cash));
+check('defaulting raises heat', defaulter.heat >= CMP.FINANCE.default.heat);
+check('and blocks further borrowing', defaulter.borrowingBlocked === true);
+check(
+  'a blocked player is told why',
+  /default/i.test(CMP.campaign.loanOffer(defaulter, cfgLoan.minAmount).error || '')
+);
+
+const phpDefault = php(
+  'settle',
+  JSON.stringify({
+    player: {
+      partyId: 'aap',
+      cash: 0,
+      heat: 0,
+      record: { restrictedUntilTurn: 0 },
+      loans: [{ id: 'L1', amount: 1000000, interest: 200000, repay: 1200000, takenRound: 1, dueRound: 3, settled: false }],
+    },
+    round: 3,
+  })
+);
+check('PHP defaults the same way', phpDefault.repayments[0].defaulted === true);
+check('PHP never lets cash go negative', phpDefault.cash === 0, String(phpDefault.cash));
+check('PHP blocks borrowing after a default', phpDefault.borrowingBlocked === true);
+
+/* ------------------------------------------------------------- funding */
+
+section('Raising money');
+
+const grant = CMP.getAction('grant');
+const underground = CMP.getAction('underground');
+check('a grant action exists', !!grant);
+check('an undisclosed funding action exists', !!underground);
+check('both sit outside safe and risky', grant.group === 'funding' && underground.group === 'funding');
+check('a grant carries no heat', (grant.outcomes || []).every((o) => !o.heat));
+check(
+  'undisclosed funding always carries heat',
+  (underground.outcomes || []).every((o) => o.heat > 0)
+);
+check(
+  'neither describes a real-world method',
+  !/how to|contact|arrange with/i.test(grant.blurb + underground.blurb)
+);
+
+const funded = freshGame();
+const cashBeforeGrant = funded.cash;
+const grantRes = CMP.campaign.play(funded, 'grant', 73, { outcome: 0.05, consequence: 0.99, consequencePick: 0.5 });
+check('a grant resolves', grantRes.ok === true);
+check('a funded outcome pays into cash', funded.cash > cashBeforeGrant - grant.cost, String(funded.cash));
+check('grants are tracked apart from other funding', funded.granted > 0 && funded.raised === 0);
+
+const shady = freshGame();
+CMP.campaign.play(shady, 'underground', null, { outcome: 0.05, consequence: 0.99, consequencePick: 0.5 });
+check('undisclosed funding pays in', shady.raised > 0, String(shady.raised));
+check('and is tracked apart from grants', shady.granted === 0);
+check('and raises heat sharply', shady.heat >= 20, String(shady.heat));
+
+const phpFund = php(
+  'play',
+  JSON.stringify({
+    player: { partyId: 'aap', budget: CMP.STARTING_BUDGET, cash: CMP.STARTING_BUDGET, spent: 0, heat: 0, granted: 0, raised: 0, actions: [] },
+    board: JSON.parse(JSON.stringify(freshGame().support)),
+    actionId: 'grant',
+    target: 73,
+    rolls: { outcome: 0.05, consequence: 0.99, consequencePick: 0.5, spare: 0.1 },
+  })
+);
+check('PHP resolves a grant to the same outcome', phpFund.report.outcomeId === grantRes.report.outcomeId,
+  phpFund.report.outcomeId + ' vs ' + grantRes.report.outcomeId);
+check('PHP credits the same cash', phpFund.cash === funded.cash, phpFund.cash + ' vs ' + funded.cash);
+
+/* -------------------------------------------------------------- events */
+
+section('Round events');
+
+const jsEvents = [];
+for (let i = 0; i < 100; i++) {
+  jsEvents.push(CMP.campaign.weightedPick(CMP.EVENTS.list, i / 100).id);
+}
+const phpEvents = php('events', 'x', '100');
+check('both sides pick the same events from the same rolls',
+  JSON.stringify(jsEvents) === JSON.stringify(phpEvents));
+
+let eventsFired = 0;
+for (let i = 0; i < 200; i++) {
+  const gg = freshGame();
+  const rand = CMP.rng.create('event-' + i);
+  if (CMP.campaign.rollEvent(gg, rand)) eventsFired++;
+}
+check(
+  'events fire roughly as often as configured',
+  Math.abs(eventsFired / 200 - CMP.EVENTS.chancePerRound) < 0.12,
+  Math.round((eventsFired / 200) * 100) + '% vs ' + Math.round(CMP.EVENTS.chancePerRound * 100) + '%'
+);
+check('most rounds are decided by players, not events', eventsFired / 200 < 0.6);
+
+/* --------------------------------------------------------- money never negative */
+
+section('Cash can never go negative');
+
+const squeeze = freshGame();
+let squeezeGuard = 0;
+while (squeezeGuard++ < 400) {
+  const affordable = CMP.ACTIONS.filter((a) => a.cost <= squeeze.cash);
+  if (!affordable.length) break;
+  const pick = affordable[squeezeGuard % affordable.length];
+  CMP.campaign.play(squeeze, pick.id, pick.needsConstituency ? 73 : null, {
+    outcome: (squeezeGuard % 17) / 17,
+    consequence: (squeezeGuard % 13) / 13,
+    consequencePick: 0.5,
+  });
+  if (squeeze.cash < 0) break;
+}
+check('cash stays at or above zero throughout', squeeze.cash >= 0, String(squeeze.cash));
+check('spending is bounded by what came in',
+  squeeze.spent <= squeeze.budget + squeeze.borrowed + squeeze.granted + squeeze.raised,
+  squeeze.spent + ' spent');
+
 section('Balance: reckless play should usually lose');
 
 function playStrategy(kind, seed) {
@@ -303,20 +593,25 @@ function playStrategy(kind, seed) {
       .filter(Boolean)
       .sort((a, b) => a.margin - b.margin);
 
-  let guard = 0;
-  while (guard++ < 400) {
-    const pool = kind === 'reckless' ? ['deal', 'lastpush', 'influence'] : ['rally', 'community', 'outreach', 'media'];
-    const affordable = pool.filter((id) => CMP.campaign.canPlay(gg, id, 1).ok);
-    if (!affordable.length) break;
-    const id = affordable[Math.floor(rand() * affordable.length)];
-    // Both strategies target sensibly; only the risk appetite differs.
-    const seat = seatsByCloseness()[Math.floor(rand() * 12)] || seatsByCloseness()[0];
-    const res = CMP.campaign.play(gg, id, seat.number, {
-      outcome: rand(),
-      consequence: rand(),
-      consequencePick: rand(),
-    });
-    if (!res.ok) break;
+  // A full campaign: fifteen rounds, three moves each.
+  for (let round = 1; round <= CMP.ROUNDS.total; round++) {
+    for (let move = 0; move < CMP.ROUNDS.actionsPerRound; move++) {
+      const pool =
+        kind === 'reckless'
+          ? ['deal', 'lastpush', 'influence']
+          : ['rally', 'community', 'outreach', 'media'];
+      const affordable = pool.filter((id) => CMP.campaign.canPlay(gg, id, 1).ok);
+      if (!affordable.length) break;
+      const id = affordable[Math.floor(rand() * affordable.length)];
+      // Both strategies target sensibly; only the risk appetite differs.
+      const seat = seatsByCloseness()[Math.floor(rand() * 12)] || seatsByCloseness()[0];
+      CMP.campaign.play(gg, id, seat.number, {
+        outcome: rand(),
+        consequence: rand(),
+        consequencePick: rand(),
+      });
+    }
+    if (CMP.campaign.endRound(gg).finished) break;
   }
   return { seats: CMP.campaign.seatsLed(gg), heat: gg.heat, spent: gg.spent };
 }
@@ -344,6 +639,237 @@ check('safe play beats reckless play on average', safeAvg > recklessAvg,
 
 /* ------------------------------------------------------------ config */
 
+section('Evidence shifts the odds, and never settles them');
+
+/*
+ * Reports are not verdicts. The finding is rolled against a hidden evidence
+ * score built from risky actions taken, current heat, previous penalties and
+ * the number of reports — so ganging up on someone who has done nothing
+ * usually fails, and a genuinely reckless player is usually caught, but
+ * neither is certain.
+ *
+ * Sampled here rather than through the API because it needs a player put
+ * deliberately into each state and a few hundred rolls to say anything.
+ */
+// A warning costs nothing but a headline. What actually hurts a campaign is a
+// fine, a restriction or a disqualification, so the two are counted apart —
+// lumping them together would call a clean player "penalised" for something
+// that never touched their campaign.
+const HURTS = ['fine', 'majorFine', 'restriction', 'disqualification'];
+
+function sampleFindings(label, spec, runs) {
+  const counts = {};
+  let cleared = 0;
+  let damaging = 0;
+  let disqualified = 0;
+
+  for (let i = 0; i < runs; i++) {
+    const r = php('investigate', JSON.stringify({ ...spec, seed: label + '-' + i }));
+    counts[r.outcomeId] = (counts[r.outcomeId] || 0) + 1;
+    if (r.outcomeId === 'cleared') cleared++;
+    if (HURTS.indexOf(r.outcomeId) !== -1) damaging++;
+    if (r.outcomeId === 'disqualification') disqualified++;
+  }
+
+  console.log('  ' + label.padEnd(22) + cleared + ' cleared, ' + damaging +
+    ' really hurt, of ' + runs + '   ' + JSON.stringify(counts));
+  return { cleared, damaging, disqualified, runs, counts };
+}
+
+const FINDING_RUNS = 60;
+const cleanPlayer = sampleFindings('clean, ganged up on', { cash: 50000000, heat: 0, risky: 0 }, FINDING_RUNS);
+const dirtyPlayer = sampleFindings('six risky actions', { cash: 50000000, heat: 85, risky: 6 }, FINDING_RUNS);
+
+check(
+  'ganging up on a clean player usually fails',
+  cleanPlayer.cleared > FINDING_RUNS / 2,
+  cleanPlayer.cleared + ' cleared of ' + FINDING_RUNS
+);
+check(
+  'and rarely does them real damage',
+  cleanPlayer.damaging < FINDING_RUNS * 0.25,
+  cleanPlayer.damaging + ' damaging of ' + FINDING_RUNS
+);
+check(
+  'but reporting one is not pointless either',
+  cleanPlayer.cleared < FINDING_RUNS,
+  'never anything but cleared'
+);
+check(
+  'a reckless player is caught far more often',
+  dirtyPlayer.damaging > cleanPlayer.damaging * 2,
+  dirtyPlayer.damaging + ' vs ' + cleanPlayer.damaging
+);
+check(
+  'and even so is sometimes cleared',
+  dirtyPlayer.cleared >= 1,
+  dirtyPlayer.cleared + ' of ' + FINDING_RUNS
+);
+check(
+  'a clean player is never disqualified outright',
+  cleanPlayer.disqualified === 0,
+  cleanPlayer.disqualified + ' disqualified'
+);
+check(
+  'disqualification stays rare even for a reckless one',
+  dirtyPlayer.disqualified <= FINDING_RUNS * 0.1,
+  dirtyPlayer.disqualified + ' of ' + FINDING_RUNS
+);
+
+section('A fine can never push cash below zero');
+
+/*
+ * Fines are charged against cash in hand. The interesting case is a fine
+ * larger than the balance: the rest must not become a negative number, it must
+ * become a different penalty. That needs a chosen balance rather than one that
+ * happens to arise from play, so it is driven straight into the PHP rules here.
+ */
+const fineRuns = [];
+for (let i = 0; i < 30; i++) {
+  fineRuns.push(php('investigate', JSON.stringify({ cash: 500000, heat: 95, risky: 8, seed: 'fine-' + i })));
+}
+const charged = fineRuns.filter((r) => r.fineCharged > 0);
+
+check('the sample produced some fines', charged.length > 0, charged.length + ' of 30');
+check(
+  'cash never lands below zero',
+  fineRuns.every((r) => r.cashAfter >= 0),
+  JSON.stringify(fineRuns.find((r) => r.cashAfter < 0) || {})
+);
+check(
+  'never more is taken than was held',
+  fineRuns.every((r) => r.finesPaid <= r.cashBefore),
+  JSON.stringify(fineRuns.find((r) => r.finesPaid > r.cashBefore) || {})
+);
+
+const shortfalls = fineRuns.filter((r) => r.note);
+check('a fine beyond reach becomes another penalty instead', shortfalls.length > 0,
+  shortfalls.length + ' of 30 could not be paid in full');
+check(
+  'and that penalty is a campaign restriction',
+  shortfalls.every((r) => r.restrictTurns > 0),
+  JSON.stringify(shortfalls.find((r) => !r.restrictTurns) || {})
+);
+
+// A player who can afford it simply pays.
+const rich = php('investigate', JSON.stringify({ cash: 50000000, heat: 95, risky: 8, seed: 'fine-0' }));
+check('a player who can afford a fine pays it in full',
+  rich.cashAfter === rich.cashBefore - rich.fineCharged,
+  rich.cashBefore + ' - ' + rich.fineCharged + ' = ' + rich.cashAfter);
+check('and takes no substitute penalty for it', rich.note === '' || !rich.note, rich.note);
+
+section('Money must not decide the game');
+
+/*
+ * The brief is explicit: a player with more money should not automatically
+ * win, and strategy should matter as much as budget. Four approaches play full
+ * campaigns, varying one thing at a time — careful and bigspender differ only
+ * in money, careful and scattergun only in aim.
+ *
+ * tools/balance-money.mjs is the same simulation with a fuller report; this is
+ * the part worth failing a build over.
+ */
+const SAFE_IDS = CMP.actionsByGroup('safe').map((a) => a.id);
+const RISKY_IDS = CMP.actionsByGroup('risky').map((a) => a.id);
+
+function withinBudget(ids, g, limit) {
+  return ids
+    .map((id) => CMP.getAction(id))
+    .filter((a) => a.cost <= limit && CMP.campaign.canPlay(g, a.id, 1).ok);
+}
+
+const PLANS = {
+  careful: { borrow: false, pick: (g, l) => withinBudget(SAFE_IDS, g, l).sort((a, b) => a.cost - b.cost)[0], aim: 'marginal' },
+  bigspender: { borrow: true, pick: (g, l) => withinBudget(SAFE_IDS, g, l).sort((a, b) => b.cost - a.cost)[0], aim: 'marginal' },
+  gambler: { borrow: true, pick: (g, l) => withinBudget(RISKY_IDS, g, l).sort((a, b) => b.cost - a.cost)[0], aim: 'marginal' },
+  scattergun: { borrow: false, pick: (g, l) => withinBudget(SAFE_IDS, g, l).sort((a, b) => a.cost - b.cost)[0], aim: 'spread' },
+};
+
+function campaignFor(name, seed) {
+  const plan = PLANS[name];
+  const g = CMP.state.startElection({
+    partyId: 'aap', candidateName: 'Bot', slogan: 'Bot', seed: 'balance:' + seed,
+  });
+  const rand = CMP.rng.create('moves:' + name + ':' + seed);
+  const marginals = () =>
+    CMP.CONSTITUENCIES.map((c) => CMP.campaign.seatView(g, c.number))
+      .filter(Boolean)
+      .sort((a, b) => a.margin - b.margin);
+
+  for (let round = 1; round <= CMP.ROUNDS.total; round++) {
+    if (plan.borrow) {
+      const offer = CMP.campaign.loanOffer(g, CMP.FINANCE.loan.maxAmount);
+      if (offer.ok && g.cash + offer.amount > CMP.campaign.debtOf(g) + offer.repay) {
+        CMP.campaign.takeLoan(g, offer.amount);
+      }
+    }
+    const dueSoon = (g.loans || [])
+      .filter((l) => !l.settled && l.dueRound <= round)
+      .reduce((t, l) => t + l.repay, 0);
+
+    for (let move = 0; move < CMP.ROUNDS.actionsPerRound; move++) {
+      const action = plan.pick(g, Math.max(0, g.cash - dueSoon));
+      if (!action) break;
+      const pool = marginals();
+      const seat = plan.aim === 'marginal'
+        ? pool[Math.floor(rand() * 8)] || pool[0]
+        : pool[Math.floor(rand() * pool.length)] || pool[0];
+      CMP.campaign.play(g, action.id, action.needsConstituency ? seat.number : null, {
+        outcome: rand(), consequence: rand(), consequencePick: rand(),
+      });
+    }
+    if (CMP.campaign.endRound(g).finished) break;
+  }
+
+  const result = CMP.campaign.runElection(g);
+  const mine = result.standings.find((r) => r.party === g.partyId);
+  return { seats: mine ? mine.seats : 0, cash: g.cash, spent: g.spent };
+}
+
+const BALANCE_GAMES = 24;
+const planNames = Object.keys(PLANS);
+const tally = {};
+planNames.forEach((n) => {
+  tally[n] = { seats: [], wins: 0 };
+});
+
+for (let i = 0; i < BALANCE_GAMES; i++) {
+  const played = planNames.map((n) => ({ name: n, ...campaignFor(n, i) }));
+  played.forEach((r) => tally[r.name].seats.push(r.seats));
+  tally[played.slice().sort((a, b) => b.seats - a.seats)[0].name].wins++;
+}
+
+const avg = (n) => tally[n].seats.reduce((a, b) => a + b, 0) / tally[n].seats.length;
+const moneyEdge = avg('bigspender') - avg('careful');
+const aimEdge = avg('careful') - avg('scattergun');
+const topShare = Math.max.apply(null, planNames.map((n) => tally[n].wins)) / BALANCE_GAMES;
+
+planNames.forEach((n) => {
+  console.log('  ' + n.padEnd(12) + avg(n).toFixed(1).padStart(6) + ' seats   ' +
+    tally[n].wins + '/' + BALANCE_GAMES + ' games');
+});
+
+check(
+  'spending more does not decide the game',
+  Math.abs(moneyEdge) < 4,
+  'money edge ' + moneyEdge.toFixed(1) + ' seats'
+);
+check(
+  'aiming well matters more than spending more',
+  aimEdge > Math.abs(moneyEdge),
+  'aim ' + aimEdge.toFixed(1) + ' vs money ' + moneyEdge.toFixed(1)
+);
+check('aiming well is a real advantage', aimEdge > 2, aimEdge.toFixed(1) + ' seats');
+check(
+  'no single approach dominates',
+  topShare <= 0.75,
+  Math.round(topShare * 100) + '% of games'
+);
+check(
+  'every approach can still win a majority sometimes',
+  planNames.every((n) => Math.max.apply(null, tally[n].seats) >= CMP.MAJORITY)
+);
+
 section('Everything is configurable');
 
 check('config exposes starting budget', typeof CMP.CAMPAIGN.startingBudget === 'number');
@@ -352,8 +878,19 @@ check('config exposes consequences', CMP.CAMPAIGN.consequences.length >= 4);
 check('four safe actions', CMP.actionsByGroup('safe').length === 4);
 check('four risky actions', CMP.actionsByGroup('risky').length === 4);
 check(
-  'every action declares cost, risk and impact labels',
-  CMP.ACTIONS.every((a) => a.cost > 0 && a.riskLabel && a.impactLabel)
+  'every action declares a risk and an impact label',
+  CMP.ACTIONS.every((a) => a.riskLabel && a.impactLabel)
+);
+check(
+  'every campaign action costs something',
+  CMP.ACTIONS.filter((a) => a.group !== 'funding').every((a) => a.cost > 0)
+);
+// Undisclosed funding is free to accept on purpose: it is the move a
+// campaign with no cash left can still make, and heat is what it costs.
+check(
+  'undisclosed funding costs nothing up front but plenty in heat',
+  CMP.getAction('underground').cost === 0 &&
+    CMP.getAction('underground').outcomes.every((o) => o.heat > 0)
 );
 check(
   'every action has weighted outcomes',

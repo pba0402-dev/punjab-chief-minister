@@ -44,7 +44,9 @@
     ],
     "_consequenceComment": "Chance of a consequence firing after an action = heat/100 * chanceFactor, floored below minHeat.",
     "minHeat": 26,
-    "chanceFactor": 0.55
+    "chanceFactor": 0.55,
+    "coolPerRound": 2.5,
+    "_coolComment": "Heat cools slightly at each round end. Without it heat only ever climbs, so a single risky round would mark a player for the rest of the campaign and the risk system becomes a one-way door rather than a dial."
   },
   "ratings": [
     {
@@ -143,7 +145,11 @@
           "heat": 2,
           "text": "Everyone else was advertising too. Limited effect."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 4,
+        "share": 0.55
+      }
     },
     {
       "id": "community",
@@ -181,7 +187,11 @@
           "heat": 0,
           "text": "It will be noticed eventually, but not before polling day."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 3,
+        "share": 0.5
+      }
     },
     {
       "id": "outreach",
@@ -265,7 +275,11 @@
           "heat": 30,
           "text": "Word spread about the arrangement. This will follow you."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 5,
+        "share": 0.55
+      }
     },
     {
       "id": "influence",
@@ -303,7 +317,11 @@
           "heat": 26,
           "text": "Someone noticed the pressure and started asking who applied it."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 4,
+        "share": 0.55
+      }
     },
     {
       "id": "negative",
@@ -342,7 +360,11 @@
           "heat": 20,
           "text": "People thought it was beneath you, and said so."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 3,
+        "share": 0.5
+      }
     },
     {
       "id": "lastpush",
@@ -380,7 +402,11 @@
           "heat": 25,
           "text": "The blitz looked desperate, and voters read it that way."
         }
-      ]
+      ],
+      "reach": {
+        "seats": 6,
+        "share": 0.6
+      }
     }
   ],
   "consequences": [
@@ -703,5 +729,273 @@
         "seats": 4
       }
     }
-  }
+  },
+  "rounds": {
+    "_comment": [
+      "Fifteen rounds of sixty seconds. The clock is authoritative on the server:",
+      "roundStartedAt is a server timestamp and every response carries the server",
+      "time, so clients compute the remaining seconds from that rather than from",
+      "their own clock. A refresh therefore picks the round up where it stands.",
+      "",
+      "Rounds advance lazily: whichever request arrives first after the clock runs",
+      "out processes the round end, under the same lock as everything else. With",
+      "clients polling every 2.5s a round turns over within a couple of seconds of",
+      "expiry, and nothing depends on a cron job the host may not have.",
+      "",
+      "graceSeconds forgives an action that was in flight as the clock expired, so",
+      "a player who clicks on 00:00 is not punished for their latency.",
+      "",
+      "actionsPerRound is what stops money deciding the game on its own. Without",
+      "it, a round rewards whoever clicks fastest, and a large purse converts",
+      "straight into support at the speed of the mouse. Three moves a round means",
+      "forty-five moves a campaign for everybody, so the question stops being how",
+      "much you can spend and becomes which three seats are worth it this minute."
+    ],
+    "total": 15,
+    "seconds": 60,
+    "graceSeconds": 2,
+    "actionsPerRound": 3
+  },
+  "finance": {
+    "_comment": [
+      "Cash and debt are tracked separately and cash may never go negative.",
+      "",
+      "Loans are the interesting decision: money now against a bill two rounds",
+      "later, at a rate that hurts. Borrowing in round 13 or later is refused",
+      "because the bill would land after the campaign has closed, which would make",
+      "late borrowing free.",
+      "",
+      "Defaulting is deliberately worse than the money involved: heat, a campaign",
+      "restriction and lost support. Otherwise the right play would always be to",
+      "borrow the maximum in the last rounds and never repay."
+    ],
+    "loan": {
+      "interestRate": 0.2,
+      "repayAfterRounds": 2,
+      "minAmount": 1000000,
+      "maxAmount": 10000000,
+      "debtLimit": 20000000,
+      "noBorrowingAfterRound": 12,
+      "increments": 1000000
+    },
+    "default": {
+      "heat": 22,
+      "restrictRounds": 3,
+      "support": -4,
+      "seats": 6,
+      "borrowingBlocked": true,
+      "text": "You could not repay. Word of the default is all over the campaign."
+    }
+  },
+  "funding": {
+    "_comment": [
+      "Two ways to raise money mid-campaign, with opposite characters.",
+      "",
+      "A grant application is honest and unreliable: it costs a real amount of",
+      "work, usually returns less than it cost on its own, and carries no heat.",
+      "It is worth doing because the development spending also moves support.",
+      "",
+      "Underground funding is the mirror image: it can pay several times over, but",
+      "it is the fastest way to raise heat in the game and can be taken away again",
+      "by an investigation. Both are fictional game mechanics; neither describes",
+      "any real-world method."
+    ],
+    "grant": {
+      "id": "grant",
+      "label": "Apply for a Grant",
+      "icon": "🏛️",
+      "cost": 2000000,
+      "heat": 0,
+      "riskLabel": "No risk",
+      "impactLabel": "Development work, uncertain funding",
+      "blurb": "Fund visible development work and apply for matching support.",
+      "needsConstituency": true,
+      "outcomes": [
+        {
+          "id": "large",
+          "weight": 25,
+          "label": "Application approved in full",
+          "funds": 2500000,
+          "support": 3,
+          "heat": 0,
+          "text": "The work is done and the grant came through in full."
+        },
+        {
+          "id": "partial",
+          "weight": 40,
+          "label": "Partly funded",
+          "funds": 1500000,
+          "support": 2.5,
+          "heat": 0,
+          "text": "Some of the money came back, and the work is visible."
+        },
+        {
+          "id": "small",
+          "weight": 20,
+          "label": "A token amount",
+          "funds": 500000,
+          "support": 2,
+          "heat": 0,
+          "text": "Barely worth the paperwork, but the work still counts."
+        },
+        {
+          "id": "none",
+          "weight": 15,
+          "label": "Application refused",
+          "funds": 0,
+          "support": 1.5,
+          "heat": 0,
+          "text": "No funding at all. At least the development was noticed."
+        }
+      ]
+    },
+    "underground": {
+      "id": "underground",
+      "label": "Underground Funding",
+      "icon": "💼",
+      "cost": 0,
+      "heat": 24,
+      "riskLabel": "Very high risk",
+      "impactLabel": "₹20-80 lakh, and a great deal of heat",
+      "blurb": "Accept an undisclosed funding offer, no questions asked.",
+      "needsConstituency": false,
+      "outcomes": [
+        {
+          "id": "big",
+          "weight": 28,
+          "label": "A large sum arrives",
+          "funds": 8000000,
+          "heat": 24,
+          "text": "The money is in the account. Nobody will say where it came from."
+        },
+        {
+          "id": "medium",
+          "weight": 32,
+          "label": "Less than promised",
+          "funds": 4000000,
+          "heat": 24,
+          "text": "Well short of what was discussed, but it is money."
+        },
+        {
+          "id": "small",
+          "weight": 22,
+          "label": "A token payment",
+          "funds": 2000000,
+          "heat": 26,
+          "text": "Barely worth the exposure."
+        },
+        {
+          "id": "nothing",
+          "weight": 18,
+          "label": "The money never arrives",
+          "funds": 0,
+          "heat": 32,
+          "support": -2,
+          "seats": 3,
+          "text": "Nothing came. The conversation, however, was noticed."
+        }
+      ]
+    }
+  },
+  "events": {
+    "_comment": [
+      "At most one event per round, and most rounds have none — an event every",
+      "round would drown out the decisions players actually made.",
+      "Events land on a named constituency or across the campaign, never as a",
+      "silent adjustment."
+    ],
+    "chancePerRound": 0.45,
+    "list": [
+      {
+        "id": "rally",
+        "kind": "good",
+        "weight": 14,
+        "label": "Successful rally",
+        "support": 2.5,
+        "seats": 2,
+        "text": "A meeting drew a far bigger crowd than anyone expected."
+      },
+      {
+        "id": "community",
+        "kind": "good",
+        "weight": 12,
+        "label": "Community support grows",
+        "support": 2,
+        "seats": 3,
+        "text": "Local associations have come out for your campaign."
+      },
+      {
+        "id": "momentum",
+        "kind": "good",
+        "weight": 10,
+        "label": "Candidate momentum",
+        "support": 3,
+        "seats": 2,
+        "text": "Your candidate is suddenly the one being talked about."
+      },
+      {
+        "id": "windfall",
+        "kind": "good",
+        "weight": 8,
+        "label": "Development grant approved",
+        "funds": 1500000,
+        "text": "A pending grant application was approved."
+      },
+      {
+        "id": "controversy",
+        "kind": "bad",
+        "weight": 12,
+        "label": "Campaign controversy",
+        "support": -2.5,
+        "seats": 3,
+        "heat": 6,
+        "text": "A remark by one of your speakers is being replayed everywhere."
+      },
+      {
+        "id": "attack",
+        "kind": "bad",
+        "weight": 12,
+        "label": "Opponent attack",
+        "support": -2,
+        "seats": 4,
+        "text": "Your rivals have built the week around attacking you."
+      },
+      {
+        "id": "localissue",
+        "kind": "bad",
+        "weight": 10,
+        "label": "Unexpected local issue",
+        "support": -3,
+        "seats": 2,
+        "text": "An agitation has broken out and your campaign is being blamed."
+      },
+      {
+        "id": "scrutiny",
+        "kind": "bad",
+        "weight": 8,
+        "label": "Funding scrutiny",
+        "heat": 10,
+        "text": "Reporters have started asking where your money is coming from."
+      }
+    ]
+  },
+  "_reachComment": [
+    "Why dearer actions reach further rather than simply hitting harder.",
+    "",
+    "Every seat is normalised to 100 across five parties, so a large gain in",
+    "one seat is compressed on the way in: +4 raw lands as roughly +3, while",
+    "+2 raw lands as roughly +1.9. Raw support therefore has sharply",
+    "diminishing returns, and an action costing two and a half times as much",
+    "bought barely a tenth more effect. With three moves a round, that made",
+    "money almost irrelevant — the opposite of the intended balance, and",
+    "measurably worse than not spending at all once interest was counted.",
+    "",
+    "Reach fixes it in the direction the subject suggests anyway. A doorstep",
+    "campaign moves one constituency. Media coverage and a statewide push are",
+    "seen in several. The extra seats take a fraction of the effect, so",
+    "spending more genuinely buys more — but it buys breadth, not certainty,",
+    "and choosing the right seat to aim at still matters more than the size of",
+    "the cheque. Bad outcomes spread the same way: a media campaign that goes",
+    "wrong goes wrong in public."
+  ]
 }

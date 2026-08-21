@@ -47,6 +47,86 @@ const SCENES = {
     "CMP.app.setGame(CMP.state.startElection({partyId:'aap'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
     "budget:100000000}));CMP.app.goTo('election');",
+
+  // Mid-campaign: a few rounds played, money borrowed, a summary on screen.
+  'election-round':
+    "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "CMP.campaign.takeLoan(g,5000000);" +
+    "for(var r=0;r<4;r++){" +
+    "  CMP.campaign.play(g,'rally',73,{outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  CMP.campaign.play(g,'doorstep',42,{outcome:0.5,consequence:0.9,consequencePick:0.5});" +
+    "  CMP.campaign.endRound(g);" +
+    "}" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var v=document.querySelector('.summary-slot');" +
+    "  if(v)v.appendChild(CMP.ui.round.summary(g,g.summary));" +
+    "},60);",
+
+  'election-money':
+    "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "CMP.campaign.takeLoan(g,5000000);" +
+    "CMP.campaign.play(g,'grant',73,{outcome:0.05,consequence:0.9,consequencePick:0.5});" +
+    "CMP.campaign.play(g,'rally',42,{outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var t=document.querySelectorAll('.panel-tab');" +
+    "  for(var i=0;i<t.length;i++)if(t[i].textContent==='Money')t[i].click();" +
+    "  var b=document.querySelector('.bank');" +
+    "  if(b)window.scrollTo(0,b.getBoundingClientRect().top+window.scrollY-90);" +
+    "},120);",
+
+  // The panel opens on the tightest race, so campaign in every seat each
+  // round — whichever one it lands on then has a history worth drawing.
+  'election-seat':
+    "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<6;r++){" +
+    "  for(var n=1;n<=117;n++){" +
+    "    var seat=g.support[n];" +
+    "    seat.aap=seat.aap+1.4;seat.inc=seat.inc-0.7;" +
+    "    CMP.campaign.normalise(seat);" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "}" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var t=document.querySelectorAll('.panel-tab');" +
+    "  for(var i=0;i<t.length;i++)if(t[i].textContent==='Constituency')t[i].click();" +
+    "  setTimeout(function(){" +
+    "    var b=document.querySelector('.history-card');" +
+    "    if(b)window.scrollTo(0,b.getBoundingClientRect().top+window.scrollY-260);" +
+    "  },60);" +
+    "},120);",
+
+  'action-confirm':
+    "CMP.app.setGame(CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'}));" +
+    "CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var c=document.querySelectorAll('.action-card');" +
+    "  for(var i=0;i<c.length;i++){" +
+    "    var l=c[i].querySelector('.action-label');" +
+    "    if(l&&l.textContent==='Underground Deal')c[i].click();" +
+    "  }" +
+    "},60);",
+
+  // Fourteen rounds played out here, then the shell's own clock is run down
+  // so the count starts the way it does in a real game.
+  'election-count':
+    "var g=CMP.state.startElection({partyId:'aap'," +
+    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
+    "for(var r=0;r<14;r++){" +
+    "  CMP.campaign.play(g,'rally',(r*7)%117+1,{outcome:0.3,consequence:0.9,consequencePick:0.5});" +
+    "  CMP.campaign.endRound(g);" +
+    "}" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "var t=setInterval(function(){" +
+    "  if(CMP.app.getScreen()==='result'){clearInterval(t);return;}" +
+    "  CMP.app.getGame().roundEndsAt=Date.now()-1000;" +
+    "},150);",
 };
 
 const CASES = [

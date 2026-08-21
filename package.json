@@ -14,7 +14,7 @@
     "data:v1": "node tools/build-simple-data.mjs",
     "test:api": "node tools/test-api.mjs",
     "test:mp": "node tools/test-multiplayer.mjs",
-    "test:all": "node tools/test-campaign.mjs && node tools/test-simple.mjs && node tools/test-api.mjs && node tools/test-systems.mjs && node tools/test-multiplayer.mjs",
+    "test:all": "node tools/test-campaign.mjs && node tools/test-simple.mjs && node tools/test-api.mjs && node tools/test-systems.mjs && node tools/test-multiplayer.mjs && node tools/test-rounds.mjs",
     "shots:lobby": "node tools/shots-lobby.mjs",
     "serve": "php -S 127.0.0.1:8080 -t simple",
     "data:campaign": "node tools/build-campaign-config.mjs",
@@ -22,7 +22,8 @@
     "data:incumbents": "node tools/build-incumbents.mjs",
     "test:systems": "node tools/test-systems.mjs",
     "measure:board": "node tools/measure-board.mjs 60",
-    "data:map": "node tools/build-map-data.mjs"
+    "data:map": "node tools/build-map-data.mjs",
+    "test:rounds": "node tools/test-rounds.mjs"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
