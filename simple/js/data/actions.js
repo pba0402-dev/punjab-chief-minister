@@ -104,7 +104,8 @@ CMP.CAMPAIGN = {
           "heat": 0,
           "text": "Turnout was modest. Some gain, not much."
         }
-      ]
+      ],
+      "menu": "campaign"
     },
     {
       "id": "media",
@@ -146,7 +147,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 4,
         "share": 0.55
-      }
+      },
+      "menu": "campaign"
     },
     {
       "id": "community",
@@ -188,7 +190,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 3,
         "share": 0.5
-      }
+      },
+      "menu": "campaign"
     },
     {
       "id": "outreach",
@@ -226,7 +229,8 @@ CMP.CAMPAIGN = {
           "heat": 1,
           "text": "A cold reception in places. Modest gain."
         }
-      ]
+      ],
+      "menu": "campaign"
     },
     {
       "id": "deal",
@@ -276,7 +280,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 5,
         "share": 0.55
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "influence",
@@ -318,7 +323,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 4,
         "share": 0.55
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "negative",
@@ -361,7 +367,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 3,
         "share": 0.5
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "lastpush",
@@ -403,7 +410,8 @@ CMP.CAMPAIGN = {
       "reach": {
         "seats": 6,
         "share": 0.6
-      }
+      },
+      "menu": "campaign"
     }
   ],
   "consequences": [
@@ -753,7 +761,8 @@ CMP.CAMPAIGN = {
           "heat": 0,
           "text": "No funding at all. At least the development was noticed."
         }
-      ]
+      ],
+      "menu": "grants"
     },
     "underground": {
       "id": "underground",
@@ -800,7 +809,8 @@ CMP.CAMPAIGN = {
           "seats": 3,
           "text": "Nothing came. The conversation, however, was noticed."
         }
-      ]
+      ],
+      "menu": "corruption"
     }
   },
   "events": {
@@ -1010,5 +1020,14 @@ CMP.getAction = function (id) {
 CMP.actionsByGroup = function (group) {
   return CMP.ACTIONS.filter(function (a) {
     return a.group === group;
+  });
+};
+
+/** The actions that belong under one menu, cheapest first. */
+CMP.actionsByMenu = function (menu) {
+  return CMP.ACTIONS.filter(function (a) {
+    return a.menu === menu;
+  }).sort(function (a, b) {
+    return a.cost - b.cost;
   });
 };

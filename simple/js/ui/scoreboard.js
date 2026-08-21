@@ -198,7 +198,7 @@ CMP.ui.scoreboard = (function () {
 
     return el('div', { class: 'position', style: { '--party': leader.colour } }, [
       el('div', { class: 'position-head' }, [
-        el('span', { class: 'stat-label', text: 'Current position' }),
+        el('span', { class: 'stat-label', text: 'Current leader' }),
         el('span', { class: 'position-party', text: leader.name }),
       ]),
       el('div', { class: 'position-numbers' }, [
@@ -315,48 +315,29 @@ CMP.ui.scoreboard = (function () {
   function create(opts) {
     opts = opts || {};
     var result = null;
-    var expanded = false;
 
     var headNode = el('div', { class: 'results-head' });
     var bannerNode = el('div', { class: 'results-banners' });
     var boardNode = el('div', { class: 'results-board' });
     var totalsNode = el('div', { class: 'results-totals' });
     var changesNode = el('div', { class: 'results-changes' });
-    var movesNode = el('div', { class: 'results-moves' });
     var positionNode = el('div', { class: 'results-position' });
-    var historyNode = el('div', { class: 'results-history' });
 
+    // Three blocks, in the order the brief asks for them: where everyone
+    // stands, which seats changed hands, and who is leading. Movements were
+    // dropped because every row already carries its own change, and the
+    // position panel because the leader line says the same thing.
     var root = el('section', { class: 'round-results' }, [
       headNode,
       bannerNode,
       boardNode,
       totalsNode,
       el('div', { class: 'results-section' }, [
-        el('h3', { class: 'results-title', text: 'Seat changes' }),
+        el('h3', { class: 'results-title', text: 'Seats changed' }),
         changesNode,
       ]),
-      el('div', { class: 'results-section' }, [
-        el('h3', { class: 'results-title', text: 'Biggest movements' }),
-        movesNode,
-      ]),
       positionNode,
-      historyNode,
     ]);
-
-    function paintHistory() {
-      mount(historyNode, [
-        el('button', {
-          class: 'btn btn-quiet btn-small',
-          type: 'button',
-          text: expanded ? 'Hide election history' : 'View election history',
-          onclick: function () {
-            expanded = !expanded;
-            paintHistory();
-          },
-        }),
-        expanded ? historyTable(opts.trend ? opts.trend() : []) : null,
-      ]);
-    }
 
     function render(next, secondsLeft) {
       if (next) result = next;
@@ -381,19 +362,13 @@ CMP.ui.scoreboard = (function () {
       ]);
 
       mount(bannerNode, banners(result));
-      mount(boardNode, [leaderboard(result, opts.you ? opts.you() : null, {})]);
+      mount(boardNode, [leaderboard(result, opts.you ? opts.you() : null, { compact: true })]);
       mount(totalsNode, [
         el('span', {}, ['Total ', el('strong', { text: String(result.totalSeats) })]),
         el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
-        el('span', {
-          class: 'results-changecount',
-          text: result.changeCount + ' seat' + (result.changeCount === 1 ? '' : 's') + ' changed hands',
-        }),
       ]);
       mount(changesNode, [seatChanges(result)]);
-      mount(movesNode, [movements(result)]);
       mount(positionNode, [position(result)]);
-      paintHistory();
     }
 
     return { root: root, render: render };

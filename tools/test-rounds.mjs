@@ -336,26 +336,21 @@ for (let round = 1; round <= 15; round++) {
   // The host borrows once, early, so repayment and interest are exercised
   // inside a real game rather than only in the unit tests.
   if (round === 2 && !loanTaken) {
-    const tab = host.qq('.panel-tab').find((t) => t.textContent === 'Money');
+    const tab = host.qq('.g-nav-item').find((t) => t.textContent === 'Loan');
     if (tab) {
       host.click(tab);
       await sleep(150);
-      const chip = host.qq('.bank-chip')[0];
-      if (chip) {
-        host.click(chip);
-        await sleep(80);
-        const take = host.qq('.bank button').find((b) => /Take loan/.test(b.textContent));
-        if (take && !take.disabled) {
-          host.click(take);
-          await sleep(80);
-          const confirm = host.q('.dialog-buttons .btn-primary');
-          if (confirm) {
-            host.click(confirm);
-            loanTaken = await host.until('loan', () => host.game().loans.length > 0, 8000);
-          }
+      const offer = host.qq('.loan-offer').find((b) => !b.disabled);
+      if (offer) {
+        host.click(offer);
+        await sleep(120);
+        const confirm = host.q('.dialog-buttons .btn-primary');
+        if (confirm) {
+          host.click(confirm);
+          loanTaken = await host.until('loan', () => host.game().loans.length > 0, 8000);
         }
       }
-      const back = host.qq('.panel-tab').find((t) => t.textContent === 'Campaign');
+      const back = host.qq('.g-nav-item').find((t) => t.textContent === 'Campaign');
       if (back) host.click(back);
     }
   }

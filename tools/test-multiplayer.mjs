@@ -284,104 +284,132 @@ host.click(startBtn());
 const hostStarted = await host.until('election', () => !!host.q('.screen-election'));
 check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
-check("the host's own party is shown", /Aam Aadmi Party/.test(onElection(host)));
-check('the host sees their candidate', /Simran Kaur Gill/.test(onElection(host)));
-check('the campaign panel renders', host.qq('.action-card').length === 10,
-  host.qq('.action-card').length + ' cards');
-check('a target constituency is chosen', !!host.q('.target-name'));
-check('all 117 seats are reachable from the picker',
+check("the host's own party is shown", /AAP/.test(host.q('.g-player-party').textContent));
+check('the host sees their candidate', /Simran Kaur Gill/.test(host.q('.g-player').textContent));
+check('the campaign section renders its actions', host.qq('.act').length === 5,
+  host.qq('.act').length + ' actions');
+check('a target constituency is chosen', !!host.q('.g-target-name'));
+check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
 check('it opens on round 1 of 15', /Round\s*1\s*of\s*15/.test(host.q('.round-bar').textContent),
   host.q('.round-bar').textContent.slice(0, 40));
-check('projected seats are shown', !!host.q('.projection'));
-check('and the panel says how many more are needed',
-  /Needs \d+ more seat|Majority reached/.test(host.q('.projection').textContent),
-  host.q('.projection').textContent.slice(0, 60));
+check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
+check('and the majority line says how many more are needed',
+  /needs \d+ more|past the majority/.test(host.q('.g-majority-text').textContent),
+  host.q('.g-majority-text').textContent.slice(0, 60));
 
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);
-check('player 2 sees their own party', /Indian National Congress/.test(onElection(players[1])));
-check('player 2 sees their own candidate', /Ravinder Singh Bajwa/.test(onElection(players[1])));
+check('player 2 sees their own party',
+  /INC/.test(players[1].q('.g-player-party').textContent));
+check('player 2 sees their own candidate',
+  /Ravinder Singh Bajwa/.test(players[1].q('.g-player').textContent));
 check(
-  'player 2 does not see the host as their candidate',
-  !/Simran Kaur Gill/.test(onElection(players[1]))
+  'player 2 does not see the host as their own candidate',
+  !/Simran Kaur Gill/.test(players[1].q('.g-player').textContent)
 );
 
 const p4Started = await players[3].until('election', () => !!players[3].q('.screen-election'));
 check('player 4 is taken along too', p4Started);
-check('player 4 sees Shiromani Akali Dal', /Shiromani Akali Dal/.test(onElection(players[3])));
+check('player 4 sees their own party',
+  /SAD/.test(players[3].q('.g-player-party').textContent));
 
 /* ------------------------------------------------- independent budgets */
 
 section('Every player has their own ₹5 crore');
 
-function statOf(client, label) {
-  const tile = client.qq('.stat').find((n) => {
-    const l = n.querySelector('.stat-label');
+/** The cash a client is showing, from its player strip. */
+const cashOf = (client) =>
+  client.q('.g-player-cash') ? client.q('.g-player-cash').textContent : null;
+
+/** Open a menu section on one client. */
+function openSection(client, label) {
+  const tab = client.qq('.g-nav-item').find((n) => n.textContent === label);
+  if (tab) client.click(tab);
+}
+
+/** A labelled figure inside the money section. */
+function moneyOf(client, label) {
+  openSection(client, 'Money');
+  const row = client.qq('.sum-line').find((n) => {
+    const l = n.querySelector('.sum-line-label');
     return l && l.textContent === label;
   });
-  return tile ? tile.querySelector('.stat-value').textContent : null;
+  const value = row ? row.querySelector('.sum-line-value').textContent : null;
+  openSection(client, 'Campaign');
+  return value;
 }
 
 for (const c of players) {
-  check(
-    c.label + ' starts on ₹5,00,00,000',
-    statOf(c, 'Cash in Hand') === '₹5,00,00,000',
-    statOf(c, 'Cash in Hand')
-  );
-  check(c.label + ' starts with no debt', statOf(c, 'Debt') === '—', statOf(c, 'Debt'));
+  check(c.label + ' starts on ₹5 crore', cashOf(c) === '₹5 crore', cashOf(c));
+  check(c.label + ' starts with no debt', !c.q('.g-player-debt'));
 }
-check('the host sees a campaign panel', host.qq('.action-card').length === 10);
-check('four safe and four risky actions', host.qq('.action-card.action-safe').length === 4);
-check('political heat starts at zero', /0 \/ 100/.test(host.q('.heat-card').textContent));
+check('the host sees the campaign actions', host.qq('.act').length === 5);
+check('and the high-risk ones are under their own heading', (function () {
+  openSection(host, 'High Risk');
+  const n = host.qq('.act').length;
+  return n === 4;
+})(), host.qq('.act').length + ' risky actions');
+check('political heat starts at zero',
+  /0 \/ 100/.test(moneyOf(host, 'Political heat') || ''), moneyOf(host, 'Political heat'));
 
 // The host spends; nobody else's purse may move.
 const dealCost = host.dom.window.CMP.getAction('deal').cost;
-const hostCard = host.qq('.action-card').find((c) => {
-  const n = c.querySelector('.action-label');
+openSection(host, 'High Risk');
+const hostCard = host.qq('.act').find((c) => {
+  const n = c.querySelector('.act-name');
   return n && n.textContent === 'Underground Deal';
 });
-host.click(hostCard);
+host.click(hostCard.querySelector('.act-use'));
 await sleep(60);
 // Spending money asks first, so agree to it the way a player would.
 const hostGo = host.q('.dialog-buttons .btn-danger, .dialog-buttons .btn-primary');
 check('spending asks for confirmation first', !!hostGo);
 host.click(hostGo);
-const hostSpent = await host.until('spent', () => statOf(host, 'Spent') !== '₹0', 12000);
-check('the host can spend', hostSpent, statOf(host, 'Spent'));
+const hostSpent = await host.until('spent', () => cashOf(host) !== '₹5 crore', 12000);
+check('the host can spend', hostSpent, cashOf(host));
+
+// The outcome arrives as a sheet; clear it before reading the screen behind.
+check('the outcome is reported to the host', !!host.q('.report-sheet'));
+if (host.q('.report-sheet')) host.click(host.q('.report-sheet .btn-primary'));
+
 check(
   'the server deducted exactly the action cost',
-  statOf(host, 'Spent') === host.dom.window.CMP.ui.money.format(dealCost),
-  statOf(host, 'Spent')
+  moneyOf(host, 'Spent') === host.dom.window.CMP.ui.money.words(dealCost),
+  moneyOf(host, 'Spent')
 );
-check('the cash in hand dropped', statOf(host, 'Cash in Hand') !== '₹5,00,00,000');
-check('a risky action raised the host heat', !/^0 \//.test(host.q('.heat-value').textContent),
-  host.q('.heat-value').textContent);
-check('the outcome is reported to the host', !!host.q('.report'));
+check('the cash in hand dropped', cashOf(host) !== '₹5 crore', cashOf(host));
+check('a risky action raised the host heat',
+  !/^0 \//.test(moneyOf(host, 'Political heat') || ''), moneyOf(host, 'Political heat'));
 
 // Give the other clients a poll or two to refresh, then confirm they are untouched.
 await sleep(3500);
 for (const c of [players[1], players[2], players[3]]) {
   check(c.label + " cash is untouched by the host's spending",
-    statOf(c, 'Cash in Hand') === '₹5,00,00,000', statOf(c, 'Cash in Hand'));
-  check(c.label + ' heat is untouched', /0 \/ 100/.test(c.q('.heat-card').textContent));
+    cashOf(c) === '₹5 crore', cashOf(c));
+  check(c.label + ' heat is untouched',
+    /0 \/ 100/.test(moneyOf(c, 'Political heat') || ''), moneyOf(c, 'Political heat'));
 }
 
 // A second player spends independently.
-const p2Card = players[1].qq('.action-card').find((c) => {
-  const n = c.querySelector('.action-label');
+openSection(players[1], 'Campaign');
+const p2Card = players[1].qq('.act').find((c) => {
+  const n = c.querySelector('.act-name');
   return n && n.textContent === 'Public Rally';
 });
-players[1].click(p2Card);
+players[1].click(p2Card.querySelector('.act-use'));
 await sleep(60);
 players[1].click(players[1].q('.dialog-buttons .btn-primary, .dialog-buttons .btn-danger'));
-const p2Spent = await players[1].until('spent', () => statOf(players[1], 'Spent') !== '₹0', 12000);
+const p2Spent = await players[1].until('spent', () => cashOf(players[1]) !== '₹5 crore', 12000);
 check('player 2 can spend their own money', p2Spent);
+if (players[1].q('.report-sheet')) {
+  players[1].click(players[1].q('.report-sheet .btn-primary'));
+}
 check(
   'the two players have different amounts left',
-  statOf(host, 'Cash in Hand') !== statOf(players[1], 'Cash in Hand'),
-  statOf(host, 'Cash in Hand') + ' vs ' + statOf(players[1], 'Cash in Hand')
+  cashOf(host) !== cashOf(players[1]),
+  cashOf(host) + ' vs ' + cashOf(players[1])
 );
 
 /* --------------------------------------------- constituency + oversight */
@@ -389,28 +417,33 @@ check(
 section('Constituency detail shows real MLA and fictional race');
 
 const tabButton = (client, label) =>
-  client.qq('.panel-tab').find((t) => t.textContent === label);
+  client.qq('.g-nav-item').find((t) => t.textContent === label);
 
-host.click(tabButton(host, 'Constituency'));
+// A constituency is opened from the list of them, the way a player does it.
+host.click(tabButton(host, 'Constituencies'));
+await host.until('list', () => !!host.q('.seat-row'));
+host.click(host.q('.seat-row'));
 await host.until('seat detail', () => !!host.q('.seat-detail'));
-check('the constituency tab opens', !!host.q('.seat-detail'));
-check('it names the seat and its AC number', /AC \d+/.test(host.q('.seat-detail-name').textContent),
-  host.q('.seat-detail-name').textContent);
-check('the sitting MLA is shown', !!host.q('.incumbent-name') && host.q('.incumbent-name').textContent.length > 2,
-  host.q('.incumbent-name') ? host.q('.incumbent-name').textContent : 'missing');
-check('their party is shown', !!host.q('.incumbent-party'));
-check('incumbency strength is shown', !!host.q('.incumbent-strength'),
-  host.q('.incumbent-strength') ? host.q('.incumbent-strength').textContent : 'missing');
+
+check('a constituency opens from the list', !!host.q('.seat-detail'));
+check('it names the seat and its AC number', /AC \d+/.test(host.q('.sd-where').textContent),
+  host.q('.sd-where').textContent);
+check('the sitting MLA is shown', !!host.q('.sd-mla-name') && host.q('.sd-mla-name').textContent.length > 2,
+  host.q('.sd-mla-name') ? host.q('.sd-mla-name').textContent : 'missing');
+check('their party is shown', !!host.q('.sd-mla-party'));
 check('it is labelled as real reference data',
-  /takes no part in the game/i.test(host.q('.seat-detail').textContent));
-check('the fictional race is shown separately', /Current Game Race/.test(host.q('.seat-detail').textContent));
-check('every party has a bar', host.qq('.race-row').length >= 4, String(host.qq('.race-row').length));
-check('one party is marked LEADING', host.qq('.race-lead').length === 1);
-check('a projected winner is named', !!host.q('.projected-party'));
-check('a LEADING badge is shown at the top', !!host.q('.leading-badge'));
+  /takes no part in the game/i.test(host.q('.sd-mla').textContent));
+check('the fictional race is shown separately', !!host.q('.sd-leader'));
+check('the game leader is named', host.q('.sd-leader-name').textContent.length > 2,
+  host.q('.sd-leader-name').textContent);
+check('with their share', /%$/.test(host.q('.sd-leader-share').textContent),
+  host.q('.sd-leader-share').textContent);
+check('every party has a bar', host.qq('.sd-bar').length >= 4, String(host.qq('.sd-bar').length));
+check('one bar is marked as leading', host.qq('.sd-bar.is-leading').length === 1);
 
 section('Reporting a rival');
-host.click(tabButton(host, 'Rivals'));
+// Rivals sit with the high-risk play they exist to police.
+host.click(tabButton(host, 'High Risk'));
 await host.until('rivals', () => !!host.q('.rival-list'));
 check('the rivals tab opens', !!host.q('.rival-list'));
 check('it lists the other three players', host.qq('.rival-row').length === 3,
@@ -434,7 +467,7 @@ check('you cannot report the same player twice',
 
 // A second, different player reporting the same rival opens an inquiry.
 const targetName = host.qq('.rival-row')[0].querySelector('.rival-name').textContent;
-players[1].click(tabButton(players[1], 'Rivals'));
+players[1].click(tabButton(players[1], 'High Risk'));
 await players[1].until('rivals', () => !!players[1].q('.rival-list'));
 const sameTarget = players[1].qq('.rival-row').find((r) =>
   r.querySelector('.rival-name').textContent.indexOf(targetName.replace(/^[A-Z]+/, '').trim()) !== -1
@@ -454,14 +487,27 @@ check('the evidence score is never sent to the browser',
 /* --------------------------------------------------------- the result */
 
 section('Closing the polls');
+// Closing the polls is not part of a round, so it lives in the menu rather
+// than on the campaign screen.
 host.click(tabButton(host, 'Campaign'));
-check('only the host is offered the declare button',
-  !!host.button('Close the polls now') && !players[1].button('Close the polls now'));
-check('everyone is told the polls close on their own',
-  /close automatically after round 15|final round/i.test(host.q('.declare-note').textContent),
-  host.q('.declare-note').textContent);
+host.click(host.q('.g-menu'));
+await sleep(60);
+const hostSheet = host.q('.sheet-panel');
+check('the menu opens', !!hostSheet);
+check('only the host is offered the declare control',
+  !!host.qq('.sheet-item').find((b) => /Close the polls now/.test(b.textContent)),
+  host.qq('.sheet-item').map((b) => b.textContent).join(' | '));
+check('the menu also offers the election history',
+  !!host.qq('.sheet-item').find((b) => /Election history/.test(b.textContent)));
 
-host.click(host.button('Close the polls now'));
+players[1].click(players[1].q('.g-menu'));
+await sleep(60);
+check('a guest is not offered it',
+  !players[1].qq('.sheet-item').find((b) => /Close the polls/.test(b.textContent)),
+  players[1].qq('.sheet-item').map((b) => b.textContent).join(' | '));
+players[1].click(players[1].qq('.sheet-panel button').find((b) => b.textContent === 'Close'));
+
+host.click(host.qq('.sheet-item').find((b) => /Close the polls now/.test(b.textContent)));
 await sleep(80);
 // Ending a campaign early for four people is worth a confirmation.
 check('closing early asks first', !!host.q('.dialog'));

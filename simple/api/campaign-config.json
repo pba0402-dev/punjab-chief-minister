@@ -107,7 +107,8 @@
           "heat": 0,
           "text": "Turnout was modest. Some gain, not much."
         }
-      ]
+      ],
+      "menu": "campaign"
     },
     {
       "id": "media",
@@ -149,7 +150,8 @@
       "reach": {
         "seats": 4,
         "share": 0.55
-      }
+      },
+      "menu": "campaign"
     },
     {
       "id": "community",
@@ -191,7 +193,8 @@
       "reach": {
         "seats": 3,
         "share": 0.5
-      }
+      },
+      "menu": "campaign"
     },
     {
       "id": "outreach",
@@ -229,7 +232,8 @@
           "heat": 1,
           "text": "A cold reception in places. Modest gain."
         }
-      ]
+      ],
+      "menu": "campaign"
     },
     {
       "id": "deal",
@@ -279,7 +283,8 @@
       "reach": {
         "seats": 5,
         "share": 0.55
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "influence",
@@ -321,7 +326,8 @@
       "reach": {
         "seats": 4,
         "share": 0.55
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "negative",
@@ -364,7 +370,8 @@
       "reach": {
         "seats": 3,
         "share": 0.5
-      }
+      },
+      "menu": "corruption"
     },
     {
       "id": "lastpush",
@@ -406,7 +413,8 @@
       "reach": {
         "seats": 6,
         "share": 0.6
-      }
+      },
+      "menu": "campaign"
     }
   ],
   "consequences": [
@@ -854,7 +862,8 @@
           "heat": 0,
           "text": "No funding at all. At least the development was noticed."
         }
-      ]
+      ],
+      "menu": "grants"
     },
     "underground": {
       "id": "underground",
@@ -901,7 +910,8 @@
           "seats": 3,
           "text": "Nothing came. The conversation, however, was noticed."
         }
-      ]
+      ],
+      "menu": "corruption"
     }
   },
   "events": {
@@ -1130,5 +1140,16 @@
       "One Punjab, one future"
     ],
     "heatBackoff": 0.5
-  }
+  },
+  "_menuComment": [
+    "Which menu each action appears under.",
+    "",
+    "The four safe strategies and the last-minute push are ordinary",
+    "campaigning. The rest are the high-risk ones, and they sit together under",
+    "their own heading so a player can see at a glance that everything on that",
+    "screen carries a real chance of going wrong.",
+    "",
+    "This lives in the config rather than the interface so adding an action",
+    "puts it in the right place without anyone editing a screen."
+  ]
 }

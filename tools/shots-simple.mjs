@@ -29,6 +29,17 @@ const NL = String.fromCharCode(10);
 
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 
+/** Open the game screen on one of its menu sections. */
+function sectionScene(label) {
+  return "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
+    "candidateName:'Gurpreet Singh',slogan:'Naya Punjab'}));" +
+    "CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var t=document.querySelectorAll('.g-nav-item');" +
+    "  for(var i=0;i<t.length;i++)if(t[i].textContent===" + JSON.stringify(label) + ")t[i].click();" +
+    "},80);";
+}
+
 const SCENES = {
   home: '',
   'home-saved':
@@ -44,9 +55,26 @@ const SCENES = {
     "type(f[0],'Simran Kaur Gill');type(f[1],'Naya Punjab, Sacha Punjab');" +
     "type(document.querySelector('.field-money'),'100000000');",
   election:
-    "CMP.app.setGame(CMP.state.startElection({partyId:'aap'," +
-    "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
-    "budget:100000000}));CMP.app.goTo('election');",
+    "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
+    "candidateName:'Gurpreet Singh',slogan:'Naya Punjab, Sacha Punjab'}));" +
+    "CMP.app.goTo('election');",
+
+  // Each of the menu sections, so every one can actually be looked at.
+  'sec-money': sectionScene('Money'),
+  'sec-loan': sectionScene('Loan'),
+  'sec-risk': sectionScene('High Risk'),
+  'sec-seats': sectionScene('Constituencies'),
+  'sec-seat-detail':
+    "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
+    "candidateName:'Gurpreet Singh',slogan:'Naya Punjab'}));" +
+    "CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var t=document.querySelectorAll('.g-nav-item');" +
+    "  for(var i=0;i<t.length;i++)if(t[i].textContent==='Constituencies')t[i].click();" +
+    "  setTimeout(function(){" +
+    "    var r=document.querySelector('.seat-row');if(r)r.click();" +
+    "  },80);" +
+    "},80);",
 
   // Mid-campaign: a few rounds played, money borrowed, a summary on screen.
   'election-round':
@@ -171,8 +199,19 @@ function auditScript(setup) {
     'try{' + setup + '}catch(e){document.title="SCENE ERROR "+e.message;}',
     'var W=document.documentElement.clientWidth, bad=[];',
     'var all=document.querySelectorAll("*");',
+    // A deliberate horizontal scroller is not page overflow: its children are
+    // meant to run past the edge and be scrolled to. Only flag elements that
+    // push the page itself sideways.
+    'function inScroller(n){',
+    '  for(var p=n.parentElement;p;p=p.parentElement){',
+    '    var o=getComputedStyle(p).overflowX;',
+    '    if(o==="auto"||o==="scroll")return true;',
+    '  }',
+    '  return false;',
+    '}',
     'for(var i=0;i<all.length;i++){',
     '  var n=all[i]; if(n.id==="audit")continue;',
+    '  if(inScroller(n))continue;',
     '  var r=n.getBoundingClientRect();',
     '  if(r.width>0&&(r.right>W+1||r.left<-1)){',
     '    var c=(typeof n.className==="string")?n.className:"";',

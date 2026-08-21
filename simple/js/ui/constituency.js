@@ -1,21 +1,17 @@
 /**
- * Constituency detail.
+ * One constituency, compactly.
  * ------------------------------------------------------------------
- * Two clearly separated halves.
+ * Who is leading here, by how much, against whom — and, kept firmly separate
+ * below it, who the real sitting MLA is.
  *
- * The top is REAL: the sitting MLA, their party and how entrenched they are.
- * That person is the incumbent the fictional campaign is fought against — they
- * take no part in the game and nothing they do here is attributed to them.
+ * That separation is the only thing on this screen that is not negotiable. The
+ * sitting member is a real person and appears as reference only: they take no
+ * part in the game, and nothing a player does is attributed to them. The
+ * candidates above them are invented, and are the ones actually contesting the
+ * fictional election.
  *
- * The bottom is the FICTIONAL game race: the candidates standing, who is
- * leading, by how much, the projected winner, and how the race has moved round
- * by round. It moves as players campaign.
- *
- * Candidates are the ones players named for themselves at setup. A party
- * nobody is playing is shown with no candidate rather than an invented one —
- * making up a name here would put a fictional person next to a real MLA on the
- * same screen, which is exactly the confusion the split above is there to
- * prevent.
+ * Everything else here is deliberately small. A player opening a seat wants
+ * four numbers and a name, not a page of analysis.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -24,7 +20,6 @@ CMP.ui.constituency = (function () {
   'use strict';
 
   var el = CMP.ui.dom.el;
-  var mount = CMP.ui.dom.mount;
 
   /** The party currently ahead in a seat, and by how much. */
   function leaderOf(support) {
@@ -52,53 +47,23 @@ CMP.ui.constituency = (function () {
     ]);
   }
 
-  /**
-   * Every party's candidate, in the order they stand in this seat.
-   * `players` is the roster: solo has one entry, multiplayer up to four.
-   */
-  function candidateTable(game, ranked, players) {
-    var byParty = {};
-    (players || []).forEach(function (p) {
-      if (p && p.partyId) byParty[p.partyId] = p;
-    });
+  /** Real party codes may be outside the four; colour them sensibly anyway. */
+  function partyColourFor(code) {
+    var party = CMP.getParty(String(code || '').toLowerCase());
+    return party ? party.colour : '#a89b89';
+  }
 
-    return el('table', { class: 'candidates' }, [
-      el('thead', {}, [
-        el('tr', {}, [
-          el('th', { text: 'Candidate' }),
-          el('th', { text: 'Party' }),
-          el('th', { class: 'is-num', text: 'Support' }),
-        ]),
-      ]),
-      el(
-        'tbody',
-        {},
-        ranked.map(function (row, i) {
-          var party = CMP.getParty(row.partyId);
-          var who = byParty[row.partyId];
-          var isYou = row.partyId === game.partyId;
-          return el('tr', { class: (isYou ? 'is-you' : '') + (i === 0 ? ' is-leading' : '') }, [
-            el('td', { class: 'candidate-name' }, [
-              who && who.candidateName
-                ? el('span', { text: who.candidateName })
-                : el('span', { class: 'muted', text: 'No declared candidate' }),
-              isYou ? el('span', { class: 'race-you', text: 'you' }) : null,
-            ]),
-            el('td', {}, [
-              el('span', { class: 'race-dot', style: { background: party.colour } }),
-              party.short,
-            ]),
-            el('td', { class: 'is-num', text: row.support.toFixed(1) + '%' }),
-          ]);
-        })
-      ),
-    ]);
+  function candidateFor(partyId, roster) {
+    for (var i = 0; i < (roster || []).length; i++) {
+      if (roster[i].partyId === partyId) return roster[i];
+    }
+    return null;
   }
 
   /**
-   * How this seat has moved, round by round. One line per party, drawn as a
-   * plain SVG — a number changing on its own says nothing about whether a
-   * campaign is working, and this is the smallest thing that does.
+   * How the race here has moved, round by round. Offered rather than shown:
+   * the four numbers above answer the question, and a chart is for the player
+   * who wants to know whether their spending is working.
    */
   function historyChart(history, current, partyId) {
     var points = (history || []).slice();
@@ -106,25 +71,22 @@ CMP.ui.constituency = (function () {
       return el('p', {
         class: 'history-empty',
         text: points.length
-          ? 'One round recorded so far. The trend appears from round two.'
-          : 'No rounds finished yet — the trend appears once one has.',
+          ? 'One round recorded. The trend appears from round two.'
+          : 'No rounds finished yet.',
       });
     }
-    // The live standing is the newest point, so the chart ends where the bars do.
     if (current) points = points.concat([{ round: points[points.length - 1].round + 1, support: current }]);
 
     var w = 320;
-    var h = 96;
+    var h = 84;
     var padL = 4;
-    var padB = 16;
-    var maxRound = points[points.length - 1].round;
+    var padB = 14;
     var minRound = points[0].round;
-    var span = Math.max(1, maxRound - minRound);
+    var span = Math.max(1, points[points.length - 1].round - minRound);
 
-    // Scale to the range the data actually occupies, not to zero. Five
-    // parties in a close seat all sit between 15 and 30 per cent, and an
-    // axis starting at zero would draw that as five flat lines in a heap —
-    // which is exactly the movement the chart exists to show.
+    // Scale to the range the data occupies, not to zero: five parties in a
+    // close seat all sit between 15 and 30 per cent, and a zero-based axis
+    // would draw that as five flat lines in a heap.
     var lo = Infinity;
     var hi = -Infinity;
     points.forEach(function (p) {
@@ -143,18 +105,11 @@ CMP.ui.constituency = (function () {
     hi = Math.min(100, hi + pad);
     if (hi - lo < 3) hi = lo + 3;
 
-    function x(round) {
-      return padL + ((round - minRound) / span) * (w - padL * 2);
-    }
-    function y(value) {
-      return (h - padB) - ((value - lo) / (hi - lo)) * (h - padB - 8);
-    }
-
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
     svg.setAttribute('class', 'history-chart');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', 'Support by round for this constituency');
+    svg.setAttribute('aria-label', 'Support by round in this constituency');
 
     function add(tag, attrs) {
       var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -164,76 +119,39 @@ CMP.ui.constituency = (function () {
       svg.appendChild(node);
       return node;
     }
+    function x(round) {
+      return padL + ((round - minRound) / span) * (w - padL * 2);
+    }
+    function y(value) {
+      return (h - padB) - ((value - lo) / (hi - lo)) * (h - padB - 8);
+    }
 
     add('line', { x1: padL, y1: h - padB, x2: w - padL, y2: h - padB, class: 'history-axis' });
-
     CMP.PARTIES.forEach(function (party) {
-      var d = points
-        .map(function (p, i) {
-          return (i ? 'L' : 'M') + x(p.round).toFixed(1) + ' ' + y(p.support[party.id] || 0).toFixed(1);
-        })
-        .join(' ');
+      var d = points.map(function (p, i) {
+        return (i ? 'L' : 'M') + x(p.round).toFixed(1) + ' ' + y(p.support[party.id] || 0).toFixed(1);
+      }).join(' ');
       add('path', {
         d: d,
         class: 'history-line' + (party.id === partyId ? ' is-you' : ''),
         stroke: party.colour,
       });
-      var last = points[points.length - 1];
-      add('circle', {
-        cx: x(last.round).toFixed(1),
-        cy: y(last.support[party.id] || 0).toFixed(1),
-        r: party.id === partyId ? 3.4 : 2.2,
-        fill: party.colour,
-      });
     });
 
-    var labels = el('div', { class: 'history-scale' }, [
-      el('span', { text: 'Round ' + minRound }),
-      el('span', { text: lo.toFixed(0) + '% – ' + hi.toFixed(0) + '%' }),
-      el('span', { text: 'now' }),
-    ]);
-
-    return el('div', { class: 'history-block' }, [svg, labels]);
-  }
-
-  /**
-   * Who held this seat when the last round was settled, and whether it has
-   * changed hands since. The leader map is the same one the scoreboard's seat
-   * changes are diffed from, so the two can never disagree.
-   */
-  function changeLine(game, number, lead) {
-    var previous = (game.leaders || {})[String(number)];
-    if (!previous) {
-      return el('p', {
-        class: 'seat-change seat-change-none',
-        text: 'No round has been settled yet, so there is nothing to compare against.',
-      });
-    }
-
-    if (previous === lead.partyId) {
-      return el('p', { class: 'seat-change seat-change-held' }, [
-        el('strong', { text: CMP.getParty(previous).short }),
-        ' held this seat through the last round.',
-      ]);
-    }
-
-    var from = CMP.getParty(previous);
-    var to = CMP.getParty(lead.partyId);
-    return el('p', {
-      class: 'seat-change seat-change-flip',
-      style: { '--from': from.colour, '--to': to.colour },
-    }, [
-      el('span', { class: 'seat-change-kicker', text: 'Changed hands' }),
-      el('span', { class: 'change-from', text: from.short }),
-      el('span', { class: 'change-arrow', text: '→' }),
-      el('span', { class: 'change-to', style: { background: to.colour, color: to.ink || '#fff' }, text: to.short }),
+    return el('div', { class: 'history-block' }, [
+      svg,
+      el('div', { class: 'history-scale' }, [
+        el('span', { text: 'Round ' + minRound }),
+        el('span', { text: lo.toFixed(0) + '%–' + hi.toFixed(0) + '%' }),
+        el('span', { text: 'now' }),
+      ]),
     ]);
   }
 
   /**
-   * The full panel for one seat.
-   * `opts.showActions` adds a footer the caller can hang buttons on.
-   * `opts.players` is the roster, and `opts.history` the round-by-round board.
+   * The panel for one seat.
+   * `opts.players` is the roster, `opts.history` the round-by-round board,
+   * `opts.onBack` a way out, `opts.footer` anything to hang underneath.
    */
   function render(game, number, opts) {
     opts = opts || {};
@@ -247,136 +165,114 @@ CMP.ui.constituency = (function () {
     var sitting = CMP.getIncumbent(def.number);
     var lead = leaderOf(support);
     var rating = CMP.campaign.ratingFor(lead.margin);
-    var strength = (game.incumbency && game.incumbency[number]) || null;
+    var leadParty = CMP.getParty(lead.partyId);
+    var leadCandidate = candidateFor(lead.partyId, opts.players);
+    var previous = (game.leaders || {})[String(number)];
+    var showHistory = false;
+
+    var historyNode = el('div', { class: 'seat-history' });
+    function paintHistory() {
+      CMP.ui.dom.mount(historyNode, [
+        el('button', {
+          class: 'seat-history-toggle',
+          type: 'button',
+          text: showHistory ? 'Hide support by round' : 'Support by round',
+          onclick: function () {
+            showHistory = !showHistory;
+            paintHistory();
+          },
+        }),
+        showHistory ? historyChart(opts.history, support, game.partyId) : null,
+      ]);
+    }
+    paintHistory();
 
     return el('div', { class: 'seat-detail' }, [
-      /* ---- heading ---- */
-      el('div', { class: 'seat-detail-head' }, [
-        el('div', {}, [
-          el('h2', { class: 'seat-detail-name' }, [
-            def.name,
-            el('span', { class: 'seat-detail-ac', text: ' — AC ' + def.number }),
-          ]),
-          el('span', { class: 'seat-detail-district' }, [
-            def.district + ' district',
+      /* ---- which seat ---- */
+      el('header', { class: 'sd-head' }, [
+        opts.onBack
+          ? el('button', {
+              class: 'sd-back',
+              type: 'button',
+              'aria-label': 'Back',
+              text: '‹',
+              onclick: opts.onBack,
+            })
+          : null,
+        el('div', { class: 'sd-title' }, [
+          el('h2', { class: 'sd-name', text: def.name }),
+          el('p', { class: 'sd-where' }, [
+            'AC ' + def.number + ' · ' + def.district,
             def.reserved ? el('span', { class: 'tag', text: def.reserved }) : null,
           ]),
         ]),
-        leadingBadge(support),
       ]),
 
-      /* ---- real incumbent ---- */
-      sitting
-        ? el('div', { class: 'incumbent-card' }, [
-            el('div', { class: 'incumbent-row' }, [
-              el('div', { class: 'incumbent-block' }, [
-                el('span', { class: 'stat-label', text: 'Current MLA' }),
-                el('strong', { class: 'incumbent-name', text: sitting.mla }),
-              ]),
-              el('div', { class: 'incumbent-block' }, [
-                el('span', { class: 'stat-label', text: 'Current Party' }),
-                el('span', {
-                  class: 'incumbent-party',
-                  style: { color: partyColourFor(sitting.party) },
-                  text: sitting.party,
-                }),
-              ]),
-              strength
-                ? el('div', { class: 'incumbent-block' }, [
-                    el('span', { class: 'stat-label', text: 'Incumbency Strength' }),
-                    el('span', { class: 'incumbent-strength', text: strength.label }),
-                  ])
-                : null,
-            ]),
-            sitting.byElection
-              ? el('span', {
-                  class: 'incumbent-note',
-                  text:
-                    'Won a by-election in ' +
-                    sitting.byElection.date +
-                    ' — ' +
-                    sitting.byElection.reason.toLowerCase() +
-                    '.',
-                })
-              : null,
-            el('span', {
-              class: 'incumbent-note incumbent-disclaimer',
-              text:
-                'Real reference data. The sitting member is the incumbent this ' +
-                'fictional campaign is fought against and takes no part in the game.',
-            }),
+      /* ---- who is winning it ---- */
+      el('div', {
+        class: 'sd-leader',
+        style: { '--party': leadParty.colour, '--party-ink': leadParty.ink || '#fff' },
+      }, [
+        leadCandidate && leadCandidate.portraitSeed
+          ? CMP.ui.portrait.render(leadCandidate.portraitSeed, 44, leadCandidate.candidateName)
+          : el('span', { class: 'sd-leader-flag', text: leadParty.short }),
+        el('div', { class: 'sd-leader-body' }, [
+          el('span', { class: 'sd-leader-kicker', text: 'Leading' }),
+          el('strong', {
+            class: 'sd-leader-name',
+            text: leadCandidate ? leadCandidate.candidateName : leadParty.name,
+          }),
+          el('span', { class: 'sd-leader-party', text: leadParty.short }),
+        ]),
+        el('div', { class: 'sd-leader-figures' }, [
+          el('strong', { class: 'sd-leader-share', text: lead.share.toFixed(1) + '%' }),
+          el('span', { class: 'sd-rating rating-' + rating.id, text: rating.label }),
+        ]),
+      ]),
+
+      /* ---- the rest of the field ---- */
+      el('div', { class: 'sd-bars' }, lead.ranked.map(function (row, i) {
+        var party = CMP.getParty(row.partyId);
+        var who = candidateFor(row.partyId, opts.players);
+        return el('div', {
+          class: 'sd-bar' + (i === 0 ? ' is-leading' : '') +
+            (row.partyId === game.partyId ? ' is-you' : ''),
+          style: { '--party': party.colour },
+        }, [
+          el('span', { class: 'sd-bar-party', text: party.short }),
+          el('span', { class: 'sd-bar-track' }, [
+            el('span', { class: 'sd-bar-fill', style: { width: row.support + '%' } }),
+          ]),
+          el('span', { class: 'sd-bar-value', text: row.support.toFixed(1) + '%' }),
+          who ? el('span', { class: 'sd-bar-who', text: who.candidateName }) : null,
+        ]);
+      })),
+
+      /* ---- did it change hands ---- */
+      previous && previous !== lead.partyId
+        ? el('p', { class: 'sd-change' }, [
+            el('span', { class: 'sd-change-kicker', text: 'Changed hands' }),
+            CMP.getParty(previous).short + ' → ' + leadParty.short,
           ])
         : null,
 
-      /* ---- fictional race ---- */
-      el('div', { class: 'race-block' }, [
-        el('div', { class: 'group-head' }, [
-          el('h3', { class: 'race-title', text: 'Current Game Race' }),
-          el('span', {
-            class: 'race-rating rating-' + rating.id,
-            text: rating.label,
-          }),
-        ]),
-        el(
-          'div',
-          { class: 'race-bars' },
-          lead.ranked.map(function (row) {
-            var party = CMP.getParty(row.partyId);
-            var isLeader = row.partyId === lead.partyId;
-            var isYou = row.partyId === game.partyId;
-            return el('div', { class: 'race-row' + (isYou ? ' is-you' : '') }, [
-              el('span', { class: 'race-name' }, [
-                el('span', { class: 'race-dot', style: { background: party.colour } }),
-                party.short,
-                isYou ? el('span', { class: 'race-you', text: 'you' }) : null,
-              ]),
-              el('span', { class: 'race-track' }, [
-                el('span', {
-                  class: 'race-fill',
-                  style: { width: Math.max(2, row.support * 1.6) + '%', background: party.colour },
-                }),
-              ]),
-              el('span', { class: 'race-value', text: row.support.toFixed(1) + '%' }),
-              isLeader ? el('span', { class: 'race-lead', text: 'LEADING' }) : null,
-            ]);
-          })
-        ),
-        candidateTable(game, lead.ranked, opts.players),
-        changeLine(game, number, lead),
-        el('div', { class: 'projected' }, [
-          el('span', { class: 'stat-label', text: 'Projected Winner' }),
-          el('span', {
-            class: 'projected-party',
-            style: { color: CMP.getParty(lead.partyId).colour },
-            text: CMP.getParty(lead.partyId).name,
-          }),
-          el('span', {
-            class: 'projected-note',
-            text:
-              rating.id === 'tossup'
-                ? 'Too close to call — this one is still winnable.'
-                : 'Ahead by ' + lead.margin.toFixed(1) + ' points.',
-          }),
-        ]),
-      ]),
+      /* ---- the real sitting member, kept apart ---- */
+      sitting
+        ? el('div', { class: 'sd-mla' }, [
+            el('span', { class: 'sd-mla-kicker', text: 'Current MLA' }),
+            el('strong', { class: 'sd-mla-name', text: sitting.mla }),
+            el('span', {
+              class: 'sd-mla-party',
+              style: { color: partyColourFor(sitting.party) },
+              text: sitting.party,
+            }),
+            el('span', { class: 'sd-mla-note', text: 'Real reference. Takes no part in the game.' }),
+          ])
+        : null,
 
-      /* ---- how the race has moved ---- */
-      el('div', { class: 'history-card' }, [
-        el('div', { class: 'group-head' }, [
-          el('h3', { class: 'race-title', text: 'Support by Round' }),
-          el('span', { class: 'group-note', text: 'Every round since the campaign opened.' }),
-        ]),
-        historyChart(opts.history, support, game.partyId),
-      ]),
-
+      historyNode,
       opts.footer || null,
     ]);
-  }
-
-  /** Real party codes may be outside the four; colour them sensibly anyway. */
-  function partyColourFor(code) {
-    var party = CMP.getParty(String(code || '').toLowerCase());
-    return party ? party.colour : '#a89b89';
   }
 
   return {

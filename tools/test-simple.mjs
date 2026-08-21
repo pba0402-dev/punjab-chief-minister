@@ -105,8 +105,8 @@ const settle = () => new Promise((r) => setTimeout(r, 10));
 const modeCard = (d, label) =>
   qq(d, '.mode-card').find((b) => b.textContent.indexOf(label) === 0);
 const actionCard = (d, label) =>
-  qq(d, '.action-card').find((c) => {
-    const n = c.querySelector('.action-label');
+  qq(d, '.act').find((c) => {
+    const n = c.querySelector('.act-name');
     return n && n.textContent === label;
   });
 
@@ -114,8 +114,20 @@ const actionCard = (d, label) =>
  * Spending money asks first. Click the card, then agree to the dialog —
  * which is what a player does, so the test should do it too.
  */
+/** Which menu section an action lives under, so a test can go find it. */
+const SECTION_OF = { campaign: 'Campaign', grants: 'Grants', corruption: 'High Risk' };
+
 const playCard = async (d, label) => {
-  clickIt(d, actionCard(d, label));
+  const action = d.window.CMP.ACTIONS.find((a) => a.label === label);
+  if (!action) throw new Error('no action called ' + label);
+  const tab = qq(d, '.g-nav-item').find((n) => n.textContent === SECTION_OF[action.menu]);
+  if (tab) {
+    clickIt(d, tab);
+    await settle();
+  }
+  const card = actionCard(d, label);
+  if (!card) throw new Error('no action called ' + label + ' in ' + SECTION_OF[action.menu]);
+  clickIt(d, card.querySelector('.act-use'));
   await settle();
   const go = q(d, '.dialog-buttons .btn-primary, .dialog-buttons .btn-danger');
   if (!go) throw new Error('no confirmation dialog appeared for ' + label);
@@ -164,37 +176,86 @@ clickIt(dom, q(dom, '.btn-start'));
 
 /* ---------------------------------------------------------------- panel */
 
-section('2. The campaign panel');
+section('2. The game screen');
 check('   election screen opens', !!q(dom, '.screen-election'));
 
-function statValue(d, label) {
-  const tile = qq(d, '.stat').find((n) => {
-    const l = n.querySelector('.stat-label');
-    return l && l.textContent === label;
-  });
-  return tile ? tile.querySelector('.stat-value').textContent : null;
+/** Open one of the menu sections by its label. */
+function openSection(d, label) {
+  const tab = qq(d, '.g-nav-item').find((n) => n.textContent === label);
+  if (!tab) throw new Error('no section called ' + label);
+  clickIt(d, tab);
 }
 
-check('2. Cash in Hand reads ₹5,00,00,000', statValue(dom, 'Cash in Hand') === '₹5,00,00,000',
-  'got ' + statValue(dom, 'Cash in Hand'));
-check('2. Spent starts at ₹0', statValue(dom, 'Spent') === '₹0', 'got ' + statValue(dom, 'Spent'));
-check('2. Debt starts empty', statValue(dom, 'Debt') === '—', 'got ' + statValue(dom, 'Debt'));
-check('   your party is shown', /Indian National Congress/.test(text(dom)));
-check('   seats led is shown', statValue(dom, 'Seats Led') !== null);
+/** A labelled figure inside the money section. */
+function moneyLine(d, label) {
+  const row = qq(d, '.sum-line').find((n) => {
+    const l = n.querySelector('.sum-line-label');
+    return l && l.textContent === label;
+  });
+  return row ? row.querySelector('.sum-line-value').textContent : null;
+}
 
-check('8. Political Heat starts at 0 / 100', /0 \/ 100/.test(q(dom, '.heat-card').textContent));
-check('8. heat level reads Low', /Low/.test(q(dom, '.heat-card').textContent));
+// The point of the redesign: the first screen answers who is winning, not
+// how much cash everyone has. The money lives one tap away.
+check('   the header names the game', /Chief Minister of Punjab/.test(q(dom, '.g-title').textContent));
+check('   and states the stakes once',
+  /117 seats · majority 59/.test(q(dom, '.g-subtitle').textContent),
+  q(dom, '.g-subtitle').textContent);
+check('   the round and clock are shown', !!q(dom, '.round-bar') && !!q(dom, '.round-clock'));
 
-check('   four safe actions listed', qq(dom, '.action-card.action-safe').length === 4);
-check('   four risky actions listed', qq(dom, '.action-card.action-risky').length === 4);
-check('   "Safe Campaign" heading', /Safe Campaign/.test(text(dom)));
-check('   "Risky Strategies" heading', /Risky Strategies/.test(text(dom)));
-check('   a constituency is targeted by default', !!q(dom, '.target-card .target-name'));
-check('   the target shows support figures', qq(dom, '.number-value').length >= 2);
-check('   the target shows a status', !!q(dom, '.target-rating'));
+check('   one compact player strip, not four cards', qq(dom, '.g-player').length === 1);
+check('   it shows the candidate', /Simran Kaur Gill/.test(q(dom, '.g-player').textContent));
+check('   their party', /INC/.test(q(dom, '.g-player-party').textContent));
+check('   their cash', /₹5 crore/.test(q(dom, '.g-player-cash').textContent),
+  q(dom, '.g-player-cash').textContent);
+check('   and their seats', /seats?$/.test(q(dom, '.g-player-seats').textContent.trim()));
+check('   no large stat cards remain', qq(dom, '.stat').length === 0);
+
+check('   a compact section menu is offered', qq(dom, '.g-nav-item').length === 7,
+  qq(dom, '.g-nav-item').length + ' items');
+check('   campaign is the section it opens on',
+  q(dom, '.g-nav-item.is-active').textContent === 'Campaign');
+
+check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
+check('   it ranks all four candidates', qq(dom, '.lb-row').length === 4);
+check('   each with a portrait', qq(dom, '.lb .portrait').length === 4);
+check('   the leader is marked', !!q(dom, '.lb-row.is-leading'));
+check('   and the rest are placed', /2nd/i.test(text(dom)) && /4th/i.test(text(dom)));
+check('8. the majority is one line, not a chart',
+  qq(dom, '.g-majority').length === 1 &&
+  /of 59|majority of 59/.test(q(dom, '.g-majority-text').textContent),
+  q(dom, '.g-majority-text').textContent);
+
+check('9. leading-from lists constituencies by party', qq(dom, '.lf-group').length >= 1);
+check('   the seats are named', qq(dom, '.seat-row').length > 0);
+check('10. and every one is clickable',
+  qq(dom, '.seat-row').every((n) => n.tagName.toLowerCase() === 'button'));
+check('   with a way through to all 117',
+  !!qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
+
+check('   campaign actions are compact rows', qq(dom, '.act').length === 5,
+  qq(dom, '.act').length + ' in campaign');
+check('   each with a Use button', qq(dom, '.act-use').length === 5);
+check('   no long descriptions', qq(dom, '.act-body').every((n) => n.textContent.length < 60));
 
 const shownProbabilities = /\b(35|30|20|15|45|25|40)%\s*(chance|probability)/i.test(text(dom));
 check('   exact probabilities are never shown', !shownProbabilities);
+
+/* ------------------------------------------------------- the money tab */
+
+openSection(dom, 'Money');
+check('15. money opens on its own',
+  moneyLine(dom, 'Cash') === '₹5 crore', 'got ' + moneyLine(dom, 'Cash'));
+check('15. spent starts at nothing', moneyLine(dom, 'Spent') === '₹0', moneyLine(dom, 'Spent'));
+check('15. debt starts at nothing', moneyLine(dom, 'Debt') === '₹0', moneyLine(dom, 'Debt'));
+check('15. political heat is here, and only here',
+  /0 \/ 100/.test(moneyLine(dom, 'Political heat') || ''), moneyLine(dom, 'Political heat'));
+check('   with a way to borrow',
+  !!qq(dom, 'button').find((b) => /Borrow money/.test(b.textContent)));
+
+openSection(dom, 'Campaign');
+check('   money is not repeated on the home screen',
+  !qq(dom, '.sum-line').length);
 
 /* ---------------------------------------------------------------- spend */
 
@@ -206,21 +267,45 @@ const rallyCost = CMP.getAction('rally').cost;
 await playCard(dom, 'Public Rally');
 game = dom.window.CMP.app.getGame();
 check('5. a safe action works', game.spent === rallyCost, 'spent ' + game.spent);
-check('3. cash in hand drops',
-  statValue(dom, 'Cash in Hand') === dom.window.CMP.ui.money.format(50000000 - rallyCost),
-  statValue(dom, 'Cash in Hand'));
-check('3. spent is displayed', statValue(dom, 'Spent') === dom.window.CMP.ui.money.format(rallyCost));
-check('   the action is logged', qq(dom, '.log-row').length === 1);
-check('   an outcome is reported', !!q(dom, '.report'));
+// The outcome arrives as a sheet: it matters for a moment, then the log
+// below keeps the record.
+check('   an outcome is reported', !!q(dom, '.report-sheet'));
 check('   the report explains what happened in words',
   q(dom, '.report-text').textContent.length > 10);
+clickIt(dom, q(dom, '.report-sheet .btn-primary'));
+await settle();
+
+check('   the player strip shows the money going down',
+  q(dom, '.g-player-cash').textContent ===
+    dom.window.CMP.ui.money.words(50000000 - rallyCost),
+  q(dom, '.g-player-cash').textContent);
+check('   the action is logged', qq(dom, '.log-row').length === 1);
+
+openSection(dom, 'Money');
+check('3. cash in hand drops',
+  moneyLine(dom, 'Cash') === dom.window.CMP.ui.money.words(50000000 - rallyCost),
+  moneyLine(dom, 'Cash'));
+check('3. spent is displayed',
+  moneyLine(dom, 'Spent') === dom.window.CMP.ui.money.words(rallyCost),
+  moneyLine(dom, 'Spent'));
+openSection(dom, 'Campaign');
 
 const heatBefore = game.heat;
 await playCard(dom, 'Underground Deal');
 game = dom.window.CMP.app.getGame();
 check('6. a risky action works', game.spent === rallyCost + CMP.getAction('deal').cost);
 check('8. risky play raises Political Heat', game.heat > heatBefore, 'heat ' + game.heat);
-check('8. the heat meter reflects it', new RegExp(Math.round(game.heat) + ' / 100').test(q(dom, '.heat-card').textContent));
+// A report sheet is over the screen after a risky move; clear it first.
+if (q(dom, '.report-sheet')) {
+  clickIt(dom, q(dom, '.report-sheet .btn-primary'));
+  await settle();
+}
+openSection(dom, 'Money');
+check('8. the heat meter reflects it',
+  new RegExp(Math.round(game.heat) + ' / 100').test(moneyLine(dom, 'Political heat') || ''),
+  moneyLine(dom, 'Political heat'));
+check('8. and a bar shows it', !!q(dom, '.g-heat-fill'));
+openSection(dom, 'Campaign');
 
 /* ---------------------------------------------------------------- overspend */
 
@@ -240,8 +325,10 @@ dom.window.CMP.storage.save(game);
 dom.window.CMP.app.goTo('election');
 
 const dear = actionCard(dom, 'Last-Minute Push');
-check('4. an unaffordable action is disabled', dear.disabled === true);
-check('4. it says Insufficient Budget', /Insufficient Budget/.test(dear.textContent), dear.textContent.slice(0, 80));
+check('4. an unaffordable action is disabled',
+  dear.querySelector('.act-use').disabled === true);
+check('4. it says Insufficient Budget', /Insufficient Budget/.test(dear.textContent),
+  dear.textContent.slice(0, 80));
 
 const spentBefore = dom.window.CMP.app.getGame().spent;
 clickIt(dom, dear);
@@ -251,8 +338,9 @@ check('4. spending never exceeds the budget',
   dom.window.CMP.app.getGame().spent <= dom.window.CMP.app.getGame().budget);
 
 const cheap = actionCard(dom, 'Village Outreach');
-check('   the cheapest action is still affordable', cheap.disabled === false,
-  'remaining ₹' + (dom.window.CMP.app.getGame().budget - dom.window.CMP.app.getGame().spent));
+check('   the cheapest action is still affordable',
+  cheap.querySelector('.act-use').disabled === false,
+  'cash ₹' + dom.window.CMP.app.getGame().cash);
 
 /* ---------------------------------------------------------------- save */
 
@@ -281,14 +369,15 @@ const resumed = dom.window.CMP.app.getGame();
 check('11. spending survived the reload', resumed.spent === spentBefore, resumed.spent + ' vs ' + spentBefore);
 check('11. heat survived the reload', resumed.heat === saved.heat);
 check('11. support survived the reload', Object.keys(resumed.support).length === 117);
-check('   the panel shows the restored remaining budget',
-  statValue(dom, 'Cash in Hand') === dom.window.CMP.ui.money.format(resumed.cash));
+check('   the panel shows the restored cash',
+  q(dom, '.g-player-cash').textContent === dom.window.CMP.ui.money.words(resumed.cash),
+  q(dom, '.g-player-cash').textContent);
 
 /* ---------------------------------------------------------------- map */
 
 section('The constituency map');
-const mapTab = qq(dom, '.panel-tab').find((t) => t.textContent === 'Map');
-check('a Map tab is offered', !!mapTab);
+const mapTab = qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map');
+check('a Map section is offered', !!mapTab);
 clickIt(dom, mapTab);
 check('the map opens', !!q(dom, '.punjab-map'));
 check('all 117 constituencies are drawn', qq(dom, '.map-cell').length === 117,
@@ -311,23 +400,33 @@ check('the legend states the majority', /majority 59/.test(q(dom, '.map-legend')
 check('the map says the shapes are not official boundaries',
   /not official constituency boundaries/i.test(q(dom, '.map-note').textContent));
 
-// Clicking a seat targets it and returns to the campaign tab.
-const beforeTarget = q(dom, '.target-name').textContent;
+// Clicking a seat opens that constituency, which is what a player expects
+// from a map — the target follows from it.
 const cell = qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 clickIt(dom, cell);
-check('clicking a seat targets it', q(dom, '.target-name').textContent === 'Amritsar Central',
-  q(dom, '.target-name').textContent);
-check('and it returns to the campaign tab', !!q(dom, '.action-grid').offsetParent || true);
+check('clicking a seat opens that constituency',
+  q(dom, '.sd-name') && q(dom, '.sd-name').textContent === 'Amritsar Central',
+  q(dom, '.sd-name') ? q(dom, '.sd-name').textContent : 'no detail opened');
+check('11. it names the seat and district',
+  /AC 17 · Amritsar/.test(q(dom, '.sd-where').textContent), q(dom, '.sd-where').textContent);
+check('11. it shows the current leader with a share',
+  !!q(dom, '.sd-leader') && /%$/.test(q(dom, '.sd-leader-share').textContent));
+check('13. and a bar for every party', qq(dom, '.sd-bar').length >= 4);
+check('12. the real sitting MLA is shown separately', !!q(dom, '.sd-mla'));
+check('12. and marked as reference only',
+  /takes no part in the game/i.test(q(dom, '.sd-mla-note').textContent));
+check('   with a way to campaign there',
+  !!qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
 
 // Colours must follow the game, not a fixed picture.
-clickIt(dom, qq(dom, '.panel-tab').find((t) => t.textContent === 'Map'));
+clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map'));
 const seat17 = () => qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 const before17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 const g17 = dom.window.CMP.app.getGame();
 // Hand this seat overwhelmingly to the player and check the map follows.
 Object.keys(g17.support[17]).forEach((p2) => { g17.support[17][p2] = p2 === g17.partyId ? 80 : 5; });
 dom.window.CMP.app.goTo('election');
-clickIt(dom, qq(dom, '.panel-tab').find((t) => t.textContent === 'Map'));
+clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Map'));
 const after17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 check('the map repaints when support moves', before17 !== after17, before17 + ' -> ' + after17);
 check('the seat now shows the player colour',
@@ -355,17 +454,43 @@ check('every seat has geometry', dom.window.CMP.GEOMETRY.seats.length === 117);
 
 /* ---------------------------------------------------------------- picker */
 
-section('Constituency targeting');
-clickIt(dom, qq(dom, '.btn-quiet').find((b) => b.textContent === 'Change'));
-check('   the seat picker opens', !!q(dom, '.picker-list'));
-check('   it lists constituencies', qq(dom, '.picker-row').length > 5);
-check('   each row shows both sides', qq(dom, '.picker-you').length > 5);
-const firstRow = qq(dom, '.picker-row')[2];
-const pickedName = firstRow.querySelector('.picker-name strong').textContent;
-clickIt(dom, firstRow);
-check('   picking a seat closes the dialog', !q(dom, '.picker-list'));
-check('   the target updates', q(dom, '.target-name').textContent === pickedName,
-  q(dom, '.target-name').textContent + ' vs ' + pickedName);
+section('20. All 117, searchable');
+clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Constituencies'));
+check('20. the full list opens', !!q(dom, '.seat-browser'));
+check('20. all 117 are listed', qq(dom, '.seat-row').length === 117,
+  qq(dom, '.seat-row').length + ' rows');
+check('20. with a search box', !!q(dom, '.seat-search'));
+check('20. and a filter per party plus toss-ups', qq(dom, '.seat-filter').length === 6,
+  qq(dom, '.seat-filter').length + ' filters');
+
+typeInto(dom, q(dom, '.seat-search'), 'Dera Baba');
+check('20. searching narrows the list', qq(dom, '.seat-row').length === 1,
+  qq(dom, '.seat-row').length + ' matches');
+check('20. and finds the right seat',
+  /Dera Baba Nanak/.test(q(dom, '.seat-row-name').textContent),
+  q(dom, '.seat-row-name').textContent);
+
+typeInto(dom, q(dom, '.seat-search'), '');
+const allRows = qq(dom, '.seat-row').length;
+clickIt(dom, qq(dom, '.seat-filter').find((b) => b.textContent === 'Toss-up'));
+check('20. filtering to toss-ups shows fewer', qq(dom, '.seat-row').length < allRows,
+  qq(dom, '.seat-row').length + ' of ' + allRows);
+clickIt(dom, qq(dom, '.seat-filter').find((b) => b.textContent === 'All'));
+
+const pickRow = qq(dom, '.seat-row')[2];
+const pickedName = pickRow.querySelector('.seat-row-name').textContent;
+clickIt(dom, pickRow);
+check('10. a constituency opens when clicked',
+  q(dom, '.sd-name') && q(dom, '.sd-name').textContent === pickedName,
+  q(dom, '.sd-name') ? q(dom, '.sd-name').textContent : 'nothing opened');
+
+clickIt(dom, qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
+await settle();
+check('   campaigning there sets the target',
+  q(dom, '.g-target-name').textContent === pickedName,
+  q(dom, '.g-target-name').textContent + ' vs ' + pickedName);
+check('   and returns to the campaign section',
+  q(dom, '.g-nav-item.is-active').textContent === 'Campaign');
 
 /* ------------------------------------------------------------ rounds */
 
@@ -384,10 +509,10 @@ check('it opens on round 1 of 15', /Round\s*1\s*of\s*15/.test(q(dom, '.round-bar
   q(dom, '.round-bar').textContent.slice(0, 40));
 check('a countdown is running', /^\d+:\d\d$/.test(q(dom, '.round-clock').textContent),
   q(dom, '.round-clock').textContent);
-check('projected seats are shown', !!q(dom, '.projection'));
-check('and how many more are needed',
-  /Needs \d+ more seat|Majority reached/.test(q(dom, '.projection').textContent),
-  q(dom, '.projection').textContent.slice(0, 50));
+check('the leaderboard is shown', qq(dom, '.lb-row').length === 4);
+check('and how many more seats are needed',
+  /needs \d+ more|past the majority/.test(q(dom, '.g-majority-text').textContent),
+  q(dom, '.g-majority-text').textContent.slice(0, 60));
 
 /**
  * Run a round out and let the shell pick it up. A round now has two stages:
@@ -429,7 +554,7 @@ check('it ranks all four candidates', qq(dom, '.board-row').length === 4,
 check('every candidate has a drawn portrait', qq(dom, '.board-row .portrait').length === 4);
 check('play is locked while the round is counted',
   !q(dom, '.action-card') && !q(dom, '.panel-tab'));
-check('a seat-change section is shown', /Seat changes/.test(q(dom, '.round-results').textContent));
+check('a seat-change section is shown', /Seats changed/.test(q(dom, '.round-results').textContent));
 check('the leader position is stated',
   /more seats? needed|Majority reached/.test(q(dom, '.position').textContent),
   q(dom, '.position').textContent.slice(0, 60));
@@ -441,7 +566,7 @@ for (let i = 0; i < 40 && dom.window.CMP.app.getGame().stage !== 'playing'; i++)
 }
 solo = dom.window.CMP.app.getGame();
 check('the break ending opens the next round', solo.round === 2, 'round ' + solo.round);
-check('play is possible again', !!q(dom, '.action-card'));
+check('play is possible again', !!q(dom, '.act'));
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
@@ -454,22 +579,22 @@ check('history recorded the finished round', solo.history.length === 1);
 clickIt(dom, q(dom, '.summary-close'));
 check('the summary can be dismissed', !q(dom, '.summary-card'));
 
-/* Borrowing, through the interface. */
-clickIt(dom, qq(dom, '.panel-tab').find((t) => t.textContent === 'Money'));
+/* 17. Borrowing, through the interface. */
+clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Loan'));
 await settle();
-check('a money tab is offered', !!q(dom, '.bank'));
-check('cash and debt are shown separately',
-  /Cash in hand/.test(q(dom, '.bank').textContent) && /Debt outstanding/.test(q(dom, '.bank').textContent));
-check('the loan terms are stated before borrowing',
-  /Repay .* end of round \d+/.test(q(dom, '.bank-terms').textContent),
-  q(dom, '.bank-terms').textContent.slice(0, 80));
-check('the breakdown separates borrowing from the opening budget',
-  /Starting budget/.test(q(dom, '.breakdown').textContent));
+check('17. a loan section is offered', !!q(dom, '.loan-offers'));
+check('17. the interest is stated', /20%/.test(q(dom, '.sum-lines').textContent));
+check('17. and when it falls due',
+  /2 rounds later/.test(q(dom, '.sum-lines').textContent));
+check('17. a few amounts are offered, not every increment',
+  qq(dom, '.loan-offer').length >= 3 && qq(dom, '.loan-offer').length <= 5,
+  qq(dom, '.loan-offer').length + ' offers');
+check('17. each shows the repayment before it is taken',
+  qq(dom, '.loan-offer').every((n) => /repay .* · round \d+/.test(n.textContent)),
+  q(dom, '.loan-offer').textContent);
 
 const cashBeforeBorrowing = dom.window.CMP.app.getGame().cash;
-clickIt(dom, qq(dom, '.bank-chip')[0]);
-await settle();
-clickIt(dom, qq(dom, '.bank button').find((b) => /Take loan/.test(b.textContent)));
+clickIt(dom, qq(dom, '.loan-offer')[0]);
 await settle();
 check('borrowing asks for confirmation', !!q(dom, '.dialog'));
 check('the confirmation states the repayment',
@@ -477,13 +602,24 @@ check('the confirmation states the repayment',
 clickIt(dom, q(dom, '.dialog-buttons .btn-primary'));
 await settle();
 
+check('15. the money section separates where it came from',
+  (function () {
+    clickIt(dom, qq(dom, '.g-nav-item').find((t) => t.textContent === 'Money'));
+    clickIt(dom, qq(dom, 'button').find((b) => /Where it came from/.test(b.textContent)));
+    const ok = !!q(dom, '.breakdown') && /Starting budget/.test(q(dom, '.breakdown').textContent);
+    const close = qq(dom, '.sheet button').find((b) => b.textContent === 'Close');
+    if (close) clickIt(dom, close);
+    return ok;
+  })());
+
 solo = dom.window.CMP.app.getGame();
 check('the loan is granted', solo.loans.length === 1);
 check('cash rose by the amount borrowed',
   solo.cash === cashBeforeBorrowing + solo.loans[0].amount, String(solo.cash));
 check('and the debt is tracked apart from it',
   dom.window.CMP.campaign.debtOf(solo) === solo.loans[0].repay);
-check('the debt tile shows it', statValue(dom, 'Debt') !== '—', statValue(dom, 'Debt'));
+check('the player strip flags the debt', !!q(dom, '.g-player-debt'),
+  q(dom, '.g-player-debt') ? q(dom, '.g-player-debt').textContent : 'no debt shown');
 
 /* Run out the rest of the campaign. */
 let rounds = 0;

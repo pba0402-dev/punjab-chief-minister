@@ -30,6 +30,9 @@ for (const a of config.actions || []) {
   const total = (a.outcomes || []).reduce((t, o) => t + (o.weight || 0), 0);
   if (total <= 0) problems.push(a.id + ': outcome weights total zero');
   if (['safe', 'risky'].indexOf(a.group) === -1) problems.push(a.id + ': group must be safe or risky');
+  if (['campaign', 'grants', 'corruption'].indexOf(a.menu) === -1) {
+    problems.push(a.id + ': menu must be campaign, grants or corruption');
+  }
 }
 for (const c of config.consequences || []) {
   if (!c.weight || c.weight <= 0) problems.push('consequence ' + c.id + ': weight must be positive');
@@ -80,6 +83,9 @@ for (const key of ['grant', 'underground']) {
   if (ids.has(f.id)) problems.push('funding.' + key + ' duplicates an action id');
   ids.add(f.id);
   if (!Array.isArray(f.outcomes) || !f.outcomes.length) problems.push(f.id + ': no outcomes');
+  if (['campaign', 'grants', 'corruption'].indexOf(f.menu) === -1) {
+    problems.push(f.id + ': menu must be campaign, grants or corruption');
+  }
   if ((f.outcomes || []).reduce((t, o) => t + (o.weight || 0), 0) <= 0) {
     problems.push(f.id + ': outcome weights total zero');
   }
@@ -146,6 +152,15 @@ CMP.actionsByGroup = function (group) {
     return a.group === group;
   });
 };
+
+/** The actions that belong under one menu, cheapest first. */
+CMP.actionsByMenu = function (menu) {
+  return CMP.ACTIONS.filter(function (a) {
+    return a.menu === menu;
+  }).sort(function (a, b) {
+    return a.cost - b.cost;
+  });
+};
 `;
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -155,6 +170,9 @@ const safe = config.actions.filter((a) => a.group === 'safe').length;
 const risky = config.actions.filter((a) => a.group === 'risky').length;
 console.log('starting budget: ₹' + config.startingBudget.toLocaleString('en-IN'));
 console.log('actions: ' + safe + ' safe, ' + risky + ' risky, 2 funding');
+console.log('menus:   ' + ['campaign', 'grants', 'corruption'].map((m) =>
+  m + ' ' + [...config.actions, config.funding.grant, config.funding.underground]
+    .filter((a) => a.menu === m).length).join(', '));
 console.log('rounds: ' + r.total + ' x ' + r.seconds + 's, ' +
   r.actionsPerRound + ' moves each (' + r.total * r.actionsPerRound + ' a campaign)');
 console.log(

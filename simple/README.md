@@ -48,6 +48,57 @@ npm run data:map            # regenerate the map geometry
 Solo mode works by opening `simple/index.html` directly. Multiplayer needs the
 page served by PHP, since the lobby talks to `api/index.php`.
 
+## The game screen
+
+Designed for a phone — 320 to 430px — and allowed to breathe on a larger
+screen rather than rebuilt for one. It answers four questions in order, and
+the first three fit above the fold:
+
+1. **Which round is this, and how long have I got.** A sticky strip: round, a
+   dot per move remaining, the clock, a hairline progress bar.
+2. **Who am I and what have I got.** One compact row: portrait, candidate,
+   party, cash, seats. Not four cards.
+3. **Who is winning.** `WHO'S LEADING?` — four candidates ranked by projected
+   seats, each with their face and their place, the leader marked. Then one
+   line for the majority: how many the leader has, and how many more they need.
+4. **Which seats am I winning them from.** `LEADING FROM` groups the board by
+   whoever leads it and names the tightest half-dozen under each party. Every
+   one opens that constituency.
+
+Everything else is one tap away on a compact menu that scrolls sideways on a
+phone and wraps on a desktop: **Campaign · Money · Grants · Loan · High Risk ·
+Map · Constituencies**. Only the selected section is on screen. Which menu an
+action belongs to is set in `campaign-config.json`, not in the interface, so
+adding one puts it in the right place without anyone editing a screen.
+
+The design rule throughout is that nothing appears twice. Cash is on the player
+strip and in **Money**, and nowhere else. Seats are on the leaderboard, and
+nowhere else. The previous version stacked every figure the game knows onto one
+page, and the result read like a financial dashboard rather than something you
+play.
+
+Two things moved out of the way rather than being removed:
+
+- **What just happened** after a move is a sheet you dismiss, not a permanent
+  panel. An outcome matters for a moment; the campaign log keeps the record.
+- **Closing the polls** and the **election history** are in the header menu.
+  Neither is part of a round, so neither competes with one.
+
+### A constituency
+
+Compact, and in one order: the seat and its district, who is leading with their
+face and their share, a bar for every party, whether it changed hands, and —
+kept firmly separate at the bottom — the real sitting MLA, labelled as
+reference that takes no part in the game. A round-by-round chart is offered
+behind a toggle for the player who wants to know whether their spending is
+working.
+
+### All 117
+
+The **Constituencies** section is the whole board with a search box and filters
+by who leads, including toss-ups. That is a far better way to find one seat
+than a list on the front page.
+
 ## The campaign: fifteen rounds of sixty seconds
 
 A campaign is **15 rounds**, each **60 seconds**, and each round gives every
@@ -108,20 +159,20 @@ Every round ends on an election-night screen: four candidates ranked by
 projected seats, each with their face, their party and what the round did to
 them, over a bar with the majority marked on it.
 
-Under the leaderboard:
+Under the leaderboard, two blocks and no more:
 
-- **Seat changes** — only the constituencies that changed hands, named, with
+- **Seats changed** — only the constituencies that changed hands, named, with
   who held them and who holds them now. Early rounds can settle forty seats at
   once and a list of all 117 every round is a wall nobody reads; the
   differences are the news. A long list is capped and the remainder counted,
   never silently dropped.
-- **Biggest movements** — who gained and who lost ground, at a glance.
-- **Current position** — the leader's seats against the majority, how many more
-  they need, and how far ahead of second place they are.
-- **New leader** and **close race** banners, when either is true.
-- **View election history** — the whole campaign as a table, round by round.
-  Offered rather than shown: fifteen rows of five numbers is reference
-  material, not headline news.
+- **Current leader** — their seats against the majority and how many more they
+  need.
+
+Plus a **new leader** or **close race** banner when either is true. Movements
+per party were dropped because every row already carries its own change, and
+the whole round-by-round table lives in the header menu rather than on a screen
+that is up for nine seconds.
 
 Every figure on that screen is worked out **once, on the server**, and shipped
 whole. Nothing on the client counts anything. Four people watching the same
@@ -508,16 +559,8 @@ in `index.php` that constructs the store.
   line underneath
 - **Setup** — pick AAP, INC, BJP or SAD, then candidate name, slogan and budget
   (formatted in Indian grouping as you type: `₹10,00,00,000`)
-- **Election** — the campaign panel, under a sticky round clock showing the
-  round, the seconds left and the moves remaining. Cash, spent, debt and seats
-  led; projected seats with how many more are needed for a majority; Political
-  Heat; a target constituency; and five tabs — Campaign, Money, Map,
-  Constituency and Rivals
-- **Money** — where the campaign's money came from and what is owed, the bank,
-  and the two ways of raising more
-- **Constituency** — the real sitting MLA above, and below it the candidates
-  standing, their support, the projected winner and a chart of how the race has
-  moved every round since the campaign opened
+- **The game screen** — see below
+- **Round results** — between rounds, an election-night scoreboard
 - **Autosave** — solo progress writes to `localStorage` after every round and
   every move, and needs no server; multiplayer state lives on the server, saved
   under lock on every change
@@ -534,7 +577,8 @@ four players, and refreshing the MLA data before the next state election.
 ```
 simple/
   index.html
-  css/styles.css           base, campaign.css, systems.css, rounds.css, map.css
+  css/styles.css           base; then campaign, systems, rounds, scoreboard,
+                           game (the screen redesign) and map, in that order
   js/
     data/parties.js          the four parties — the only place a party is defined
     data/constituencies.js   GENERATED: the 117 seats
@@ -552,9 +596,10 @@ simple/
     ui/setup.js              solo party + candidate form
     ui/multiplayer.js        create game / join game
     ui/lobby.js              the four-player lobby
-    ui/round.js              round clock, projection, the bank and the dialogs
+    ui/round.js              round clock, the bank and the dialogs
     ui/portrait.js           drawn candidate portraits, from a seed
     ui/scoreboard.js         the leaderboard, seat changes and round results
+    ui/seats.js              leading-from, and all 117 with search and filters
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: real MLA above, game race below
     ui/oversight.js          rivals, reporting and your own record
