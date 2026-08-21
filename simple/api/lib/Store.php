@@ -25,6 +25,9 @@ interface Store
      * game does not exist. The mutator may return null to abort the write.
      */
     public function withLock(string $id, callable $mutator): ?array;
+
+    /** Unfinished games a profile can still return to. */
+    public function gamesForProfile(string $profileId): array;
 }
 
 final class FileStore implements Store
@@ -211,5 +214,47 @@ final class FileStore implements Store
     public function activeGameCount(): int
     {
         return count(glob($this->dir . '/game-*.json') ?: []);
+    }
+
+    /**
+     * Unfinished games one profile is still a part of.
+     *
+     * Reads every game file, which is fine at this size and honest about what
+     * it is — a few dozen small files on shared hosting. It would want an
+     * index long before it wanted a different database.
+     *
+     * Skips finished elections and any game the player explicitly ended:
+     * ending is a decision, and the point of it is that the game stops
+     * offering itself back.
+     *
+     * @return array<int, array{game:array, playerId:string}>
+     */
+    public function gamesForProfile(string $profileId): array
+    {
+        if ($profileId === '') {
+            return [];
+        }
+        $out = [];
+        foreach (glob($this->dir . '/game-*.json') ?: [] as $file) {
+            $raw = @file_get_contents($file);
+            $game = $raw === false ? null : json_decode($raw, true);
+            if (!is_array($game)) {
+                continue;
+            }
+            if (in_array($game['phase'] ?? '', ['government', 'hung'], true)) {
+                continue;
+            }
+            foreach (($game['players'] ?? []) as $pid => $p) {
+                if (($p['profileId'] ?? null) !== $profileId || !empty($p['endedByPlayer'])) {
+                    continue;
+                }
+                $out[] = ['game' => $game, 'playerId' => (string) $pid];
+            }
+        }
+        usort(
+            $out,
+            static fn($a, $b) => (int) ($b['game']['updatedAt'] ?? 0) <=> (int) ($a['game']['updatedAt'] ?? 0)
+        );
+        return $out;
     }
 }

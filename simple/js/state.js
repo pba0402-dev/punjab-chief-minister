@@ -16,7 +16,10 @@ window.CMP = window.CMP || {};
 CMP.state = (function () {
   'use strict';
 
-  var VERSION = 4;
+  // 5: the twenty-round economy. Cash carries forward, grants are held per
+  // region, and a saved game from the fifteen-round rules cannot be read as
+  // one of these — the bump is what retires it instead of crashing on it.
+  var VERSION = 5;
 
   /** A blank campaign, before the player has filled anything in. */
   function create() {
@@ -32,6 +35,19 @@ CMP.state = (function () {
       // is actually in hand right now.
       budget: CMP.STARTING_BUDGET,
       cash: CMP.STARTING_BUDGET,
+
+      // Region-locked grant purses, the ledger behind every figure, and the
+      // per-round keys that stop an allowance being paid twice.
+      grants: {},
+      incomeCredited: {},
+      grantsCredited: {},
+      incomeTotal: 0,
+      grantTotalEarned: 0,
+      districtsHeld: 0,
+      ledger: [],
+      priorityDistricts: [],
+      roundReady: false,
+
       spent: 0,
       borrowed: 0,
       repaid: 0,
@@ -161,9 +177,9 @@ CMP.state = (function () {
     if (!draft.candidateName || !draft.candidateName.trim()) {
       errors.candidateName = 'Enter your candidate’s name.';
     }
-    if (!draft.slogan || !draft.slogan.trim()) {
-      errors.slogan = 'Enter an election slogan.';
-    }
+    // No slogan. It was one more thing to type before anybody could play, it
+    // appeared on nothing that mattered, and a returning player had to invent
+    // one again every time.
 
     var ok = true;
     for (var k in errors) {
@@ -185,12 +201,18 @@ CMP.state = (function () {
     seedSupport(game);
     game.seatsWon = CMP.campaign.seatsLed(game);
 
+    // The districts each party is handed by the deal. They pay nothing — a
+    // grant is for a district taken during the election, not one inherited
+    // from the sitting MLAs.
+    game.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, game.partyId);
+
     // An opponent for every party the player did not take.
     game.opponents = CMP.ai.opponentsFor(game.partyId, game.seed);
     var counts = CMP.campaign.seatCounts(game.support);
     game.opponents.forEach(function (o) {
       o.seatsLed = counts[o.partyId] || 0;
       o.seatsBefore = o.seatsLed;
+      o.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, o.partyId);
     });
 
     // The opening leader map, so round one reports real changes rather than

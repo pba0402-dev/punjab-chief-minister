@@ -386,8 +386,24 @@ CMP.app = (function () {
     if (screen === 'election' && game) {
       if (!electionView) {
         electionView = CMP.ui.election.create({
+          // Stepping away keeps the seat: the session is cleared here, the
+          // game carries on there, and the home screen offers it back.
           onMenu: function () {
+            if (game && game.mode === 'multiplayer') {
+              CMP.net.leave(false).then(function () {
+                goTo('home');
+              });
+              return;
+            }
             goTo('home');
+          },
+
+          // The confirmed decision. Out for good, no way back in.
+          onEndGame: function () {
+            CMP.net.leave(true).then(function () {
+              game = null;
+              goTo('home');
+            });
           },
           play: playAction,
           borrow: borrow,

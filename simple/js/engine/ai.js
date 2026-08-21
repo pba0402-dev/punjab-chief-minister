@@ -45,8 +45,19 @@ CMP.ai = (function () {
       slogan: slogan,
       portraitSeed: seed + ':' + partyId,
 
+      // Opponents run on the same economy as the player: nothing to start
+      // with, five crore a round, and whatever they hold ground for.
       cash: CMP.STARTING_BUDGET,
       budget: CMP.STARTING_BUDGET,
+      grants: {},
+      incomeCredited: {},
+      grantsCredited: {},
+      incomeTotal: 0,
+      grantTotalEarned: 0,
+      districtsHeld: 0,
+      ledger: [],
+      roundSpent: 0,
+      roundReady: false,
       spent: 0,
       borrowed: 0,
       repaid: 0,

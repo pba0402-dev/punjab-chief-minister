@@ -14,6 +14,8 @@ declare(strict_types=1);
 
 final class Campaign
 {
+    private ?Territory $territory = null;
+
     private array $config;
 
     public function __construct(string $configPath)
@@ -103,7 +105,8 @@ final class Campaign
         if (empty($cfg['enabled']) || empty($action['allowsAmount']) || $base <= 0) {
             return 1.0;
         }
-        $scale = sqrt($amount / $base);
+        $curve = (float) ($cfg['curve'] ?? 0.5);
+        $scale = pow($amount / $base, $curve);
         return self::clamp($scale, (float) $cfg['minScale'], (float) $cfg['maxScale']);
     }
 
@@ -299,12 +302,200 @@ final class Campaign
     /* ------------------------------------------------------------- money */
 
     /**
-     * Spendable cash. Borrowed money is in here; what is owed is not deducted
-     * until it falls due, which is exactly what makes borrowing tempting.
+     * Spendable general cash. Borrowed money is in here; what is owed is not
+     * deducted until it falls due, which is exactly what makes borrowing
+     * tempting. Grant money is deliberately not counted — see spendableOn.
      */
     public function remaining(array $player): int
     {
         return max(0, (int) ($player['cash'] ?? 0));
+    }
+
+    /* ------------------------------------------------- region purses */
+
+    public function territory(): Territory
+    {
+        if ($this->territory === null) {
+            $this->territory = new Territory();
+        }
+        return $this->territory;
+    }
+
+    public function grantIn(array $player, ?string $region): int
+    {
+        if ($region === null) {
+            return 0;
+        }
+        return max(0, (int) (($player['grants'] ?? [])[$region] ?? 0));
+    }
+
+    /** Every region purse added up. Spendable, but not spendable anywhere. */
+    public function grantTotal(array $player): int
+    {
+        $total = 0;
+        foreach (($player['grants'] ?? []) as $amount) {
+            $total += max(0, (int) $amount);
+        }
+        return $total;
+    }
+
+    /**
+     * What can go behind a move aimed at one seat: general cash, plus the
+     * purse for that seat's region and nothing else.
+     *
+     * A move with no seat behind it can only draw general cash, because there
+     * is no region in which to say the grant money was spent.
+     *
+     * @return array{region:?string,cash:int,grant:int,total:int}
+     */
+    public function spendableOn(array $player, $target): array
+    {
+        $region = ($target === null || $target === '')
+            ? null
+            : $this->territory()->regionOfSeat($target);
+        $grant = $this->grantIn($player, $region);
+        $cash = $this->remaining($player);
+        return ['region' => $region, 'cash' => $cash, 'grant' => $grant, 'total' => $cash + $grant];
+    }
+
+    /**
+     * Take money off a player, region purse first.
+     *
+     * The restricted money goes before the free money: holding it back would
+     * strand it the moment the district that earned it was lost.
+     *
+     * @return array{0:array,1:array{total:int,grant:int,cash:int,region:?string}}
+     */
+    public function charge(array $player, $target, int $amount): array
+    {
+        $pot = $this->spendableOn($player, $target);
+        $take = max(0, min($amount, $pot['total']));
+
+        $fromGrant = min($pot['grant'], $take);
+        $fromCash = $take - $fromGrant;
+
+        if ($fromGrant > 0) {
+            $grants = $player['grants'] ?? [];
+            $grants[$pot['region']] = $this->grantIn($player, $pot['region']) - $fromGrant;
+            $player['grants'] = $grants;
+        }
+        $player['cash'] = max(0, (int) $player['cash'] - $fromCash);
+
+        return [$player, [
+            'total' => $take,
+            'grant' => $fromGrant,
+            'cash' => $fromCash,
+            'region' => $pot['region'],
+        ]];
+    }
+
+    /* ------------------------------------------------------ the ledger */
+
+    /**
+     * Write one movement of money into the player's own account of it.
+     *
+     * The running balances are the truth; this is the record of how they got
+     * there, written by the same code that moves the money so the two cannot
+     * tell different stories.
+     */
+    public function ledger(array $player, array $entry): array
+    {
+        $entry['round'] = (int) ($entry['round'] ?? ($player['round'] ?? 1));
+        $entry['at'] = time();
+        $rows = $player['ledger'] ?? [];
+        $rows[] = $entry;
+        if (count($rows) > 400) {
+            array_shift($rows);
+        }
+        $player['ledger'] = $rows;
+        return $player;
+    }
+
+    /**
+     * Credit one round's allowance, once.
+     *
+     * Keyed by round rather than counted, so a refresh, a reconnection, a
+     * retried request or a doubled-up advance cannot pay anybody twice. That
+     * is the one accounting failure this economy would never recover from.
+     */
+    public function creditRoundIncome(array $player, int $round): array
+    {
+        $credited = $player['incomeCredited'] ?? [];
+        $key = (string) $round;
+        if (!empty($credited[$key])) {
+            return $player;
+        }
+
+        $amount = (int) (($this->config['income'] ?? [])['perRound'] ?? 0);
+        $credited[$key] = true;
+        $player['incomeCredited'] = $credited;
+        $player['cash'] = (int) ($player['cash'] ?? 0) + $amount;
+        $player['incomeTotal'] = (int) ($player['incomeTotal'] ?? 0) + $amount;
+
+        return $this->ledger($player, [
+            'round' => $round,
+            'kind' => 'income',
+            'label' => 'Round allowance',
+            'amount' => $amount,
+        ]);
+    }
+
+    /**
+     * Pay the grants for every district this player wholly holds, once for
+     * the round, into the purse for each district's own region.
+     */
+    public function creditDistrictGrants(array $player, array $board, int $round): array
+    {
+        $credited = $player['grantsCredited'] ?? [];
+        $key = (string) $round;
+        if (!empty($credited[$key])) {
+            return $player;
+        }
+        $credited[$key] = true;
+        $player['grantsCredited'] = $credited;
+
+        $partyId = (string) ($player['partyId'] ?? '');
+        if ($partyId === '') {
+            return $player;
+        }
+
+        $held = $this->territory()->heldBy(Territory::leadersOf($board), $partyId);
+        $player['districtsHeld'] = count($held);
+
+        // A grant is for a district taken, not one inherited. The opening
+        // board is dealt from the sitting MLAs and routinely hands one party
+        // several districts before anybody has campaigned; paying for those
+        // would settle the election on the deal. They pay nothing until they
+        // are lost and taken back, which is a thing the player did.
+        $opening = $player['openingDistricts'] ?? [];
+        $earned = [];
+        foreach ($held as $d) {
+            if (!in_array($d['id'], $opening, true)) {
+                $earned[] = $d;
+            }
+        }
+
+        $grants = $player['grants'] ?? [];
+        $total = 0;
+
+        foreach ($earned as $d) {
+            $region = (string) $d['region'];
+            $grants[$region] = max(0, (int) ($grants[$region] ?? 0)) + (int) $d['grant'];
+            $total += (int) $d['grant'];
+            $player = $this->ledger($player, [
+                'round' => $round,
+                'kind' => 'grant',
+                'label' => $d['name'] . ' district grant',
+                'region' => $region,
+                'district' => $d['id'],
+                'amount' => (int) $d['grant'],
+            ]);
+        }
+
+        $player['grants'] = $grants;
+        $player['grantTotalEarned'] = (int) ($player['grantTotalEarned'] ?? 0) + $total;
+        $player['districtsPaying'] = count($earned);
+        return $player;
     }
 
     /** Everything still owed to the banks, principal and interest together. */
@@ -381,6 +572,11 @@ final class Campaign
         }
 
         $player['cash'] = (int) $player['cash'] + $offer['amount'];
+        $player = $this->ledger($player, [
+            'kind' => 'loan',
+            'label' => 'Loan taken',
+            'amount' => (int) $offer['amount'],
+        ]);
         $player['borrowed'] = (int) ($player['borrowed'] ?? 0) + $offer['amount'];
         $player['loans'][] = [
             'id' => 'L' . (count($player['loans'] ?? []) + 1),
@@ -503,12 +699,15 @@ final class Campaign
         if ($action === null) {
             return 'Unknown action.';
         }
+        if (!empty($player['roundReady'])) {
+            return 'You have ended your round. Wait for the next one.';
+        }
         if ($this->actionsLeft($player) <= 0) {
             return 'No moves left this round';
         }
         $spend = $this->resolveAmount($action, $amount);
-        if ($spend > $this->remaining($player)) {
-            return 'Insufficient Budget';
+        if ($spend > $this->spendableOn($player, $target)['total']) {
+            return 'More than you can spend here';
         }
         if (!empty($action['needsConstituency'])) {
             if ($target === null || $target === '') {
@@ -539,10 +738,21 @@ final class Campaign
         $cost = $this->resolveAmount($action, $amount);
         $scale = $this->scaleFor($action, $cost);
         $outcome = self::scaleOutcome($outcome, $scale);
-        $player['cash'] = max(0, (int) $player['cash'] - $cost);
+        // Region purse first, then general cash.
+        [$player, $paid] = $this->charge($player, $target, $cost);
+        $cost = $paid['total'];
         $player['spent'] = (int) $player['spent'] + $cost;
         $player['roundSpent'] = (int) ($player['roundSpent'] ?? 0) + $cost;
         $player['roundActions'] = (int) ($player['roundActions'] ?? 0) + 1;
+        $player = $this->ledger($player, [
+            'kind' => 'campaign',
+            'label' => (string) ($action['label'] ?? $actionId),
+            'seat' => $target === null ? null : (int) $target,
+            'region' => $paid['region'],
+            'fromGrant' => $paid['grant'],
+            'fromCash' => $paid['cash'],
+            'amount' => -$cost,
+        ]);
 
         // Money an outcome brings in. Grants are recorded apart from
         // undisclosed funding so a player's own breakdown stays honest about
@@ -556,6 +766,11 @@ final class Campaign
             } else {
                 $player['raised'] = (int) ($player['raised'] ?? 0) + $funds;
             }
+            $player = $this->ledger($player, [
+                'kind' => ($action['id'] ?? '') === 'grant' ? 'funding' : 'raised',
+                'label' => (string) ($action['label'] ?? $actionId),
+                'amount' => $funds,
+            ]);
         }
 
         $applied = ['player' => 0.0, 'opponent' => 0.0, 'reach' => []];

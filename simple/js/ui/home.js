@@ -36,8 +36,8 @@ CMP.ui.home = (function () {
     var recentNode = el('div', { class: 'h-block' });
 
     var saved = CMP.storage.load();
-    var session = CMP.net.getSession();
     var me = CMP.profile.get();
+    var resumeNode = el('div', { class: 'h-resume' });
 
     var root = el('section', { class: 'screen screen-home' }, [
       el('div', { class: 'h-inner' }, [
@@ -78,26 +78,7 @@ CMP.ui.home = (function () {
         ]),
 
         /* ---- anything already in progress ---- */
-        session || (saved && CMP.state.isValid(saved))
-          ? el('div', { class: 'h-resume' }, [
-              session
-                ? el('button', {
-                    class: 'resume-link',
-                    type: 'button',
-                    text: 'Rejoin game ' + session.code,
-                    onclick: opts.onRejoin,
-                  })
-                : null,
-              saved && CMP.state.isValid(saved)
-                ? el('button', {
-                    class: 'resume-link',
-                    type: 'button',
-                    text: 'Continue election · round ' + (saved.round || 1),
-                    onclick: opts.onContinueSolo,
-                  })
-                : null,
-            ])
-          : null,
+        resumeNode,
 
         statsNode,
         boardNode,
@@ -106,6 +87,55 @@ CMP.ui.home = (function () {
         recentNode,
       ]),
     ]);
+
+    /**
+     * What is waiting to be picked up.
+     *
+     * Closing a tab is not quitting. A multiplayer game somebody stepped away
+     * from is still theirs, so it is offered back by code — and asked of the
+     * server rather than read out of this browser, because the whole point is
+     * that it survives a browser that forgot.
+     *
+     * A game the player deliberately ended is never offered. That is what
+     * ending means, and an "end game" that kept suggesting itself afterwards
+     * would be no different from leaving.
+     */
+    function paintResume(openGames) {
+      var rows = [];
+
+      (openGames || []).forEach(function (entry) {
+        var where = entry.round > 0
+          ? 'Round ' + entry.round + ' of ' + (entry.roundsTotal || CMP.ROUNDS.total)
+          : 'Waiting in the lobby';
+        rows.push(el('button', {
+          class: 'resume-link is-rejoin',
+          type: 'button',
+          onclick: function () {
+            CMP.net.adopt(entry);
+            if (opts.onRejoin) opts.onRejoin();
+          },
+        }, [
+          el('span', { class: 'resume-title', text: 'Rejoin game ' + entry.code }),
+          el('span', { class: 'resume-note', text: where }),
+        ]));
+      });
+
+      if (saved && CMP.state.isValid(saved)) {
+        rows.push(el('button', {
+          class: 'resume-link',
+          type: 'button',
+          onclick: opts.onContinueSolo,
+        }, [
+          el('span', { class: 'resume-title', text: 'Continue solo election' }),
+          el('span', {
+            class: 'resume-note',
+            text: 'Round ' + (saved.round || 1) + ' of ' + (saved.roundsTotal || CMP.ROUNDS.total),
+          }),
+        ]));
+      }
+
+      mount(resumeNode, rows);
+    }
 
     /* ------------------------------------------------------- painting */
 
@@ -275,6 +305,18 @@ CMP.ui.home = (function () {
     if (CMP.profile.stats()) {
       paintProfile(CMP.profile.stats());
       paintRecent(CMP.profile.stats());
+    }
+
+    // Show whatever this browser already knows about immediately, then ask
+    // the server for anything it has forgotten.
+    var session = CMP.net.getSession();
+    paintResume(session ? [{ code: session.code, round: 0, roundsTotal: 0,
+      playerId: session.playerId, token: session.token }] : []);
+
+    if (me) {
+      CMP.net.resumable(me.id).then(function (res) {
+        if (res && res.ok) paintResume(res.games);
+      });
     }
 
     CMP.net

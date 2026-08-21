@@ -242,12 +242,54 @@ CMP.net = (function () {
     return request('ready', authed({ ready: !!ready }));
   }
 
-  function start() {
-    return request('start', authed());
+  /** Start the election. The host's chosen round length goes with it. */
+  function start(roundSeconds) {
+    return request('start', authed({ roundSeconds: roundSeconds || 0 }));
   }
 
-  function leave() {
-    return request('leave', authed()).then(function (res) {
+  /** Declare yourself finished for this round. */
+  function endRound() {
+    return request('endround', authed());
+  }
+
+  /** Name the districts this campaign is prioritising. */
+  function setPriority(districts) {
+    return request('priority', authed({ districts: districts || [] }));
+  }
+
+  /** Offer, accept, decline or withdraw an alliance. */
+  function ally(move, otherPlayerId) {
+    return request('ally', authed({ move: move, playerId2: otherPlayerId }));
+  }
+
+  /**
+   * Unfinished games this profile can walk back into.
+   *
+   * Asked of the server rather than read from this browser, so a player who
+   * cleared their history, switched devices or lost their session still finds
+   * their election.
+   */
+  function resumable(profileId) {
+    if (!profileId) return Promise.resolve({ ok: true, games: [] });
+    return request('resume', { profileId: profileId }, 'GET');
+  }
+
+  /** Adopt a session returned by resumable(), so the next call is authorised. */
+  function adopt(entry) {
+    writeSession({ code: entry.code, playerId: entry.playerId, token: entry.token });
+    return entry;
+  }
+
+  /**
+   * Step away, or finish for good.
+   *
+   * Stepping away clears this browser's session but leaves the seat, the
+   * money and the position exactly as they were — the game is still there to
+   * come back to. Ending is the confirmed decision, and the only thing that
+   * takes the way back away.
+   */
+  function leave(forGood) {
+    return request('leave', authed({ end: !!forGood })).then(function (res) {
       clearSession();
       return res;
     });
@@ -320,6 +362,11 @@ CMP.net = (function () {
     coalition: coalition,
     setReady: setReady,
     start: start,
+    resumable: resumable,
+    adopt: adopt,
+    endRound: endRound,
+    setPriority: setPriority,
+    ally: ally,
     leave: leave,
     health: health,
     startPolling: startPolling,

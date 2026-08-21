@@ -112,11 +112,221 @@ CMP.campaign = (function () {
   /* ------------------------------------------------------ affordability */
 
   /**
-   * Spendable cash. Borrowed money is in here; what is owed is not deducted
-   * until it falls due, which is exactly what makes borrowing tempting.
+   * A campaign holds money in four purses: general cash, and one for each
+   * region of Punjab.
+   *
+   * General cash is the round allowance, loans, and anything raised. It can be
+   * spent anywhere. A region purse is grant money earned by holding whole
+   * districts in that region, and it can only be spent there — which is the
+   * point of the whole territory system, and the reason it is a separate
+   * number rather than a note against a single total.
+   */
+  function grantsOf(game) {
+    if (!game.grants) game.grants = {};
+    return game.grants;
+  }
+
+  function grantIn(game, regionId) {
+    if (!regionId) return 0;
+    return Math.max(0, grantsOf(game)[regionId] || 0);
+  }
+
+  /** Every region purse added up. Spendable, but not spendable anywhere. */
+  function grantTotal(game) {
+    var g = grantsOf(game);
+    return Object.keys(g).reduce(function (t, k) {
+      return t + Math.max(0, g[k] || 0);
+    }, 0);
+  }
+
+  /**
+   * Spendable general cash. Borrowed money is in here; what is owed is not
+   * deducted until it falls due, which is exactly what makes borrowing
+   * tempting. Grant money is deliberately not included — see spendableOn.
    */
   function remaining(game) {
     return Math.max(0, game.cash || 0);
+  }
+
+  /** Everything the campaign holds, however restricted. For display only. */
+  function heldTotal(game) {
+    return remaining(game) + grantTotal(game);
+  }
+
+  /**
+   * What can be put behind a move aimed at one seat: general cash, plus the
+   * purse for the region that seat sits in, and nothing else.
+   *
+   * A move with no seat behind it — applying for a grant, taking undisclosed
+   * money — can only draw on general cash, because there is no region to say
+   * the grant money is being spent in.
+   */
+  function spendableOn(game, seatNumber) {
+    var region = seatNumber ? CMP.regionOfSeat(Number(seatNumber)) : null;
+    var grant = region ? grantIn(game, region) : 0;
+    return {
+      region: region,
+      cash: remaining(game),
+      grant: grant,
+      total: remaining(game) + grant,
+    };
+  }
+
+  /**
+   * Take an amount off the campaign, region purse first.
+   *
+   * Grant money is spent before general cash because it is the more
+   * restricted of the two: holding it back to spend general cash first would
+   * strand it if the district were lost. Returns how much came from where, so
+   * the ledger can say so.
+   */
+  function charge(game, seatNumber, amount) {
+    var pot = spendableOn(game, seatNumber);
+    var take = Math.min(Math.max(0, Math.round(amount)), pot.total);
+
+    var fromGrant = Math.min(pot.grant, take);
+    var fromCash = take - fromGrant;
+
+    if (fromGrant > 0) {
+      grantsOf(game)[pot.region] = grantIn(game, pot.region) - fromGrant;
+    }
+    game.cash = Math.max(0, (game.cash || 0) - fromCash);
+
+    return { total: take, grant: fromGrant, cash: fromCash, region: pot.region };
+  }
+
+  /* ---------------------------------------------------------- the ledger */
+
+  /**
+   * Every movement of money, in the order it happened.
+   *
+   * The running balances are the truth and this is the account of how they got
+   * there — written by the same functions that move the money, so the two
+   * cannot tell different stories. Trimmed, because a twenty-round game with
+   * four players generates more rows than anybody will read.
+   */
+  function ledger(game, entry) {
+    if (!game.ledger) game.ledger = [];
+    entry.round = entry.round || game.round || 1;
+    entry.at = Date.now();
+    game.ledger.push(entry);
+    if (game.ledger.length > 400) game.ledger.shift();
+    return entry;
+  }
+
+  /**
+   * Credit one round's allowance, once.
+   *
+   * Keyed by round number rather than counted, so a refresh, a reconnection or
+   * a doubled-up call cannot pay anybody twice — which is the failure this
+   * whole game's economy would never recover from.
+   */
+  function creditRoundIncome(game, round) {
+    if (!game.incomeCredited) game.incomeCredited = {};
+    var key = String(round);
+    if (game.incomeCredited[key]) return 0;
+
+    var amount = (CMP.CAMPAIGN.income || {}).perRound || 0;
+    game.incomeCredited[key] = true;
+    game.cash = (game.cash || 0) + amount;
+    game.incomeTotal = (game.incomeTotal || 0) + amount;
+    ledger(game, { round: round, kind: 'income', label: 'Round allowance', amount: amount });
+    return amount;
+  }
+
+  /**
+   * Pay the grants for every district this campaign wholly holds.
+   *
+   * Paid every round the hold lasts, into the purse for the district's own
+   * region. Like the allowance it is keyed by round, so it cannot be paid
+   * twice for the same round.
+   */
+  function creditDistrictGrants(game, round) {
+    if (!game.grantsCredited) game.grantsCredited = {};
+    var key = String(round);
+    if (game.grantsCredited[key]) return 0;
+    game.grantsCredited[key] = true;
+
+    var held = districtsHeldBy(game.support, game.partyId);
+    game.districtsHeld = held.length;
+
+    // A grant is for a district taken, not one inherited.
+    //
+    // The opening board is dealt from the sitting MLAs, and it routinely hands
+    // one party six districts before anybody has campaigned — on some seeds,
+    // eighteen. Paying for those would settle the election in round one and
+    // make the whole territory system a lottery on the deal. So the districts
+    // a party opens holding are its starting position and pay nothing, until
+    // it loses one and takes it back, which is a thing it did.
+    var opening = game.openingDistricts || [];
+    var earned = held.filter(function (d) {
+      return opening.indexOf(d.id) === -1;
+    });
+
+    var total = 0;
+    earned.forEach(function (d) {
+      grantsOf(game)[d.region] = grantIn(game, d.region) + d.grant;
+      total += d.grant;
+      ledger(game, {
+        round: round,
+        kind: 'grant',
+        label: d.name + ' district grant',
+        region: d.region,
+        district: d.id,
+        amount: d.grant,
+      });
+    });
+    game.grantTotalEarned = (game.grantTotalEarned || 0) + total;
+    game.districtsPaying = earned.length;
+    return total;
+  }
+
+  /**
+   * The districts a party holds before a single move is played.
+   *
+   * Recorded once, when the board is dealt, and never updated: it is the
+   * starting position, and losing one of them does not change what the
+   * starting position was.
+   */
+  function openingDistrictsFor(support, partyId) {
+    return districtsHeldBy(support, partyId).map(function (d) {
+      return d.id;
+    });
+  }
+
+  /* ------------------------------------------------------------ territory */
+
+  /**
+   * The districts one party leads outright — every seat, not most of them.
+   *
+   * Leading eight of nine seats in a district is a good position and pays
+   * nothing. That is deliberate: a grant should be the reward for finishing a
+   * job, not for being ahead.
+   */
+  function districtsHeldBy(support, partyId) {
+    if (!partyId || !CMP.DISTRICTS) return [];
+    var leaders = currentLeaders(support);
+    return CMP.DISTRICTS.filter(function (d) {
+      for (var i = 0; i < d.seats.length; i++) {
+        if (leaders[d.seats[i]] !== partyId) return false;
+      }
+      return d.seats.length > 0;
+    });
+  }
+
+  /** How a district stands for one party: held, leading, or neither. */
+  function districtStanding(support, partyId, district) {
+    var leaders = currentLeaders(support);
+    var mine = 0;
+    district.seats.forEach(function (n) {
+      if (leaders[n] === partyId) mine++;
+    });
+    return {
+      district: district,
+      mine: mine,
+      total: district.seats.length,
+      held: mine === district.seats.length && district.seats.length > 0,
+    };
   }
 
   /** Everything still owed, principal and interest together. */
@@ -158,7 +368,8 @@ CMP.campaign = (function () {
   function scaleFor(action, amount) {
     var cfg = CMP.CAMPAIGN.spending;
     if (!cfg || !cfg.enabled || !action.allowsAmount || !action.cost) return 1;
-    return clamp(Math.sqrt(amount / action.cost), cfg.minScale, cfg.maxScale);
+    var curve = cfg.curve || 0.5;
+    return clamp(Math.pow(amount / action.cost, curve), cfg.minScale, cfg.maxScale);
   }
 
   /** The amount a move will actually cost, clamped to what is allowed. */
@@ -199,9 +410,12 @@ CMP.campaign = (function () {
   function canPlay(game, actionId, target, amount) {
     var action = CMP.getAction(actionId);
     if (!action) return { ok: false, reason: 'Unknown action.' };
+    if (game.roundReady) {
+      return { ok: false, reason: 'You have ended your round. Wait for the next one.' };
+    }
     if (actionsLeft(game) <= 0) return { ok: false, reason: 'No moves left this round' };
-    if (resolveAmount(action, amount) > remaining(game)) {
-      return { ok: false, reason: 'Insufficient Budget' };
+    if (resolveAmount(action, amount) > spendableOn(game, target).total) {
+      return { ok: false, reason: 'More than you can spend here' };
     }
     if (action.needsConstituency && !target) {
       return { ok: false, reason: 'Choose a constituency first' };
@@ -253,22 +467,43 @@ CMP.campaign = (function () {
     game.stage = 'playing';
     game.turn = round;
     game.roundsTotal = CMP.ROUNDS.total;
-    game.roundSeconds = CMP.ROUNDS.seconds;
-    game.roundEndsAt = Date.now() + CMP.ROUNDS.seconds * 1000;
+    game.roundSeconds = game.roundSeconds || CMP.ROUNDS.seconds;
+    game.roundEndsAt = Date.now() + game.roundSeconds * 1000;
     game.nextRoundAt = 0;
     (game.opponents || []).forEach(function (o) {
       o.roundActions = 0;
+      o.roundSpent = 0;
+      o.roundReady = false;
+      creditRoundIncome(o, round);
+      creditDistrictGrants(withBoard(o, game), round);
     });
+
+    // Nothing is wiped. The allowance is added to whatever survived the last
+    // round, and district grants pay again for as long as the ground is held.
+    game.roundReady = false;
     game.roundSpent = 0;
     game.roundGained = 0;
     game.roundActions = 0;
+    creditRoundIncome(game, round);
+    creditDistrictGrants(game, round);
+
     game.roundOpen = {
       cash: game.cash || 0,
+      grants: JSON.parse(JSON.stringify(grantsOf(game))),
       heat: game.heat || 0,
       seats: game.seatsWon || 0,
       support: averageSupport(game.support, game.partyId),
     };
     return game;
+  }
+
+  /**
+   * An opponent's purse with the shared board attached, so the territory
+   * functions can read the seats without the opponent carrying a copy of them.
+   */
+  function withBoard(actor, game) {
+    actor.support = game.support;
+    return actor;
   }
 
   /* ------------------------------------------------------------ borrowing */
@@ -322,6 +557,7 @@ CMP.campaign = (function () {
 
     game.cash += offer.amount;
     game.borrowed += offer.amount;
+    ledger(game, { kind: 'loan', label: 'Loan taken', amount: offer.amount });
     game.loans.push({
       id: 'L' + (game.loans.length + 1),
       amount: offer.amount,
@@ -354,6 +590,7 @@ CMP.campaign = (function () {
         game.repaid += loan.repay;
         game.interestPaid += loan.interest;
         loan.settled = true;
+        ledger(game, { kind: 'repayment', label: 'Loan repaid', amount: -loan.repay });
         summary.repayments.push({
           id: loan.id,
           paid: loan.repay,
@@ -628,6 +865,132 @@ CMP.campaign = (function () {
     return null;
   }
 
+  /* ------------------------------------------------------------- in bulk */
+
+  /**
+   * How a sum divides across a set of seats.
+   *
+   * Each seat gets an equal share, clamped to what one move of that action is
+   * allowed to cost — a rally is still a rally however rich the campaign, so
+   * money past the ceiling has nowhere to go on that seat. What will not fit
+   * is reported back rather than quietly kept or quietly spent, because a
+   * player who allocated twenty crore and saw eight disappear would rightly
+   * never trust the screen again.
+   */
+  function planBulk(game, actionId, seats, total) {
+    var action = CMP.getAction(actionId);
+    if (!action) return { ok: false, reason: 'Unknown action.', rows: [] };
+
+    var list = (seats || []).map(Number).filter(function (n) {
+      return !!game.support[n];
+    });
+    if (!list.length) return { ok: false, reason: 'Choose somewhere to campaign.', rows: [] };
+
+    var range = amountRange(action);
+    var want = Math.max(0, Math.round(total || 0));
+    var each = Math.floor(want / list.length);
+
+    // Whatever does not divide evenly goes on the first few seats, a rupee
+    // each, so an allocation of one crore across fourteen seats spends one
+    // crore rather than 99,99,990 and quietly keeps the rest.
+    var remainder = want - each * list.length;
+
+    // Region purses are per region, so what is affordable has to be worked out
+    // region by region rather than against one running total.
+    var pots = {};
+    var cashLeft = remaining(game);
+
+    var rows = [];
+    var allocated = 0;
+
+    list.forEach(function (seat, index) {
+      var share = each + (index < remainder ? 1 : 0);
+      var want = clamp(share, 0, range.max);
+      if (want < range.min) want = 0;
+
+      var region = CMP.regionOfSeat(seat);
+      if (region && pots[region] === undefined) pots[region] = grantIn(game, region);
+
+      var fromGrant = region ? Math.min(pots[region], want) : 0;
+      var fromCash = Math.min(cashLeft, want - fromGrant);
+      var afford = fromGrant + fromCash;
+
+      if (afford < range.min) {
+        rows.push({ seat: seat, amount: 0, region: region, short: true });
+        return;
+      }
+
+      if (region) pots[region] -= fromGrant;
+      cashLeft -= fromCash;
+      allocated += afford;
+      rows.push({ seat: seat, amount: afford, region: region, short: afford < want });
+    });
+
+    var spendable = rows.filter(function (r) {
+      return r.amount > 0;
+    });
+
+    return {
+      ok: spendable.length > 0,
+      reason: spendable.length ? null : 'Not enough to campaign anywhere at that spread.',
+      rows: rows,
+      seats: spendable.length,
+      allocated: allocated,
+      unspent: Math.max(0, (total || 0) - allocated),
+      perSeatMax: range.max,
+      perSeatMin: range.min,
+    };
+  }
+
+  /**
+   * Play one action across several seats at once, from a single allocation.
+   *
+   * This is the same play() applied seat by seat, not a shortcut around it:
+   * every move costs, scales, raises heat and can bring a consequence exactly
+   * as it would alone. What bulk buys the player is one decision instead of
+   * fifteen, which over twenty rounds is the difference between a strategy
+   * game and an afternoon of clicking.
+   *
+   * rollsFor(index) supplies the randomness per move, so the caller keeps
+   * control of the RNG.
+   */
+  function campaignBulk(game, actionId, seats, total, rollsFor) {
+    var plan = planBulk(game, actionId, seats, total);
+    if (!plan.ok) return { ok: false, reason: plan.reason, reports: [] };
+
+    var reports = [];
+    var spent = 0;
+    var refused = [];
+
+    plan.rows.forEach(function (row, i) {
+      if (row.amount <= 0) return;
+      var res = play(game, actionId, row.seat, rollsFor(i), row.amount);
+      if (res.ok) {
+        reports.push(res.report);
+        spent += res.report.cost;
+      } else {
+        refused.push({ seat: row.seat, reason: res.reason });
+      }
+    });
+
+    if (!reports.length) {
+      return {
+        ok: false,
+        reason: (refused[0] && refused[0].reason) || 'Nothing could be played.',
+        reports: [],
+      };
+    }
+
+    return {
+      ok: true,
+      reports: reports,
+      spent: spent,
+      seats: reports.length,
+      refused: refused,
+      unspent: plan.unspent,
+    };
+  }
+
   /* ------------------------------------------------- acting for others */
 
   /**
@@ -724,20 +1087,36 @@ CMP.campaign = (function () {
     var scale = scaleFor(action, cost);
     var outcome = scaleOutcome(weightedPick(action.outcomes, rolls.outcome), scale);
 
-    game.cash = Math.max(0, game.cash - cost);
-    game.spent += cost;
-    game.roundSpent = (game.roundSpent || 0) + cost;
+    // Region purse first, then general cash. paid says where it came from.
+    var paid = charge(game, target, cost);
+    game.spent += paid.total;
+    game.roundSpent = (game.roundSpent || 0) + paid.total;
     game.roundActions = (game.roundActions || 0) + 1;
+    ledger(game, {
+      kind: 'campaign',
+      label: action.label,
+      seat: target || null,
+      region: paid.region,
+      fromGrant: paid.grant,
+      fromCash: paid.cash,
+      amount: -paid.total,
+    });
 
     // Money an outcome brings in. Grants are recorded apart from undisclosed
     // funding so the player's own breakdown stays honest about where the
-    // campaign's money came from.
+    // campaign's money came from. It lands in general cash: it was not earned
+    // by holding ground, so it is not tied to any region.
     var funds = outcome.funds || 0;
     if (funds > 0) {
       game.cash += funds;
       game.roundGained = (game.roundGained || 0) + funds;
       if (action.id === 'grant') game.granted += funds;
       else game.raised += funds;
+      ledger(game, {
+        kind: action.id === 'grant' ? 'funding' : 'raised',
+        label: action.label,
+        amount: funds,
+      });
     }
 
     var applied = applySupport(game, target, outcome);
@@ -1068,6 +1447,19 @@ CMP.campaign = (function () {
     remaining: remaining,
     debtOf: debtOf,
     actionsLeft: actionsLeft,
+    spendableOn: spendableOn,
+    grantIn: grantIn,
+    grantTotal: grantTotal,
+    heldTotal: heldTotal,
+    charge: charge,
+    planBulk: planBulk,
+    campaignBulk: campaignBulk,
+    ledger: ledger,
+    creditRoundIncome: creditRoundIncome,
+    creditDistrictGrants: creditDistrictGrants,
+    districtsHeldBy: districtsHeldBy,
+    openingDistrictsFor: openingDistrictsFor,
+    districtStanding: districtStanding,
     amountRange: amountRange,
     scaleFor: scaleFor,
     resolveAmount: resolveAmount,

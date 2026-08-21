@@ -13,7 +13,7 @@
     "consequence - they describe no real-world method and never explain how",
     "anything would be done."
   ],
-  "startingBudget": 50000000,
+  "startingBudget": 0,
   "heat": {
     "max": 100,
     "levels": [
@@ -77,7 +77,7 @@
       "label": "Public Rally",
       "icon": "📣",
       "blurb": "A stage, a crowd and a speech in one constituency.",
-      "cost": 1500000,
+      "cost": 22500000,
       "heat": 0,
       "riskLabel": "Low risk",
       "impactLabel": "Moderate gain",
@@ -117,7 +117,7 @@
       "label": "Media Campaign",
       "icon": "📺",
       "blurb": "Cable spots, print and hoardings across the constituency.",
-      "cost": 2500000,
+      "cost": 37500000,
       "heat": 1,
       "riskLabel": "Low risk",
       "impactLabel": "Good gain",
@@ -127,7 +127,7 @@
           "id": "strong",
           "weight": 30,
           "label": "The message cuts through",
-          "support": 6,
+          "support": 2.57,
           "heat": 1,
           "text": "Your line is being repeated back to you on the street."
         },
@@ -135,7 +135,7 @@
           "id": "normal",
           "weight": 55,
           "label": "Steady coverage",
-          "support": 4,
+          "support": 1.72,
           "heat": 1,
           "text": "Solid visibility for the money."
         },
@@ -143,7 +143,7 @@
           "id": "weak",
           "weight": 15,
           "label": "Lost in the noise",
-          "support": 1.5,
+          "support": 0.65,
           "heat": 2,
           "text": "Everyone else was advertising too. Limited effect."
         }
@@ -161,7 +161,7 @@
       "label": "Community Development",
       "icon": "🏗️",
       "blurb": "Fund something visible and useful that people will remember.",
-      "cost": 2000000,
+      "cost": 30000000,
       "heat": 0,
       "riskLabel": "Very low risk",
       "impactLabel": "Moderate, durable gain",
@@ -171,7 +171,7 @@
           "id": "strong",
           "weight": 30,
           "label": "Genuinely appreciated",
-          "support": 5,
+          "support": 2.75,
           "heat": 0,
           "text": "The work is visible and people credit you for it."
         },
@@ -179,7 +179,7 @@
           "id": "normal",
           "weight": 65,
           "label": "Well received",
-          "support": 3.5,
+          "support": 1.92,
           "heat": 0,
           "text": "Quiet, solid goodwill."
         },
@@ -187,7 +187,7 @@
           "id": "weak",
           "weight": 5,
           "label": "Slow to land",
-          "support": 1.5,
+          "support": 0.83,
           "heat": 0,
           "text": "It will be noticed eventually, but not before polling day."
         }
@@ -205,7 +205,7 @@
       "label": "Village Outreach",
       "icon": "🚪",
       "blurb": "Workers walking door to door through the villages.",
-      "cost": 1000000,
+      "cost": 15000000,
       "heat": 0,
       "riskLabel": "Low risk",
       "impactLabel": "Small, cheap gain",
@@ -215,7 +215,7 @@
           "id": "strong",
           "weight": 25,
           "label": "Warm reception",
-          "support": 3.2,
+          "support": 3.01,
           "heat": 0,
           "text": "Doors opened and workers were listened to."
         },
@@ -223,7 +223,7 @@
           "id": "normal",
           "weight": 60,
           "label": "Ground covered",
-          "support": 2.2,
+          "support": 2.07,
           "heat": 0,
           "text": "Slow, steady, dependable."
         },
@@ -231,7 +231,7 @@
           "id": "weak",
           "weight": 15,
           "label": "Hard going",
-          "support": 0.9,
+          "support": 0.84,
           "heat": 1,
           "text": "A cold reception in places. Modest gain."
         }
@@ -245,7 +245,7 @@
       "label": "Undisclosed Deal",
       "icon": "🤝",
       "blurb": "An arrangement with local powerbrokers, made quietly.",
-      "cost": 6000000,
+      "cost": 90000000,
       "heat": 18,
       "riskLabel": "High risk",
       "impactLabel": "Big swing, or trouble",
@@ -255,7 +255,7 @@
           "id": "large",
           "weight": 35,
           "label": "The deal holds",
-          "support": 12,
+          "support": 7.65,
           "heat": 18,
           "text": "Whole blocks of votes move your way. Nobody says how."
         },
@@ -263,7 +263,7 @@
           "id": "small",
           "weight": 30,
           "label": "Partly delivered",
-          "support": 5,
+          "support": 3.19,
           "heat": 18,
           "text": "Less than promised, but something moved."
         },
@@ -279,7 +279,7 @@
           "id": "backfire",
           "weight": 15,
           "label": "It got out",
-          "support": -8,
+          "support": -5.1,
           "heat": 30,
           "text": "Word spread about the arrangement. This will follow you."
         }
@@ -297,7 +297,7 @@
       "label": "Political Influence",
       "icon": "🌀",
       "blurb": "Quiet pressure applied through intermediaries.",
-      "cost": 4000000,
+      "cost": 60000000,
       "heat": 12,
       "riskLabel": "Medium risk",
       "impactLabel": "Gain, or heat",
@@ -307,7 +307,7 @@
           "id": "gain",
           "weight": 40,
           "label": "Levers moved",
-          "support": 7,
+          "support": 4.8,
           "heat": 12,
           "text": "The right people became helpful."
         },
@@ -341,7 +341,7 @@
       "label": "Negative Campaign",
       "icon": "🗣️",
       "blurb": "Turn the constituency against whoever is ahead of you.",
-      "cost": 3000000,
+      "cost": 45000000,
       "heat": 10,
       "riskLabel": "Medium risk",
       "impactLabel": "Hurts your rival — usually",
@@ -386,7 +386,7 @@
       "label": "Last-Minute Push",
       "icon": "⚡",
       "blurb": "Throw everything at one seat in the final stretch.",
-      "cost": 7000000,
+      "cost": 105000000,
       "heat": 15,
       "riskLabel": "High risk",
       "impactLabel": "Can flip a marginal",
@@ -396,7 +396,7 @@
           "id": "large",
           "weight": 30,
           "label": "The seat swings",
-          "support": 15,
+          "support": 12.97,
           "heat": 15,
           "text": "A late surge. This could be the seat that decides it."
         },
@@ -404,7 +404,7 @@
           "id": "moderate",
           "weight": 40,
           "label": "Some movement",
-          "support": 6,
+          "support": 5.19,
           "heat": 15,
           "text": "It moved, but not as far as you needed."
         },
@@ -412,7 +412,7 @@
           "id": "backlash",
           "weight": 30,
           "label": "Too much, too late",
-          "support": -10,
+          "support": -8.64,
           "heat": 25,
           "text": "The blitz looked desperate, and voters read it that way."
         }
@@ -689,7 +689,7 @@
         "weight": 18,
         "evidenceBias": 0.6,
         "text": "Your campaign is fined.",
-        "fine": 2500000,
+        "fine": 37500000,
         "heat": -6,
         "support": -2.5,
         "seats": 4,
@@ -701,7 +701,7 @@
         "weight": 10,
         "evidenceBias": 1,
         "text": "A substantial fine is imposed after a damaging finding.",
-        "fine": 7500000,
+        "fine": 112500000,
         "heat": -8,
         "support": -4,
         "seats": 6,
@@ -748,36 +748,30 @@
   },
   "rounds": {
     "_comment": [
-      "Fifteen rounds of sixty seconds, with a short results break between them.",
+      "Twenty rounds. One to fifteen are the campaign; fifteen is the checkpoint",
+      "where the weakest campaign can be eliminated; sixteen to twenty are the",
+      "run to government.",
       "",
-      "The clock is authoritative on the server: roundStartedAt is a server",
-      "timestamp and every response carries the server time, so clients compute the",
-      "remaining seconds from that rather than from their own clock. A refresh",
-      "therefore picks the round up where it stands.",
+      "The host picks the round length from durationOptions before the game",
+      "starts. Two minutes is the default and the floor — below that nobody can",
+      "read a board, let alone decide anything.",
       "",
-      "Rounds advance lazily: whichever request arrives first after the clock runs",
-      "out processes the round end, under the same lock as everything else. With",
-      "clients polling every 2.5s a round turns over within a couple of seconds of",
-      "expiry, and nothing depends on a cron job the host may not have.",
-      "",
-      "graceSeconds forgives an action that was in flight as the clock expired, so",
-      "a player who clicks on 00:00 is not punished for their latency.",
-      "",
-      "actionsPerRound is what stops money deciding the game on its own. Without",
-      "it, a round rewards whoever clicks fastest, and a large purse converts",
-      "straight into support at the speed of the mouse. Three moves a round means",
-      "forty-five moves a campaign for everybody, so the question stops being how",
-      "much you can spend and becomes which three seats are worth it this minute.",
-      "",
-      "intermissionSeconds is the results break. Play is locked while it runs, so",
-      "the scoreboard is not competing with the next round for the same seconds —",
-      "reading what just happened is part of the game, not a tax on it."
+      "There is no cap on moves per round. What limits a round is the money a",
+      "player has and the moment they press END ROUND."
     ],
-    "total": 15,
-    "seconds": 60,
+    "total": 20,
+    "seconds": 120,
     "graceSeconds": 2,
-    "actionsPerRound": 3,
-    "intermissionSeconds": 9
+    "actionsPerRound": 0,
+    "intermissionSeconds": 9,
+    "eliminationRound": 15,
+    "allianceDeadline": 10,
+    "finalPhaseFrom": 16,
+    "durationOptions": [
+      120,
+      180,
+      300
+    ]
   },
   "finance": {
     "_comment": [
@@ -794,12 +788,22 @@
     ],
     "loan": {
       "interestRate": 0.2,
-      "repayAfterRounds": 2,
-      "minAmount": 1000000,
-      "maxAmount": 10000000,
-      "debtLimit": 20000000,
-      "noBorrowingAfterRound": 12,
-      "increments": 1000000
+      "repayAfterRounds": 4,
+      "minAmount": 15000000,
+      "maxAmount": 150000000,
+      "debtLimit": 300000000,
+      "noBorrowingAfterRound": 16,
+      "increments": 15000000,
+      "_comment": [
+        "Twenty per cent, due four rounds later.",
+        "",
+        "Two rounds was right when a campaign had five crore for the whole",
+        "election. Against five crore a round it forced a default every time: a",
+        "fifteen crore loan wants eighteen back out of ten crore of income, so the",
+        "only outcome was the penalty. Four rounds makes borrowing a real choice —",
+        "twenty crore of income against an eighteen crore bill — rather than a trap",
+        "with a sign on it."
+      ]
     },
     "default": {
       "heat": 22,
@@ -827,7 +831,7 @@
       "id": "grant",
       "label": "Apply for a Grant",
       "icon": "🏛️",
-      "cost": 2000000,
+      "cost": 30000000,
       "heat": 0,
       "riskLabel": "No risk",
       "impactLabel": "Development work, uncertain funding",
@@ -838,7 +842,7 @@
           "id": "large",
           "weight": 25,
           "label": "Application approved in full",
-          "funds": 2500000,
+          "funds": 37500000,
           "support": 3,
           "heat": 0,
           "text": "The work is done and the grant came through in full."
@@ -847,7 +851,7 @@
           "id": "partial",
           "weight": 40,
           "label": "Partly funded",
-          "funds": 1500000,
+          "funds": 22500000,
           "support": 2.5,
           "heat": 0,
           "text": "Some of the money came back, and the work is visible."
@@ -856,7 +860,7 @@
           "id": "small",
           "weight": 20,
           "label": "A token amount",
-          "funds": 500000,
+          "funds": 7500000,
           "support": 2,
           "heat": 0,
           "text": "Barely worth the paperwork, but the work still counts."
@@ -889,7 +893,7 @@
           "id": "big",
           "weight": 28,
           "label": "A large sum arrives",
-          "funds": 8000000,
+          "funds": 120000000,
           "heat": 24,
           "text": "The money is in the account. Nobody will say where it came from."
         },
@@ -897,7 +901,7 @@
           "id": "medium",
           "weight": 32,
           "label": "Less than promised",
-          "funds": 4000000,
+          "funds": 60000000,
           "heat": 24,
           "text": "Well short of what was discussed, but it is money."
         },
@@ -905,7 +909,7 @@
           "id": "small",
           "weight": 22,
           "label": "A token payment",
-          "funds": 2000000,
+          "funds": 30000000,
           "heat": 26,
           "text": "Barely worth the exposure."
         },
@@ -1164,37 +1168,36 @@
   ],
   "spending": {
     "_comment": [
-      "How much to put behind a move is now the player's decision, not a fixed",
-      "price. Each action has a base cost; spending more or less than it scales",
-      "what the move achieves.",
+      "How much a single move may cost. The floor keeps a move meaningful; the",
+      "ceiling is a multiple of the action's own cost, so a rally is still a",
+      "rally however rich the campaign.",
       "",
-      "The curve is a square root, and that choice carries the whole balance of",
-      "the feature. Spending four times the base cost buys twice the effect, not",
-      "four times it — so for a fixed budget the most efficient play is to spread",
-      "money evenly across every move you have, never to dump it into a few.",
-      "That is exactly the behaviour we want: money should buy a real advantage",
-      "without letting a rich campaign simply purchase the election in three",
-      "expensive gestures.",
-      "",
-      "The clamps stop both ends running away. Below minScale a token amount",
-      "would otherwise look like a bargain, since a move costs one of the three",
-      "a round whatever is spent; above maxScale a single move could swing a seat",
-      "outright.",
-      "",
-      "Heat scales with the money too. Putting four times the money behind a",
-      "risky move is four times as visible, and it should be."
+      "None of this caps a round. A player with twenty crore saved may spend all",
+      "of it in one round across as many seats as they like."
     ],
     "enabled": true,
-    "minAmount": 500000,
-    "maxMultiple": 4,
+    "minAmount": 7500000,
+    "maxMultiple": 6,
     "minScale": 0.45,
     "maxScale": 2,
     "quickAmounts": [
-      500000,
-      1000000,
-      2500000,
-      5000000,
-      10000000
+      15000000,
+      37500000,
+      75000000,
+      150000000,
+      375000000
+    ],
+    "curve": 0.72,
+    "_curveComment": [
+      "How an amount converts to effect: scale = (amount / baseCost) ^ curve.",
+      "",
+      "At 0.5 this is a square root, and spreading one sum across N seats is",
+      "worth sqrt(N) times aiming it at one — a very strong pull toward breadth.",
+      "Raising the exponent toward 1 flattens that: at c, spreading is worth",
+      "N^(1-c). This is the single lever that decides whether the game rewards",
+      "reading the map or simply touching every seat.",
+      "",
+      "Measure with: node tools/balance-money.mjs"
     ]
   },
   "bribe": {
@@ -1217,7 +1220,7 @@
         "icon": "🎲",
         "group": "risky",
         "menu": "bribe",
-        "cost": 2000000,
+        "cost": 30000000,
         "allowsAmount": true,
         "riskLabel": "Very high risk",
         "impactLabel": "A swing, or a scandal",
@@ -1231,7 +1234,7 @@
             "id": "swing",
             "weight": 26,
             "label": "It moves",
-            "support": 6.5,
+            "support": 6.4,
             "heat": 26,
             "text": "Something shifted. Nobody is saying what."
           },
@@ -1239,7 +1242,7 @@
             "id": "slight",
             "weight": 30,
             "label": "A small shift",
-            "support": 2.5,
+            "support": 2.46,
             "heat": 24,
             "text": "A little movement, and a lot of exposure for it."
           },
@@ -1255,7 +1258,7 @@
             "id": "backfire",
             "weight": 18,
             "label": "It got out",
-            "support": -4.5,
+            "support": -4.44,
             "seats": 3,
             "heat": 36,
             "text": "Word travelled faster than the offer did."
@@ -1268,7 +1271,7 @@
         "icon": "🤫",
         "group": "risky",
         "menu": "bribe",
-        "cost": 3500000,
+        "cost": 52500000,
         "allowsAmount": true,
         "riskLabel": "Very high risk",
         "impactLabel": "A big swing, or an inquiry",
@@ -1282,7 +1285,7 @@
             "id": "accepted",
             "weight": 24,
             "label": "Accepted",
-            "support": 8,
+            "support": 21.28,
             "heat": 30,
             "text": "Whatever was agreed, it is holding."
           },
@@ -1290,7 +1293,7 @@
             "id": "partial",
             "weight": 28,
             "label": "Partly honoured",
-            "support": 3.5,
+            "support": 9.32,
             "heat": 28,
             "text": "Half of what was promised, at full price."
           },
@@ -1298,7 +1301,7 @@
             "id": "refused",
             "weight": 26,
             "label": "Refused",
-            "support": -1,
+            "support": -2.66,
             "heat": 32,
             "text": "Turned down, and remembered."
           },
@@ -1306,7 +1309,7 @@
             "id": "exposed",
             "weight": 22,
             "label": "Exposed",
-            "support": -6,
+            "support": -15.97,
             "seats": 4,
             "heat": 40,
             "text": "Somebody in the room was taking notes."
@@ -1319,7 +1322,7 @@
         "icon": "🎰",
         "group": "risky",
         "menu": "bribe",
-        "cost": 5000000,
+        "cost": 75000000,
         "allowsAmount": true,
         "riskLabel": "Extreme risk",
         "impactLabel": "Everything, or nothing at all",
@@ -1385,7 +1388,8 @@
       "perSeat": 4,
       "perCoalitionWin": 150,
       "perAchievement": 100,
-      "perGamePlayed": 10
+      "perGamePlayed": 10,
+      "perDistrictControlled": 25
     },
     "level": {
       "_comment": "Level is score-based, on a widening curve so early levels come quickly.",
@@ -1435,7 +1439,107 @@
         "label": "Risk Taker",
         "blurb": "Win after using the high-risk mechanics.",
         "icon": "🔥"
+      },
+      {
+        "id": "landlord",
+        "label": "Landlord",
+        "blurb": "Hold every seat in five districts at once.",
+        "icon": "🗺️"
+      },
+      {
+        "id": "survivor",
+        "label": "Survivor",
+        "blurb": "Win after surviving the round fifteen review.",
+        "icon": "🧭"
       }
-    ]
+    ],
+    "_financialMasterUnder": 450000000
+  },
+  "_startingBudgetComment": [
+    "Nobody starts with money any more. A campaign is funded round by round:",
+    "income.perRound arrives at the start of every round and whatever is not",
+    "spent stays. Over twenty rounds that is a hundred crore a player, and a",
+    "four-player election generates four hundred — but only ever five crore at",
+    "a time, so saving for a big move is a real decision rather than a footnote."
+  ],
+  "income": {
+    "_comment": [
+      "The round allowance. This is income, not a spending cap: a player who",
+      "has saved may spend everything they hold in one round.",
+      "",
+      "Credited exactly once per round per player, keyed by round number, so a",
+      "refresh or a reconnection cannot pay somebody twice."
+    ],
+    "perRound": 50000000
+  },
+  "territory": {
+    "_comment": [
+      "Districts and the three regions of Punjab.",
+      "",
+      "Holding every seat in a district pays its grant every round for as long",
+      "as the hold lasts, and the money is locked to the region the district",
+      "sits in. That is what makes the map worth reading: a fourteen-seat",
+      "district in Malwa pays for a Malwa campaign and nothing else.",
+      "",
+      "The grant scales with district size between the floor and the ceiling.",
+      "tools/build-regions.mjs does the scaling and writes js/data/regions.js;",
+      "the district-to-region mapping lives there because it is geography, not",
+      "balance."
+    ],
+    "grant": {
+      "min": 20000000,
+      "max": 300000000
+    },
+    "priorityDistricts": {
+      "_comment": [
+        "How many districts a player may name as priority targets. Priority",
+        "is a statement of intent, not ownership — rivals can and do campaign",
+        "in the same places.",
+        "",
+        "The ceiling is the number of districts Punjab actually has. The",
+        "brief asked for up to seventy; Punjab has twenty-three, and",
+        "inventing another forty-seven was not an option."
+      ],
+      "min": 4,
+      "max": 23,
+      "options": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        15,
+        20,
+        23
+      ]
+    }
+  },
+  "alliances": {
+    "_comment": [
+      "Two players may agree to fight the election together. Offers close at",
+      "the end of the deadline round; after that an alliance is locked until",
+      "the result, so nobody can shop for a better partner at round nineteen.",
+      "",
+      "Allies see each other's priority districts. They do not see each",
+      "other's cash, their heat, or anything they did quietly."
+    ],
+    "deadlineRound": 10,
+    "maxSize": 2,
+    "coalitionCountsAllies": true
+  },
+  "elimination": {
+    "_comment": [
+      "At the end of the checkpoint round the weakest campaign may be put out",
+      "of the election — but only if it is genuinely out of it. A player still",
+      "within reach of the majority survives, because a comeback is the best",
+      "thing that can happen in a game like this.",
+      "",
+      "Never applied when two or fewer players remain."
+    ],
+    "round": 15,
+    "minPlayersToEliminate": 3,
+    "safeIfWithinSeatsOfMajority": 20,
+    "safeIfWithinSeatsOfLeader": 12
   }
 }

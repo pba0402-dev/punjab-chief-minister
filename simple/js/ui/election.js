@@ -311,15 +311,41 @@ CMP.ui.election = (function () {
               })
             : null,
 
+          // Stepping away and finishing for good are different things and
+          // are worded so nobody has to guess which is which.
           el('button', {
             class: 'sheet-item',
             type: 'button',
-            text: 'Back to main menu',
             onclick: function () {
               close();
               if (opts.onMenu) opts.onMenu();
             },
-          }),
+          }, [
+            el('strong', { class: 'sheet-item-title', text: 'Leave for now' }),
+            el('span', {
+              class: 'sheet-item-note',
+              text: game.mode === 'multiplayer'
+                ? 'The election carries on. You can rejoin from the home screen.'
+                : 'Your progress is saved. Pick it up from the home screen.',
+            }),
+          ]),
+
+          game.mode === 'multiplayer'
+            ? el('button', {
+                class: 'sheet-item is-danger',
+                type: 'button',
+                onclick: function () {
+                  close();
+                  confirmEndGame();
+                },
+              }, [
+                el('strong', { class: 'sheet-item-title', text: 'End this game' }),
+                el('span', {
+                  class: 'sheet-item-note',
+                  text: 'Finish here for good. You will not be able to rejoin.',
+                }),
+              ])
+            : null,
 
           el('button', {
             class: 'btn btn-quiet btn-wide',
@@ -327,6 +353,53 @@ CMP.ui.election = (function () {
             text: 'Close',
             onclick: function () {
               close();
+            },
+          }),
+        ]),
+      ]);
+
+      function close() {
+        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+      }
+      sheet.addEventListener('click', function (e) {
+        if (e.target === sheet) close();
+      });
+      document.body.appendChild(sheet);
+    }
+
+    /**
+     * Ending a game is the one thing here that cannot be undone, so it says
+     * exactly what it costs and makes the safe answer the easy one.
+     */
+    function confirmEndGame() {
+      var sheet = el('div', { class: 'sheet' }, [
+        el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('h2', { class: 'sheet-title', text: 'End this game?' }),
+          el('p', {
+            class: 'sheet-text',
+            text: 'You will not be able to rejoin this game later. The other ' +
+              'players carry on without you, and your seats stay on the board.',
+          }),
+          el('p', {
+            class: 'sheet-text is-quiet',
+            text: 'If you only want to stop for now, close this and choose ' +
+              '"Leave for now" instead — that keeps your place.',
+          }),
+          el('button', {
+            class: 'btn btn-primary btn-wide',
+            type: 'button',
+            text: 'Keep playing',
+            onclick: function () {
+              close();
+            },
+          }),
+          el('button', {
+            class: 'btn btn-danger btn-wide',
+            type: 'button',
+            text: 'End the game for good',
+            onclick: function () {
+              close();
+              if (opts.onEndGame) opts.onEndGame();
             },
           }),
         ]),

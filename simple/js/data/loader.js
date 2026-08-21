@@ -23,6 +23,7 @@ CMP.data = (function () {
   var FILES = [
     'js/data/constituencies.js',
     'js/data/incumbents.js',
+    'js/data/regions.js',
     'js/data/geometry.js',
   ];
 
@@ -30,7 +31,8 @@ CMP.data = (function () {
 
   /** Is the board already here? */
   function ready() {
-    return !!(CMP.CONSTITUENCIES && CMP.CONSTITUENCIES.length);
+    return !!(CMP.CONSTITUENCIES && CMP.CONSTITUENCIES.length
+      && CMP.DISTRICTS && CMP.DISTRICTS.length);
   }
 
   function loadScript(src) {

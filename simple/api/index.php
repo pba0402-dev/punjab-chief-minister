@@ -38,6 +38,8 @@ declare(strict_types=1);
 require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
+require __DIR__ . '/lib/Territory.php';
+require __DIR__ . '/lib/Alliances.php';
 require __DIR__ . '/lib/Campaign.php';
 require __DIR__ . '/lib/Rounds.php';
 require __DIR__ . '/lib/AI.php';
@@ -92,6 +94,7 @@ $investigation = new Investigation($campaign);
 $election = new Election($campaign);
 $coalitionRules = new Coalition($campaign);
 $profiles = new Profiles($dataDir, $campaign->config());
+$territory = $campaign->territory();
 
 /* The seat list the board is dealt from. Read once from the generated data
    file so the server and browser always agree on which seats exist. */
@@ -548,6 +551,97 @@ switch (route()) {
         });
     }
 
+    /* -------------------------------------------------------- end round */
+    case 'endround': {
+        [$game, $playerId] = authenticate($store);
+
+        // Declaring yourself finished locks only you. Everybody else plays on
+        // until they say the same or the clock runs out. The round then closes
+        // inside mutate(), which already runs the pipeline under the lock.
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId) {
+            if (($g['phase'] ?? '') !== 'election') {
+                throw new LobbyError('The election is not running.');
+            }
+            if (($g['stage'] ?? '') !== 'playing') {
+                throw new LobbyError('That round has already closed.');
+            }
+            if (!empty($g['players'][$playerId]['eliminated'])) {
+                throw new LobbyError('You are out of this election.');
+            }
+            $g['players'][$playerId]['roundReady'] = true;
+            $g['players'][$playerId]['readyRound'] = (int) ($g['round'] ?? 1);
+            return $g;
+        });
+    }
+
+    /* ------------------------------------------------- priority districts */
+    case 'priority': {
+        [$game, $playerId] = authenticate($store);
+
+        $wanted = input('districts', []);
+        if (!is_array($wanted)) {
+            $wanted = [];
+        }
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $wanted) {
+            $cfg = $GLOBALS['campaign']->config()['territory']['priorityDistricts'] ?? [];
+            $max = (int) ($cfg['max'] ?? 23);
+
+            // Only real district ids, no duplicates, and never more than the
+            // configured ceiling — a client picking all twenty-three and then
+            // some is a client to be trimmed, not trusted.
+            $known = [];
+            foreach ($GLOBALS['territory']->districts() as $d) {
+                $known[(string) $d['id']] = true;
+            }
+            $clean = [];
+            foreach ($wanted as $id) {
+                $id = (string) $id;
+                if (isset($known[$id]) && !in_array($id, $clean, true)) {
+                    $clean[] = $id;
+                }
+            }
+            $g['players'][$playerId]['priorityDistricts'] = array_slice($clean, 0, $max);
+            return $g;
+        });
+    }
+
+    /* --------------------------------------------------------- alliances */
+    case 'ally': {
+        [$game, $playerId] = authenticate($store);
+        $move = strtolower((string) input('move', 'offer'));   // offer|accept|decline|withdraw
+        $otherId = (string) input('playerId2', '');
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $otherId, $move) {
+            $config = $GLOBALS['campaign']->config();
+
+            if ($move === 'accept') {
+                $offers = $g['allianceOffers'] ?? [];
+                if (!isset($offers[$otherId . '>' . $playerId])) {
+                    throw new LobbyError('There is no offer from that player.');
+                }
+                $reason = Alliances::offerBlockedReason($g, $otherId, $playerId, $config);
+                if ($reason !== null) {
+                    throw new LobbyError($reason, 'alliance_blocked');
+                }
+                return Alliances::accept($g, $playerId, $otherId);
+            }
+
+            if ($move === 'decline') {
+                return Alliances::drop($g, $otherId, $playerId);
+            }
+            if ($move === 'withdraw') {
+                return Alliances::drop($g, $playerId, $otherId);
+            }
+
+            $reason = Alliances::offerBlockedReason($g, $playerId, $otherId, $config);
+            if ($reason !== null) {
+                throw new LobbyError($reason, 'alliance_blocked');
+            }
+            return Alliances::offer($g, $playerId, $otherId);
+        });
+    }
+
     /* ------------------------------------------------------------- start */
     case 'start': {
         [$game, $playerId] = authenticate($store);
@@ -560,6 +654,17 @@ switch (route()) {
             if ($reason !== null) {
                 throw new LobbyError($reason, 'not_ready');
             }
+
+            // The round length the host chose, checked against the offered
+            // options rather than trusted — a client that asks for a
+            // five-second round should not get one.
+            $engineCfg = $GLOBALS['campaign']->rounds();
+            $options = array_map('intval', $engineCfg['durationOptions'] ?? []);
+            $wanted = (int) input('roundSeconds', 0);
+            $g['roundSeconds'] = in_array($wanted, $options, true)
+                ? $wanted
+                : (int) $engineCfg['seconds'];
+
             $g['phase'] = 'election';
 
             // Deal the opening map once. Everyone campaigns on this same
@@ -574,6 +679,20 @@ switch (route()) {
             );
             $g['board'] = $board;
             $g['incumbency'] = $incumbency;
+
+            // What the deal handed each party. Recorded once, so a grant can
+            // only ever be paid for a district somebody actually took.
+            $terr = $GLOBALS['territory'];
+            $openingLeaders = Territory::leadersOf($board);
+            foreach ($g['players'] as $pid => $pl) {
+                $party = (string) ($pl['partyId'] ?? '');
+                $g['players'][$pid]['openingDistricts'] = $party === ''
+                    ? []
+                    : array_map(
+                        static fn($d) => (string) $d['id'],
+                        $terr->heldBy($openingLeaders, $party)
+                    );
+            }
             $g['history'] = [];
             $g['roundLog'] = [];
 
@@ -825,16 +944,92 @@ switch (route()) {
 
     /* ------------------------------------------------------------- leave */
     case 'leave': {
+        /*
+         * Leaving is not ending.
+         *
+         * Closing a tab, losing signal, or walking away mid-round must never
+         * cost somebody their election — they keep their seat, their money and
+         * their position, and can come back to exactly where they were. That
+         * is what `leave` does once an election is under way.
+         *
+         * `end=1` is the other thing entirely: a deliberate, confirmed
+         * decision to be finished with this game. It is the only path that
+         * takes away the right to rejoin, and it is irreversible.
+         *
+         * In the lobby, before anybody has played, leaving really is leaving —
+         * there is no game state worth preserving and an empty seat should go
+         * back to the pool.
+         */
         [$game, $playerId] = authenticate($store);
-        $updated = $store->withLock($game['id'], static function (array $g) use ($playerId) {
-            unset($g['players'][$playerId]);
-            $g['updatedAt'] = time();
-            return Lobby::ensureHost($g);
-        });
+        $ending = filter_var(input('end', false), FILTER_VALIDATE_BOOLEAN);
+        $inLobby = ($game['phase'] ?? '') === 'lobby';
+
+        $updated = $store->withLock(
+            $game['id'],
+            static function (array $g) use ($playerId, $ending, $inLobby) {
+                if ($inLobby) {
+                    unset($g['players'][$playerId]);
+                } elseif ($ending) {
+                    // Out for good. The seats they built stay on the board —
+                    // the support is real and the other campaigns have to beat
+                    // it — but the player takes no further part and cannot
+                    // come back.
+                    $g['players'][$playerId]['endedByPlayer'] = true;
+                    $g['players'][$playerId]['leftAt'] = time();
+                    $g['players'][$playerId]['roundReady'] = true;
+                } else {
+                    // Stepped away. Nothing is taken from them.
+                    $g['players'][$playerId]['awayAt'] = time();
+                }
+                $g['updatedAt'] = time();
+                return Lobby::ensureHost($g);
+            }
+        );
+
         if ($updated !== null && count($updated['players']) === 0) {
             $store->delete($updated['id']);
         }
-        send(['ok' => true]);
+        send(['ok' => true, 'ended' => $ending]);
+    }
+
+    /* ------------------------------------------------------------ resume */
+    case 'resume': {
+        /*
+         * Is there a game to go back to?
+         *
+         * Answers from the profile id the browser carries, so a player who
+         * cleared their session — or opened the game on another device signed
+         * in as themselves — still finds their election. Never lists a game
+         * they explicitly ended, and never one that has already finished.
+         */
+        $profileId = Profiles::cleanId((string) input('profileId', ''));
+        if ($profileId === '') {
+            send(['ok' => true, 'games' => []]);
+        }
+
+        $open = [];
+        foreach ($store->gamesForProfile($profileId) as $row) {
+            $g = $row['game'];
+            $p = $g['players'][$row['playerId']];
+            $open[] = [
+                'code' => (string) $g['code'],
+                'phase' => (string) $g['phase'],
+                'round' => (int) ($g['round'] ?? 0),
+                'roundsTotal' => (int) ($g['roundsTotal'] ?? 0),
+                'players' => count($g['players'] ?? []),
+                'partyId' => $p['partyId'] ?? null,
+
+                // The credentials to walk back in with. They are this
+                // player's own, returned only to a request carrying their own
+                // profile id, which is the same thing that identifies them
+                // everywhere else in this game.
+                'playerId' => $row['playerId'],
+                'token' => (string) ($p['token'] ?? ''),
+                'updatedAt' => (int) ($g['updatedAt'] ?? 0),
+            ];
+        }
+
+        send(['ok' => true, 'games' => array_slice($open, 0, 3)]);
     }
 
     /* ------------------------------------------------------------- stats */

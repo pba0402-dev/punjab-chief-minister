@@ -38,6 +38,7 @@ for (const f of [
   'js/data/parties.js',
   'js/data/constituencies.js',
   'js/data/incumbents.js',
+  'js/data/regions.js',
   'js/data/actions.js',
   'js/engine/rng.js',
   'js/engine/campaign.js',
@@ -79,8 +80,9 @@ const SPEND = {
   base: () => null,
   heavy: (g, action) => CMP.campaign.amountRange(action).max,
   spread: (g, action, round) => {
-    const movesLeft = Math.max(1, (CMP.ROUNDS.total - round + 1) * CMP.ROUNDS.actionsPerRound);
-    return Math.floor(g.cash / movesLeft);
+    // Hold enough back to keep campaigning for the rest of the election.
+    const roundsLeft = Math.max(1, CMP.ROUNDS.total - round + 1);
+    return Math.floor(g.cash / (roundsLeft * 2));
   },
 };
 
@@ -125,7 +127,9 @@ function playCampaign(name, seed) {
       .filter((l) => !l.settled && l.dueRound <= round)
       .reduce((t, l) => t + l.repay, 0);
 
-    for (let move = 0; move < CMP.ROUNDS.actionsPerRound; move++) {
+    // A round ends when the money runs out or the plan stops; the guard is a
+    // runaway backstop, not a rule of the game.
+    for (let move = 0; move < 40; move++) {
       // Whatever falls due this round is not available to spend.
       const action = plan.pick(game, Math.max(0, game.cash - dueSoon));
       if (!action) break;
@@ -184,7 +188,9 @@ for (let i = 0; i < GAMES; i++) {
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 const money = (n) => '₹' + (n / 10000000).toFixed(2) + 'cr';
 
-console.log('Fifteen rounds, ' + CMP.ROUNDS.actionsPerRound + ' moves each, over ' + GAMES + ' games.\n');
+console.log(CMP.ROUNDS.total + ' rounds, ₹' +
+  (CMP.CAMPAIGN.income.perRound / 10000000) + ' crore a round, over ' + GAMES + ' games.');
+console.log('');
 console.log(
   'strategy    seats (mean)   range     majorities   games won   spent    borrowed  heat  defaults'
 );

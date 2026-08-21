@@ -35,16 +35,22 @@ final class Rounds
     {
         $cfg = $engine->rounds();
         $now = time();
+
+        // The host chose the round length before the game started; fall back
+        // to the configured default for a game created before they could.
+        $seconds = (int) ($game['roundSeconds'] ?? $cfg['seconds']);
+
         $game['round'] = $round;
         $game['stage'] = 'playing';
+        $game['roundState'] = 'active';
         $game['roundStartedAt'] = $now;
-        $game['roundEndsAt'] = $now + (int) $cfg['seconds'];
+        $game['roundEndsAt'] = $now + $seconds;
         $game['nextRoundAt'] = 0;
 
         // Kept on the record so the lobby view can describe the clock without
         // needing the config loaded.
         $game['roundsTotal'] = (int) $cfg['total'];
-        $game['roundSeconds'] = (int) $cfg['seconds'];
+        $game['roundSeconds'] = $seconds;
         $game['intermissionSeconds'] = (int) $cfg['intermissionSeconds'];
 
         // turn tracks rounds one-for-one. Restrictions and investigations were
@@ -58,18 +64,91 @@ final class Rounds
         $board = self::boardOf($game);
         foreach ($game['players'] as $pid => $p) {
             $partyId = (string) ($p['partyId'] ?? '');
-            $game['players'][$pid]['roundActions'] = 0;
-            $game['players'][$pid]['roundSpent'] = 0;
-            $game['players'][$pid]['roundGained'] = 0;
-            $game['players'][$pid]['round'] = $round;
-            $game['players'][$pid]['roundOpen'] = [
+
+            // Income and grants first, so roundOpen records what the player
+            // actually starts the round holding rather than what was left at
+            // the end of the last one. Both are keyed by round number inside
+            // the engine, so calling this twice cannot pay anybody twice.
+            $p = $engine->creditRoundIncome($p, $round);
+            if ($partyId !== '') {
+                $p = $engine->creditDistrictGrants($p, $board, $round);
+            }
+
+            $p['roundActions'] = 0;
+            $p['roundSpent'] = 0;
+            $p['roundGained'] = 0;
+            $p['roundReady'] = false;
+            $p['readyRound'] = 0;
+            $p['round'] = $round;
+            $p['roundOpen'] = [
                 'cash' => (int) ($p['cash'] ?? 0),
+                'grants' => $p['grants'] ?? [],
                 'heat' => (float) ($p['heat'] ?? 0),
                 'seats' => (int) ($p['seatsLed'] ?? 0),
                 'support' => $partyId === '' ? 0.0 : $engine->averageSupport($board, $partyId),
             ];
+            $game['players'][$pid] = $p;
         }
         return $game;
+    }
+
+    /* ------------------------------------------------------ readiness */
+
+    /**
+     * Who still has to declare themselves finished before the round can close.
+     *
+     * An AI opponent is never waited for — it plays its round inside the
+     * pipeline. A player who has been eliminated is not waited for either.
+     *
+     * A disconnected player IS still waited for, but only until the clock runs
+     * out: they may be reloading a page or on a train, and putting somebody
+     * out of a round for a dropped poll would be worse than the wait. The
+     * clock is what stops one lost connection holding up three people.
+     *
+     * @return array<int, string> player ids
+     */
+    public static function awaiting(array $game): array
+    {
+        $out = [];
+        foreach (($game['players'] ?? []) as $pid => $p) {
+            if (!empty($p['isAI']) || !empty($p['eliminated'])) {
+                continue;
+            }
+            if (empty($p['roundReady'])) {
+                $out[] = (string) $pid;
+            }
+        }
+        return $out;
+    }
+
+    /** Everyone still in the election has pressed END ROUND. */
+    public static function everyoneReady(array $game): bool
+    {
+        $playing = 0;
+        foreach (($game['players'] ?? []) as $p) {
+            if (empty($p['isAI']) && empty($p['eliminated'])) {
+                $playing++;
+            }
+        }
+        // Nobody left to wait for is not the same as everybody being ready.
+        return $playing > 0 && self::awaiting($game) === [];
+    }
+
+    /** How the ready count reads on screen: [ready, of]. */
+    public static function readyCount(array $game): array
+    {
+        $ready = 0;
+        $total = 0;
+        foreach (($game['players'] ?? []) as $p) {
+            if (!empty($p['isAI']) || !empty($p['eliminated'])) {
+                continue;
+            }
+            $total++;
+            if (!empty($p['roundReady'])) {
+                $ready++;
+            }
+        }
+        return [$ready, $total];
     }
 
     public static function secondsLeft(array $game, ?int $now = null): int
@@ -137,7 +216,12 @@ final class Rounds
         while (($game['phase'] ?? '') === 'election' && $guard++ < 60) {
             $stage = $game['stage'] ?? 'playing';
 
-            if ($stage === 'playing' && $now >= (int) ($game['roundEndsAt'] ?? 0)) {
+            // A round closes when its clock runs out, or the moment every
+            // player still in the election has said they are done. Waiting out
+            // a two-minute clock nobody is using is the fastest way to make a
+            // twenty-round game feel like a chore.
+            if ($stage === 'playing'
+                && ($now >= (int) ($game['roundEndsAt'] ?? 0) || self::everyoneReady($game))) {
                 $game = self::endRound($game, $engine, $election);
                 continue;
             }
@@ -298,13 +382,37 @@ final class Rounds
 
         $game['leadParty'] = $game['lastResult']['leadParty'];
 
-        // 10. Into the results break. The next round opens when it expires.
+        // 10. The checkpoint. At the configured round the weakest campaign
+        // may be put out — and only then, and only if it is genuinely beyond
+        // saving. Everything it built stays on the board.
+        $cfg = $engine->config();
+        if ($round === (int) (($cfg['elimination'] ?? [])['round'] ?? 0)) {
+            $review = Alliances::review($game, $cfg, $seats);
+            $game['lastResult']['review'] = [
+                'round' => $round,
+                'standings' => $review['standings'],
+                'reason' => $review['reason'],
+                'eliminated' => null,
+            ];
+            if ($review['playerId'] !== null) {
+                $out = $game['players'][$review['playerId']] ?? [];
+                $game = Alliances::eliminate($game, $review['playerId'], $review['reason']);
+                $game['lastResult']['review']['eliminated'] = [
+                    'playerId' => $review['playerId'],
+                    'partyId' => (string) ($out['partyId'] ?? ''),
+                    'candidateName' => (string) ($out['candidateName'] ?? ''),
+                ];
+            }
+        }
+
+        // 11. Into the results break. The next round opens when it expires.
         //
         // The break is measured from when the round actually ended, not from
         // the moment we noticed it had. A game nobody touched for five minutes
         // is settled by whichever request arrives next, and stamping the break
         // from "now" would leave it stuck on a scoreboard nobody was there to
         // read — one owed round at a time, forever.
+        $game['roundState'] = 'completed';
         $game['stage'] = 'results';
         $game['nextRoundAt'] = (int) $game['roundEndsAt']
             + (int) $engine->rounds()['intermissionSeconds'];

@@ -42,6 +42,18 @@ final class Lobby
             'roundStartedAt' => 0,
             'roundEndsAt' => 0,
 
+            // Chosen by the host before the election starts, from the offered
+            // options. Zero here means "not chosen yet"; begin() falls back to
+            // the configured default.
+            'roundSeconds' => 0,
+            'roundState' => 'not_started',
+
+            // Agreements between players, and who has been put out of the
+            // election at the checkpoint round.
+            'alliances' => [],
+            'allianceOffers' => [],
+            'eliminations' => [],
+
             // One board, shared. Every player campaigns on the same map and
             // sees the same leaders, which is the whole point of playing in
             // the same room. What stays private is money, heat and what each
@@ -95,6 +107,28 @@ final class Lobby
             'finesPaid' => 0,
             'loans' => [],
             'defaults' => 0,
+
+            // Region-locked grant purses, and the account of every movement
+            // of money behind the running totals above.
+            'grants' => [],
+            'ledger' => [],
+            'incomeCredited' => [],
+            'grantsCredited' => [],
+            'incomeTotal' => 0,
+            'grantTotalEarned' => 0,
+            'districtsHeld' => 0,
+
+            // Districts this player has named as priority targets. A
+            // statement of intent, not a claim of ownership.
+            'priorityDistricts' => [],
+
+            // Where the round stands, and where the election stands.
+            'roundReady' => false,
+            'readyRound' => 0,
+            'roundSpent' => 0,
+            'eliminated' => false,
+            'eliminatedRound' => 0,
+            'allyId' => null,
 
             'heat' => 0,
             'actions' => [],
@@ -218,12 +252,12 @@ final class Lobby
         return !in_array($partyId, self::takenParties($game, $playerId), true);
     }
 
-    /** A player is startable when they have a party, a name, a slogan and a budget. */
+    /** A player is startable when they have a party and a candidate name. */
     public static function playerIsComplete(array $p): bool
     {
         return !empty($p['partyId'])
             && trim((string) $p['candidateName']) !== ''
-            && trim((string) $p['slogan']) !== '';
+            && true;   // no slogan: see the note in js/ui/setup.js
     }
 
     /**
@@ -246,7 +280,7 @@ final class Lobby
 
         foreach ($connected as $p) {
             if (!self::playerIsComplete($p)) {
-                return 'Every player needs a party, a candidate and a slogan.';
+                return 'Every player needs a party and a candidate name.';
             }
             if (empty($p['ready'])) {
                 return 'Waiting for all players to be ready.';
@@ -352,6 +386,16 @@ final class Lobby
                 'ready' => (bool) $p['ready'],
                 'complete' => self::playerIsComplete($p),
 
+                // Where the round stands for this player. Everyone can see
+                // who has finished — that is the point of the ready count —
+                // and everyone can see how many districts somebody holds,
+                // because holding a district is written across the map.
+                'roundReady' => !empty($p['roundReady']),
+                'roundSpent' => (int) ($p['roundSpent'] ?? 0),
+                'districtsHeld' => (int) ($p['districtsHeld'] ?? 0),
+                'eliminated' => !empty($p['eliminated']),
+                'allyId' => $p['allyId'] ?? null,
+
                 // Public oversight figures. Everyone can see how many
                 // reports stand against a player and whether they have been
                 // penalised; the evidence score behind an investigation is
@@ -377,6 +421,24 @@ final class Lobby
                 $entry['loanHistory'] = $p['loans'] ?? [];
                 $entry['summary'] = $p['summary'] ?? null;
                 $entry['borrowingBlocked'] = !empty($p['borrowingBlocked']);
+
+                // Your own purses and your own account of them. A rival's
+                // region balances would tell them exactly where you can
+                // afford to fight, which is the whole game.
+                $entry['grants'] = (object) ($p['grants'] ?? []);
+                $entry['ledger'] = array_slice($p['ledger'] ?? [], -60);
+                $entry['incomeTotal'] = (int) ($p['incomeTotal'] ?? 0);
+                $entry['grantTotalEarned'] = (int) ($p['grantTotalEarned'] ?? 0);
+                $entry['priorityDistricts'] = array_values($p['priorityDistricts'] ?? []);
+            }
+
+            // Allies plan together, so they see each other's priority
+            // districts — and nothing else. Not their cash, not their heat,
+            // not what they did quietly.
+            if (!$isYou && $viewerId !== null
+                && ($p['allyId'] ?? null) === $viewerId
+                && ($game['players'][$viewerId]['allyId'] ?? null) === $p['id']) {
+                $entry['priorityDistricts'] = array_values($p['priorityDistricts'] ?? []);
             }
             $slots[] = $entry;
         }
@@ -385,10 +447,23 @@ final class Lobby
         $board = is_array($board) ? $board : (array) $board;
         $seats = self::seatCounts($board);
 
+        [$readyCount, $readyOf] = Rounds::readyCount($game);
+
         return [
             'code' => $game['code'],
             'phase' => $game['phase'],
             'turn' => (int) $game['turn'],
+
+            // The ready count, so every client can show the same "3 / 4" and
+            // nobody has to work it out from a list of players.
+            'readyCount' => $readyCount,
+            'readyOf' => $readyOf,
+            'roundState' => (string) ($game['roundState'] ?? 'active'),
+            'alliances' => array_values($game['alliances'] ?? []),
+            'allianceOffers' => $viewerId === null
+                ? []
+                : Alliances::offersTo($game, $viewerId),
+            'eliminations' => array_values($game['eliminations'] ?? []),
 
             // The clock, as the server sees it. Clients work out the seconds
             // remaining from serverNow and roundEndsAt rather than from their

@@ -15,7 +15,10 @@ CMP.ui.setup = (function () {
   var money = CMP.ui.money;
 
   function render(opts) {
-    var draft = { partyId: null, candidateName: '', slogan: '' };
+    // A returning player has already told us who they are. Asking again every
+    // time was the single most pointless thing this screen did.
+    var me = CMP.profile.get();
+    var draft = { partyId: null, candidateName: me ? me.name : '', slogan: '' };
     var errors = {};
 
     var root = el('section', { class: 'screen screen-setup' });
@@ -78,17 +81,23 @@ CMP.ui.setup = (function () {
           ]),
 
           el('div', { class: 'block' }, [
-            el('h2', { class: 'block-title', text: 'Candidate Details' }),
+            el('h2', {
+              class: 'block-title',
+              text: me ? 'Your candidate' : 'Who are you?',
+            }),
 
             el('label', { class: 'field' }, [
-              el('span', { class: 'field-label', text: 'Chief Minister Candidate Name' }),
+              el('span', {
+                class: 'field-label',
+                text: me ? 'Playing as' : 'Your name',
+              }),
               el('input', {
                 class: 'field-input' + (errors.candidateName ? ' has-error' : ''),
                 type: 'text',
                 maxlength: '60',
                 autocomplete: 'off',
                 value: draft.candidateName,
-                placeholder: 'Enter the name of your CM face',
+                placeholder: 'The name other players will see',
                 oninput: function (e) {
                   draft.candidateName = e.target.value;
                   if (errors.candidateName) {
@@ -102,32 +111,21 @@ CMP.ui.setup = (function () {
               setError('candidateName'),
             ]),
 
-            el('label', { class: 'field' }, [
-              el('span', { class: 'field-label', text: 'Election Slogan' }),
-              el('input', {
-                class: 'field-input' + (errors.slogan ? ' has-error' : ''),
-                type: 'text',
-                maxlength: '80',
-                autocomplete: 'off',
-                value: draft.slogan,
-                placeholder: 'The line your campaign runs on',
-                oninput: function (e) {
-                  draft.slogan = e.target.value;
-                  if (errors.slogan) {
-                    delete errors.slogan;
-                    e.target.classList.remove('has-error');
-                    var msg = e.target.parentNode.querySelector('.field-error');
-                    if (msg) msg.remove();
-                  }
-                },
-              }),
-              setError('slogan'),
-            ]),
+            me
+              ? el('p', {
+                  class: 'granted-note',
+                  text: 'Saved to your profile. Change it here any time.',
+                })
+              : el('p', {
+                  class: 'granted-note',
+                  text: 'Saved once, so you never have to type it again.',
+                }),
 
             el('p', { class: 'granted-note' }, [
-              'Every candidate is given ',
-              el('strong', { text: CMP.ui.money.format(CMP.STARTING_BUDGET) }),
-              ' to run the campaign.',
+              'Every campaign is funded ',
+              el('strong', { text: CMP.ui.money.words(CMP.CAMPAIGN.income.perRound) }),
+              ' a round, over ' + CMP.ROUNDS.total + ' rounds. ',
+              'Whatever you do not spend, you keep.',
             ]),
           ]),
 

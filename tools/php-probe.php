@@ -17,6 +17,8 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../simple/api/lib/Lobby.php';
+require __DIR__ . '/../simple/api/lib/Territory.php';
+require __DIR__ . '/../simple/api/lib/Alliances.php';
 require __DIR__ . '/../simple/api/lib/Campaign.php';
 require __DIR__ . '/../simple/api/lib/Rounds.php';
 require __DIR__ . '/../simple/api/lib/Coalition.php';

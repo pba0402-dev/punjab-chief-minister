@@ -47,14 +47,11 @@ CMP.ui.lobby = (function () {
       oninput: queueDetails,
     });
 
-    var sloganInput = el('input', {
-      class: 'field-input',
-      type: 'text',
-      maxlength: '80',
-      autocomplete: 'off',
-      placeholder: 'The line your campaign runs on',
-      oninput: queueDetails,
-    });
+    // How long each round runs. The host chooses once, before the election
+    // starts, and it applies to all twenty rounds.
+    var roundSeconds = CMP.ROUNDS.seconds;
+
+    var clockNode = el('div', { class: 'lobby-clock' });
 
     var readyBtn = el('button', {
       class: 'btn btn-xl btn-ready',
@@ -110,19 +107,18 @@ CMP.ui.lobby = (function () {
         el('div', { class: 'lobby-section' }, [
           el('h2', { class: 'block-title', text: 'Your Candidate' }),
           el('label', { class: 'field' }, [
-            el('span', { class: 'field-label', text: 'Chief Minister Candidate Name' }),
+            el('span', { class: 'field-label', text: 'Playing as' }),
             nameInput,
           ]),
-          el('label', { class: 'field' }, [
-            el('span', { class: 'field-label', text: 'Election Slogan' }),
-            sloganInput,
-          ]),
           el('p', { class: 'granted-note' }, [
-            'Every player is given ',
-            el('strong', { text: money.format(CMP.STARTING_BUDGET) }),
-            ' of their own to spend.',
+            'Every campaign is funded ',
+            el('strong', { text: money.words(CMP.CAMPAIGN.income.perRound) }),
+            ' a round over ' + CMP.ROUNDS.total + ' rounds. Whatever you do not ',
+            'spend, you keep.',
           ]),
         ]),
+
+        clockNode,
 
         footNode,
       ]),
@@ -224,7 +220,7 @@ CMP.ui.lobby = (function () {
       if (name && !CMP.profile.has()) CMP.profile.create(name);
 
       CMP.net
-        .setDetails(nameInput.value, sloganInput.value, CMP.profile.get())
+        .setDetails(nameInput.value, '', CMP.profile.get())
         .then(function (res) {
           if (!res.ok && !res.offline) setNotice(res.error);
           if (res.game) update(res.game);
@@ -247,8 +243,49 @@ CMP.ui.lobby = (function () {
       });
     }
 
+    /** The round length, host only. Everyone else is told what was chosen. */
+    function paintClock() {
+      var mine = me();
+      var isHost = !!(mine && mine.isHost);
+
+      if (!isHost) {
+        mount(clockNode, game && game.roundSeconds
+          ? [el('p', { class: 'lobby-note', text: 'Rounds run ' +
+              Math.round(game.roundSeconds / 60) + ' minutes.' })]
+          : []);
+        return;
+      }
+
+      mount(clockNode, [
+        el('div', { class: 'lobby-section' }, [
+          el('h2', { class: 'block-title', text: 'Round length' }),
+          el('div', { class: 'clock-options' }, CMP.ROUNDS.durationOptions.map(function (secs) {
+            return el('button', {
+              class: 'clock-option' + (roundSeconds === secs ? ' is-active' : ''),
+              type: 'button',
+              onclick: function () {
+                roundSeconds = secs;
+                paintClock();
+              },
+            }, [
+              el('strong', { class: 'clock-option-value', text: Math.round(secs / 60) + ' min' }),
+              el('span', {
+                class: 'clock-option-note',
+                text: secs === 120 ? 'Brisk' : secs === 180 ? 'Steady' : 'Considered',
+              }),
+            ]);
+          })),
+          el('p', {
+            class: 'granted-note',
+            text: 'Applies to all ' + CMP.ROUNDS.total + ' rounds. A round also ends ' +
+              'the moment everybody has pressed END ROUND.',
+          }),
+        ]),
+      ]);
+    }
+
     function startElection() {
-      CMP.net.start().then(function (res) {
+      CMP.net.start(roundSeconds).then(function (res) {
         setNotice(res.ok ? null : res.error);
         if (res.game) update(res.game);
         CMP.net.refresh();
@@ -272,6 +309,7 @@ CMP.ui.lobby = (function () {
       paintRoster();
       paintParties();
       paintOwnFields();
+      paintClock();
       paintFoot();
     }
 
@@ -376,9 +414,6 @@ CMP.ui.lobby = (function () {
 
       if (document.activeElement !== nameInput && nameInput.value !== mine.candidateName) {
         nameInput.value = mine.candidateName;
-      }
-      if (document.activeElement !== sloganInput && sloganInput.value !== mine.slogan) {
-        sloganInput.value = mine.slogan;
       }
     }
 

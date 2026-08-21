@@ -19,7 +19,11 @@ const config = JSON.parse(raw);
 /* Sanity checks, so a bad edit fails here rather than mid-game. */
 const MENUS = ['campaign', 'grants', 'corruption', 'bribe'];
 const problems = [];
-if (!config.startingBudget || config.startingBudget <= 0) problems.push('startingBudget missing');
+// Zero is the point now: a campaign is funded round by round, not handed a
+// purse at the start. Only a missing or negative figure is a problem.
+if (typeof config.startingBudget !== 'number' || config.startingBudget < 0) {
+  problems.push('startingBudget must be a number, zero or more');
+}
 if (!Array.isArray(config.actions) || !config.actions.length) problems.push('no actions');
 
 const ids = new Set();
@@ -53,8 +57,64 @@ for (const c of config.consequences || []) {
 const r = config.rounds || {};
 if (!(r.total > 0)) problems.push('rounds.total must be positive');
 if (!(r.seconds > 0)) problems.push('rounds.seconds must be positive');
-if (!(r.actionsPerRound > 0)) problems.push('rounds.actionsPerRound must be positive');
 if (!(r.intermissionSeconds > 0)) problems.push('rounds.intermissionSeconds must be positive');
+
+// A round is bounded by money and by the END ROUND button now, so a move cap
+// is optional — but a negative one would silently stop play.
+if (r.actionsPerRound < 0) problems.push('rounds.actionsPerRound cannot be negative');
+
+const durations = r.durationOptions || [];
+if (!durations.length) problems.push('rounds.durationOptions missing');
+if (Math.min(...durations) < 120) {
+  // Below two minutes nobody can read a board of 117 seats, let alone decide
+  // anything on it. The floor is a playability rule, not a preference.
+  problems.push('rounds.durationOptions cannot offer less than two minutes');
+}
+if (durations.indexOf(r.seconds) === -1) {
+  problems.push('rounds.seconds must be one of the offered durationOptions');
+}
+if (!(r.eliminationRound > 0 && r.eliminationRound < r.total)) {
+  problems.push('rounds.eliminationRound must fall inside the game');
+}
+if (!(r.allianceDeadline > 0 && r.allianceDeadline < r.eliminationRound)) {
+  problems.push('rounds.allianceDeadline must close before the checkpoint');
+}
+
+/* The round allowance. This is income, never a spending cap. */
+const income = config.income || {};
+if (!(income.perRound > 0)) problems.push('income.perRound must be positive');
+
+/* Territory: district grants and how many districts may be prioritised. */
+const terr = config.territory || {};
+const grant = terr.grant || {};
+if (!(grant.min > 0 && grant.max > grant.min)) {
+  problems.push('territory.grant needs a min and a larger max');
+}
+const prio = terr.priorityDistricts || {};
+if (!(prio.min > 0 && prio.max >= prio.min)) {
+  problems.push('territory.priorityDistricts needs a min and a max');
+}
+for (const n of prio.options || []) {
+  if (n < prio.min || n > prio.max) {
+    problems.push('territory.priorityDistricts.options has ' + n + ', outside min..max');
+  }
+}
+
+/* Alliances and the checkpoint. */
+const alli = config.alliances || {};
+if (!(alli.deadlineRound > 0)) problems.push('alliances.deadlineRound must be positive');
+if (alli.deadlineRound !== r.allianceDeadline) {
+  problems.push('alliances.deadlineRound and rounds.allianceDeadline disagree');
+}
+const elim = config.elimination || {};
+if (elim.round !== r.eliminationRound) {
+  problems.push('elimination.round and rounds.eliminationRound disagree');
+}
+if (!(elim.minPlayersToEliminate >= 3)) {
+  // Putting somebody out of a two-player game ends it by walkover, which is
+  // not a result anybody wants to have played twenty rounds for.
+  problems.push('elimination.minPlayersToEliminate must be at least 3');
+}
 
 /* The scoreboard and the opponents. */
 const sb = config.scoreboard || {};
@@ -152,6 +212,8 @@ CMP.CAMPAIGN = ${JSON.stringify(clean, null, 2)};
 
 CMP.STARTING_BUDGET = CMP.CAMPAIGN.startingBudget;
 CMP.ROUNDS = CMP.CAMPAIGN.rounds;
+CMP.INCOME = CMP.CAMPAIGN.income;
+CMP.TERRITORY = CMP.CAMPAIGN.territory;
 CMP.SCOREBOARD = CMP.CAMPAIGN.scoreboard;
 CMP.FINANCE = CMP.CAMPAIGN.finance;
 CMP.EVENTS = CMP.CAMPAIGN.events;
@@ -206,8 +268,15 @@ console.log('actions: ' + safe + ' safe, ' + risky + ' risky, ' +
 console.log('menus:   ' + MENUS.map((m) =>
   m + ' ' + [...config.actions, ...bribeActions, config.funding.grant, config.funding.underground]
     .filter((a) => a.menu === m).length).join(', '));
-console.log('rounds: ' + r.total + ' x ' + r.seconds + 's, ' +
-  r.actionsPerRound + ' moves each (' + r.total * r.actionsPerRound + ' a campaign)');
+console.log('rounds: ' + r.total + ' x ' + r.seconds + 's (' +
+  r.durationOptions.map((d) => d / 60 + 'm').join('/') + ' offered)');
+console.log('income: ' + (income.perRound / 10000000) + ' Cr a round, ' +
+  (income.perRound * r.total / 10000000) + ' Cr a campaign, ' +
+  (income.perRound * r.total * 4 / 10000000) + ' Cr across four players');
+console.log('checkpoint: round ' + r.eliminationRound +
+  ', alliances close after round ' + r.allianceDeadline);
+console.log('grants: ' + (grant.min / 10000000) + '-' + (grant.max / 10000000) +
+  ' Cr a district, ' + prio.min + '-' + prio.max + ' priority districts');
 console.log(
   'loans: ' + Math.round(loan.interestRate * 100) + '% due after ' +
   loan.repayAfterRounds + ' rounds, none after round ' + loan.noBorrowingAfterRound
