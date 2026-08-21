@@ -51,6 +51,8 @@ CMP.ui.election = (function () {
     { id: 'bribe', label: 'Bribe', hint: 'Highest risk', icon: '▲', risky: true },
     { id: 'map', label: 'Map', hint: 'All of Punjab', icon: '◉' },
     { id: 'seats', label: 'Constituencies', hint: 'All 117', icon: '☰' },
+    { id: 'priorities', label: 'My Areas', hint: 'Districts to fight for', icon: '★' },
+    { id: 'allies', label: 'Alliances', hint: 'Fight together', icon: '⚭' },
   ];
 
   function sectionById(id) {
@@ -737,6 +739,8 @@ CMP.ui.election = (function () {
       else if (section === 'bribe') body = riskSection('bribe');
       else if (section === 'map') body = [mapSection()];
       else if (section === 'seats') body = [seatsSection()];
+      else if (section === 'priorities') body = prioritiesSection();
+      else if (section === 'allies') body = alliesSection();
       else body = [];
 
       // The candidate's own screen carries its own portrait, name and back
@@ -925,6 +929,43 @@ CMP.ui.election = (function () {
             'seats and nothing else.',
         }),
       ].concat(blocks);
+    }
+
+    /**
+     * The districts this campaign means to fight for.
+     *
+     * Saved to the server as they are picked, because an ally is shown them
+     * and a list that only existed in one browser would be no use to anybody.
+     */
+    function prioritiesSection() {
+      return [
+        el('p', {
+          class: 'g-block-note',
+          text: 'Where you mean to fight. Hold every seat in a district and it ' +
+            'pays you every round — and the money is locked to that district’s ' +
+            'own region.',
+        }),
+        CMP.ui.territory.priorities(game, {
+          onChange: function (ids) {
+            if (game.mode === 'multiplayer') CMP.net.setPriority(ids);
+            else CMP.storage.save(game);
+          },
+        }),
+      ];
+    }
+
+    function alliesSection() {
+      return [
+        CMP.ui.territory.alliances(game, opts.getServerView && opts.getServerView(), {
+          onAlly: function (move, otherId) {
+            CMP.net.ally(move, otherId).then(function (res) {
+              if (!res.ok && !res.offline) setNotice(res.error, 'bad');
+              else setNotice(null);
+              paintBody();
+            });
+          },
+        }),
+      ];
     }
 
     function areasSection() {

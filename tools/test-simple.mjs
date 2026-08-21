@@ -309,10 +309,11 @@ const menuLabels = () =>
 check('1. a compact menu grid replaces the scrolling strip',
   qq(dom, '.g-menu').length === 1 && !q(dom, '.g-nav'),
   menuLabels().join('/'));
-check('1. eight destinations, two columns', qq(dom, '.g-menu-item').length === 8,
+check('1. ten destinations, two columns', qq(dom, '.g-menu-item').length === 10,
   menuLabels().length + ' items');
 check('1. every item the brief asks for is there',
-  ['Campaign', 'Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'Map', 'Constituencies']
+  ['Campaign', 'Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'Map',
+   'Constituencies', 'My Areas', 'Alliances']
     .every((l) => menuLabels().indexOf(l) !== -1),
   menuLabels().join('/'));
 check('2. "High Risk" is gone, replaced by Corruption and Bribe',
@@ -849,7 +850,7 @@ solo = dom.window.CMP.app.getGame();
 check('the break ending opens the next round', solo.round === 2, 'round ' + solo.round);
 check('play is possible again', dom.window.CMP.campaign.roundIsLive(solo));
 goHome(dom);
-check('and the menu is back', qq(dom, '.g-menu-item').length === 8);
+check('and the menu is back', qq(dom, '.g-menu-item').length === 10);
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));

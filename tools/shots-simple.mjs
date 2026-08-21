@@ -145,6 +145,8 @@ const SCENES = {
   'sec-corruption': sectionScene('Corruption'),
   'sec-bribe': sectionScene('Bribe'),
   'sec-seats': sectionScene('Constituencies'),
+  'sec-priorities': sectionScene('My Areas'),
+  'sec-allies': sectionScene('Alliances'),
 
   // The money screen with something in the ledger to show.
   'money-spent':

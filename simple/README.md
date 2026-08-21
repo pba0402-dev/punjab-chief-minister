@@ -74,7 +74,16 @@ player row, then the menu, then the only thing home is for: **WHO'S LEADING?**
 place. One line for the majority. Then **LEADING FROM**, naming the tightest
 seats under each party.
 
-The menu is a two-column grid of eight, not a strip that scrolls sideways:
+A compact circular timer sits in the corner and drains as the round runs —
+full circle at the start, empty at zero — with `ROUND 4 OF 20` beside it and,
+in a game with other people in it, how many of them have finished.
+
+Under that, the four figures that make the economy readable at a glance:
+available, new this round, spent, and how far through the ₹100 crore the
+campaign is. Region grant purses get their own line, because money that can
+only be spent in Majha is not the same money as cash.
+
+Then the menu — a two-column grid of ten, not a strip that scrolls sideways:
 
 | | |
 | --- | --- |
@@ -82,6 +91,10 @@ The menu is a two-column grid of eight, not a strip that scrolls sideways:
 | **Grants** | **Loan** |
 | **Corruption** | **Bribe** |
 | **Map** | **Constituencies** |
+| **My Areas** | **Alliances** |
+
+And at the foot of the screen, under everything a player might still want to
+do, **END ROUND** — reached by finishing rather than by accident.
 
 It lives here rather than above every screen, which is what makes each
 destination a place you go and come back from instead of a tab you switch to.
@@ -163,6 +176,17 @@ since neither belongs to a round. The history is a chart of all four parties
 across every round played, plus the same figures as a table — deliberately not
 on the game screen, because it is the shape of a whole campaign and a
 distraction during one.
+
+## Built for a phone held upright
+
+The layout is designed for portrait, not shrunk into it. Type is fluid through
+`clamp()` so a 320px phone and a 430px one each get a layout that fits; the
+home screen starts at the top rather than being vertically centred; sheets come
+up from the bottom edge; and padding respects the safe area so nothing is
+clipped behind a home indicator.
+
+`node tools/shots-simple.mjs` renders every screen at 320, 375, 390, 414, 430,
+768 and 1400 and fails the run if anything overflows horizontally.
 
 ## Twenty rounds, and where the money comes from
 
@@ -828,16 +852,18 @@ four players, and refreshing the MLA data before the next state election.
 simple/
   index.html
   css/styles.css           base; then campaign, systems, rounds, scoreboard,
-                           game, map, home (the opening screen, profile and
-                           leaderboard) and menu (the menu grid, money screen,
-                           candidate summary and history chart), in that order
+                           game, home, menu, play (timer, money panel,
+                           districts, END ROUND), territory (priorities,
+                           alliances, bulk), map, and finally mobile —
+                           portrait phones, loaded last so it wins
   js/
     data/parties.js          the four parties — the only place a party is defined
     data/actions.js          GENERATED: costs, outcomes, heat, consequences
     data/loader.js           fetches the board when a game starts, not before
-    data/constituencies.js   GENERATED: the 117 seats        ] fetched on
-    data/incumbents.js       GENERATED: the 117 sitting MLAs ] demand, not
-    data/geometry.js         GENERATED: map shapes and hex tiles ] in the page
+    data/constituencies.js   GENERATED: the 117 seats           ] fetched on
+    data/incumbents.js       GENERATED: the 117 sitting MLAs    ] demand,
+    data/regions.js          GENERATED: regions, districts, grants ] not in
+    data/geometry.js         GENERATED: map shapes and hex tiles   ] the page
     engine/rng.js            seeded randomness
     engine/campaign.js       campaign rules for solo play: moves, money, rounds
     engine/ai.js             opponents for solo play
@@ -857,6 +883,8 @@ simple/
     ui/seats.js              leading-from, on the home screen
     ui/areas.js              a candidate's areas: leading, close, losing
     ui/campaign-sheet.js     pick a move, pick an amount, see the result
+    ui/allocate.js           one sum across many seats, in one decision
+    ui/territory.js          priority districts, and alliances
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: real MLA above, game race below
     ui/oversight.js          rivals, reporting and your own record
@@ -875,6 +903,8 @@ simple/
     lib/Coalition.php        coalition proposals and terms
     lib/Investigation.php    reports, evidence, findings and penalties
     lib/Profiles.php         profiles, levels, achievements and the counters
+    lib/Territory.php        regions, districts, and who holds them
+    lib/Alliances.php        pacts, and the round fifteen checkpoint
     campaign-config.json     THE balance sheet — both sides read this
 ```
 

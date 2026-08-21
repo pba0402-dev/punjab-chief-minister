@@ -328,8 +328,8 @@ check('the home screen carries no campaign actions', host.qq('.act').length === 
 goHome(host);
 check('1. the menu is a compact grid, not a scrolling strip',
   host.qq('.g-menu').length === 1 && !host.q('.g-nav'));
-check('1. with all eight destinations',
-  host.qq('.g-menu-item').length === 8,
+check('1. with every destination',
+  host.qq('.g-menu-item').length === 10,
   host.qq('.g-menu-item .g-menu-label').map((n) => n.textContent).join('/'));
 check('2. corruption and bribe are separate items',
   !!menuItem(host, 'Corruption') && !!menuItem(host, 'Bribe'));

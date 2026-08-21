@@ -1,0 +1,323 @@
+/* ------------------------------------------------------------------
+   Priority districts, and alliances.
+   ------------------------------------------------------------------ */
+
+.tr-priorities {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tr-count {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tr-count-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.tr-count-value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+.tr-count-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.tr-regions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tr-region {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tr-region-name {
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+
+.tr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.tr-district {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.tr-district.is-on {
+  border-color: var(--wheat);
+  background: rgba(232, 185, 60, 0.12);
+}
+.tr-district.is-held { border-left: 3px solid var(--river); }
+.tr-district:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 2px;
+}
+.tr-district-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-district-seats {
+  font-size: 0.62rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.tr-district.is-on .tr-district-seats { color: var(--muted); }
+
+/* ------------------------------------------------------------ alliances */
+
+.tr-alliance {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tr-ally {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--party, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.tr-ally-name { font-size: 1rem; font-weight: 700; }
+.tr-ally-party {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--party, var(--muted));
+}
+.tr-ally-note {
+  margin-top: 3px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
+.tr-ally-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tr-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(88, 168, 184, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(88, 168, 184, 0.1);
+}
+.tr-offer-name { font-size: 0.9rem; font-weight: 700; }
+
+.tr-candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0 9px 10px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 2px solid var(--party, var(--line));
+}
+.tr-candidate-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-candidate-party {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--party, var(--muted));
+}
+
+/* ---------------------------------------------------- bulk allocation */
+
+.ar-bulks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ar-bulk {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+}
+.ar-bulk:hover { border-color: var(--wheat-deep); }
+.ar-bulk[disabled] { opacity: 0.5; cursor: default; }
+.ar-bulk-label { font-size: 0.86rem; font-weight: 700; }
+.ar-bulk-note { font-size: 0.68rem; color: var(--muted-2); }
+
+.al-panel { gap: 0; }
+.al-body {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.al-head { display: flex; flex-direction: column; gap: 2px; }
+.al-sub { margin: 0; font-size: 0.72rem; color: var(--muted-2); }
+
+.al-moves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.al-move {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--cream);
+  cursor: pointer;
+  min-width: 0;
+}
+.al-move.is-active {
+  border-color: var(--wheat);
+  background: rgba(232, 185, 60, 0.12);
+}
+.al-move-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.al-move-cost { font-size: 0.62rem; color: var(--muted-2); }
+
+.al-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.al-amount-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.al-amount-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.al-amount-value {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+.al-slider { width: 100%; accent-color: var(--wheat); }
+
+.al-quick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.al-quick-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 7px 4px;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.al-note {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.cs-cannot {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------- narrow */
+
+@media (max-width: 560px) {
+  .tr-priorities { gap: 12px; }
+  .tr-grid { gap: 6px; }
+  .tr-district { padding: 8px 9px; }
+  .tr-district-name { font-size: 0.73rem; }
+  .tr-district-seats { font-size: 0.58rem; }
+  .tr-count-value { font-size: 1.35rem; }
+  .al-moves { gap: 6px; }
+  .al-move-name { font-size: 0.72rem; }
+}
+
+@media (max-width: 349px) {
+  .tr-grid { grid-template-columns: 1fr; }
+  .al-moves { grid-template-columns: 1fr; }
+}
