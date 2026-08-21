@@ -16,6 +16,7 @@ CMP.ui.result = (function () {
   'use strict';
 
   var el = CMP.ui.dom.el;
+  var svg = CMP.ui.dom.svg;
   var mount = CMP.ui.dom.mount;
   var money = CMP.ui.money;
 
@@ -284,6 +285,7 @@ CMP.ui.result = (function () {
       var result = view.result;
       return el('div', { class: 'result-block' }, [
         el('h2', { class: 'result-heading', text: 'Punjab Election Result' }),
+        seatDonut(result),
         el(
           'div',
           { class: 'result-rows' },
@@ -313,6 +315,85 @@ CMP.ui.result = (function () {
           el('span', {}, ['Total ', el('strong', { text: String(result.totalSeats) })]),
           el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
         ]),
+      ]);
+    }
+
+    /**
+     * The whole assembly as one ring.
+     *
+     * A hundred and seventeen seats divided four ways is the single fact the
+     * result screen exists to state, and a ring states it before anybody reads
+     * a number. The majority is marked on it, so "did anybody get there" is
+     * answered by looking rather than by arithmetic.
+     */
+    function seatDonut(result) {
+      var total = result.totalSeats || 117;
+      var R = 42;
+      var C = 2 * Math.PI * R;
+      var offset = 0;
+
+      var arcs = result.standings.map(function (row) {
+        var party = CMP.getParty(row.party);
+        var length = (row.seats / total) * C;
+        var node = svg('circle', {
+          class: 'ring-arc',
+          cx: '50', cy: '50', r: String(R),
+          fill: 'none',
+          stroke: party ? party.colour : 'var(--line)',
+          'stroke-width': '14',
+          'stroke-dasharray': length + ' ' + (C - length),
+          'stroke-dashoffset': String(-offset),
+        });
+        offset += length;
+        return node;
+      });
+
+      var top = result.standings.slice().sort(function (a, b) {
+        return b.seats - a.seats;
+      })[0];
+
+      return el('div', { class: 'rd-block' }, [
+        el('div', { class: 'rd-wrap' }, [
+          svg('svg', {
+            class: 'ring', viewBox: '0 0 100 100', role: 'img',
+            'aria-label': result.standings.map(function (r) {
+              var p = CMP.getParty(r.party);
+              return (p ? p.short : r.party) + ' ' + r.seats;
+            }).join(', '),
+          }, [
+            svg('circle', {
+              cx: '50', cy: '50', r: String(R),
+              fill: 'none', stroke: 'var(--line-soft)', 'stroke-width': '14',
+            }),
+          ].concat(arcs)),
+          el('div', { class: 'rd-centre' }, [
+            el('strong', { class: 'rd-value', text: String(top ? top.seats : 0) }),
+            el('span', { class: 'rd-label', text: 'of ' + total }),
+          ]),
+        ]),
+
+        el('ul', { class: 'rd-key' }, result.standings.slice().sort(function (a, b) {
+          return b.seats - a.seats;
+        }).map(function (row) {
+          var party = CMP.getParty(row.party);
+          return el('li', { class: 'rd-key-row' }, [
+            el('span', {
+              class: 'rd-key-dot',
+              style: { background: party ? party.colour : 'var(--line)' },
+            }),
+            el('span', { class: 'rd-key-label', text: party ? party.short : row.party }),
+            el('strong', { class: 'rd-key-value', text: String(row.seats) }),
+            el('span', {
+              class: 'rd-key-share',
+              text: Math.round((row.seats / total) * 1000) / 10 + '%',
+            }),
+          ]);
+        })),
+
+        el('p', {
+          class: 'rd-note',
+          text: (result.majority || 59) + ' seats is a majority.',
+        }),
       ]);
     }
 

@@ -199,25 +199,35 @@ CMP.state = (function () {
     game.screen = 'election';
     game.portraitSeed = draft.portraitSeed || (game.seed + ':you');
     seedSupport(game);
-    game.seatsWon = CMP.campaign.seatsLed(game);
+    // Seats are settled at the end of round one, not dealt at the start.
 
     // The districts each party is handed by the deal. They pay nothing — a
     // grant is for a district taken during the election, not one inherited
     // from the sitting MLAs.
     game.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, game.partyId);
 
-    // An opponent for every party the player did not take.
+    /*
+     * Everybody opens on nothing.
+     *
+     * The board underneath decides who is ahead in each seat; being ahead is
+     * not holding it. Seats are awarded when round one is settled, so the
+     * scoreboard opens 0 - 0 - 0 - 0 and the first round actually matters.
+     */
+    game.seatTotals = null;
+    game.seatsDecided = false;
+    game.seatsWon = 0;
+
     game.opponents = CMP.ai.opponentsFor(game.partyId, game.seed);
-    var counts = CMP.campaign.seatCounts(game.support);
     game.opponents.forEach(function (o) {
-      o.seatsLed = counts[o.partyId] || 0;
-      o.seatsBefore = o.seatsLed;
+      o.seatsLed = 0;
+      o.seatsBefore = 0;
       o.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, o.partyId);
     });
 
-    // The opening leader map, so round one reports real changes rather than
-    // announcing all 117 seats at once.
-    game.leaders = CMP.campaign.currentLeaders(game.support);
+    // No leader map yet either: with nothing decided, round one reports every
+    // seat it decides as newly won rather than as a change from a position
+    // nobody earned.
+    game.leaders = {};
     CMP.campaign.beginRound(game, 1);
     game.updatedAt = Date.now();
     return game;

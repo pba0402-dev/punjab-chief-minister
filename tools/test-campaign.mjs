@@ -513,38 +513,131 @@ check('a loan is repaid when it falls due', payer.cash === cashBeforeDue - owed,
 check('the debt clears', CMP.campaign.debtOf(payer) === 0);
 check('and the summary says so', paidSummary.repayments.length === 1 && !paidSummary.repayments[0].defaulted);
 
-// Defaulting.
-const defaulter = freshGame();
-CMP.campaign.takeLoan(defaulter, cfgLoan.maxAmount);
-defaulter.cash = 0;
-defaulter.round = defaulter.loans[0].dueRound;
-const defSummary = { repayments: [] };
-CMP.campaign.settleLoans(defaulter, defSummary);
-check('a player who cannot pay defaults', defSummary.repayments[0].defaulted === true);
-check('cash never goes negative', defaulter.cash === 0, String(defaulter.cash));
-check('defaulting raises heat', defaulter.heat >= CMP.FINANCE.default.heat);
-check('and blocks further borrowing', defaulter.borrowingBlocked === true);
-check(
-  'a blocked player is told why',
-  /default/i.test(CMP.campaign.loanOffer(defaulter, cfgLoan.minAmount).error || '')
-);
+/*
+ * A payment that cannot be met.
+ *
+ * The loan does not vanish and the player is not written off. What they have
+ * goes toward it, the balance carries into the next round, and a penalty is
+ * added to whatever is left. It keeps carrying until it is cleared.
+ */
+const short_ = freshGame('aap', 0);
+short_.cash = 20000000;
+const shortLoan = CMP.campaign.maxLoan(short_);
+CMP.campaign.takeLoan(short_, shortLoan);
+const owedTotal = short_.loans[0].repay;
 
-const phpDefault = php(
+short_.cash = Math.floor(owedTotal / 3);
+const partPaid = short_.cash;
+short_.round = short_.loans[0].dueRound;
+
+const missSummary = { repayments: [] };
+CMP.campaign.settleLoans(short_, missSummary);
+
+const missed = missSummary.repayments[0];
+check('21. a payment that cannot be met is recorded as missed', missed.missed === true);
+check('21. what the campaign had went toward it', missed.paid === partPaid, String(missed.paid));
+check('21. cash never goes negative', short_.cash === 0, String(short_.cash));
+check('21. and the loan does not disappear',
+  short_.loans[0].settled === false && CMP.campaign.debtOf(short_) > 0,
+  String(CMP.campaign.debtOf(short_)));
+
+const rate = CMP.FINANCE.loan.missedPenaltyRate;
+const leftAfterPart = owedTotal - partPaid;
+check('22. a penalty is added to what is outstanding',
+  missed.penalty === Math.round(leftAfterPart * rate),
+  missed.penalty + ' on ' + leftAfterPart);
+check('22. the penalty is 30%', rate === 0.3, String(rate));
+check('22. and the balance is due again next round',
+  short_.loans[0].dueRound === short_.round + 1,
+  String(short_.loans[0].dueRound));
+
+check('18. no further borrowing while behind',
+  /missed payment/i.test(CMP.campaign.loanOffer(short_, CMP.FINANCE.loan.minAmount).error || ''),
+  CMP.campaign.loanOffer(short_, CMP.FINANCE.loan.minAmount).error);
+
+// Next round: enough to clear it, and it clears.
+const nowOwed = CMP.campaign.debtOf(short_);
+short_.round = short_.loans[0].dueRound;
+short_.cash = nowOwed;
+const clearSummary = { repayments: [] };
+CMP.campaign.settleLoans(short_, clearSummary);
+check('23. the carried balance is collected automatically',
+  short_.loans[0].settled === true && CMP.campaign.debtOf(short_) === 0);
+check('23. and the campaign is told it cleared',
+  !clearSummary.repayments[0].missed, JSON.stringify(clearSummary.repayments[0]));
+
+/*
+ * Affordability: nobody is lent what they cannot service.
+ */
+/*
+ * Capacity binds once there is already debt.
+ *
+ * A first loan is comfortably inside four rounds of guaranteed allowance, as
+ * it should be — the rule exists to stop a campaign stacking borrowing it
+ * cannot service, not to make the first one hard.
+ */
+const stacked = freshGame('aap', 0);
+stacked.cash = 0;
+stacked.loans = [{
+  id: 'L0',
+  amount: 200000000,
+  interest: 40000000,
+  repay: 240000000,
+  takenRound: 1,
+  dueRound: 6,
+  paid: 0,
+  penalties: 0,
+  missedCount: 0,
+  settled: false,
+}];
+const tooBig = CMP.campaign.loanOffer(stacked, CMP.FINANCE.loan.maxAmount);
+check('17. a loan beyond capacity is refused', tooBig.ok === false, tooBig.error);
+check('17. and the refusal explains why',
+  /repayment capacity|debt limit/i.test(tooBig.error || ''), tooBig.error);
+check('15. existing debt is subtracted from capacity',
+  CMP.campaign.repaymentCapacity(stacked).owed === 240000000,
+  String(CMP.campaign.repaymentCapacity(stacked).owed));
+
+const solvent = freshGame('aap', 0);
+solvent.cash = 40000000;
+const most = CMP.campaign.maxLoan(solvent);
+check('16. a maximum affordable loan is offered', most > 0, String(most));
+check('16. borrowing exactly that is allowed',
+  CMP.campaign.loanOffer(solvent, most).ok === true);
+check('18. borrowing one increment more is not',
+  CMP.campaign.loanOffer(solvent, most + CMP.FINANCE.loan.increments).ok === false);
+
+const capacity = CMP.campaign.repaymentCapacity(solvent);
+check('15. capacity counts cash, allowances and grants already paid',
+  capacity.total === Math.max(0, capacity.cash + capacity.income + capacity.grants - capacity.owed),
+  JSON.stringify(capacity));
+check('15. and nothing speculative — seats are not money',
+  capacity.total <= capacity.cash + capacity.income + capacity.grants);
+
+const phpMissed = php(
   'settle',
   JSON.stringify({
     player: {
       partyId: 'aap',
-      cash: 0,
+      cash: 400000,
       heat: 0,
       record: { restrictedUntilTurn: 0 },
-      loans: [{ id: 'L1', amount: 1000000, interest: 200000, repay: 1200000, takenRound: 1, dueRound: 3, settled: false }],
+      loans: [{
+        id: 'L1', amount: 1000000, interest: 200000, repay: 1200000,
+        takenRound: 1, dueRound: 3, paid: 0, penalties: 0, missedCount: 0, settled: false,
+      }],
     },
     round: 3,
   })
 );
-check('PHP defaults the same way', phpDefault.repayments[0].defaulted === true);
-check('PHP never lets cash go negative', phpDefault.cash === 0, String(phpDefault.cash));
-check('PHP blocks borrowing after a default', phpDefault.borrowingBlocked === true);
+check('21. PHP records a missed payment the same way',
+  phpMissed.repayments[0].missed === true, JSON.stringify(phpMissed.repayments[0]));
+check('21. PHP never lets cash go negative', phpMissed.cash === 0, String(phpMissed.cash));
+check('22. PHP adds the same 30% penalty',
+  phpMissed.repayments[0].penalty === Math.round((1200000 - 400000) * 0.3),
+  String(phpMissed.repayments[0].penalty));
+check('21. PHP keeps the loan alive',
+  phpMissed.loans[0].settled === false, JSON.stringify(phpMissed.loans[0]));
 
 /* ------------------------------------------------------------- funding */
 
@@ -849,14 +942,18 @@ check('the player is not marked as an opponent',
   board1.standings.filter((r) => !r.isAI).length === 1);
 check('three opponents fill the other parties',
   board1.standings.filter((r) => r.isAI).length === 3);
-// The opening leader map is recorded when the campaign starts, so round one
-// has a real baseline and reports the seats that actually moved during it —
-// rather than announcing all 117 as though every one had changed hands.
-check('the first round reports only the seats that moved',
-  board1.changeCount < 117 && board1.changeCount >= 0,
+/*
+ * Everybody opens on nothing, so round one settles all 117 at once: every
+ * seat is newly decided rather than changing hands. The screen shows the
+ * five that matter to the player and offers the rest — see ui/scoreboard.js.
+ */
+check('1. round one decides every seat', board1.changeCount === 117,
   board1.changeCount + ' of 117');
-check('and each one names a different holder before and after',
-  board1.changes.every((c) => c.from !== c.to));
+check('3. and none of them had a holder before it',
+  board1.changes.every((c) => c.from === null),
+  JSON.stringify(board1.changes[0]));
+check('and each one names who took it',
+  board1.changes.every((c) => !!c.to && c.from !== c.to));
 
 /* A second round can change hands, and the diff must find exactly those. */
 CMP.campaign.startNextRound(boardGame);

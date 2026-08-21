@@ -110,7 +110,9 @@ switch ($cmd) {
             'cash' => $player['cash'],
             'heat' => $player['heat'],
             'defaults' => $player['defaults'] ?? 0,
+            'missedPayments' => $player['missedPayments'] ?? 0,
             'borrowingBlocked' => !empty($player['borrowingBlocked']),
+            'loans' => array_values($player['loans'] ?? []),
             'repayments' => $summary['repayments'],
         ]);
         break;

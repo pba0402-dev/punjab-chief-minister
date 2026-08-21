@@ -718,7 +718,8 @@ CMP.CAMPAIGN = {
       "maxAmount": 66500000,
       "debtLimit": 133500000,
       "noBorrowingAfterRound": 16,
-      "increments": 6500000
+      "increments": 6500000,
+      "missedPenaltyRate": 0.3
     },
     "default": {
       "heat": 22,

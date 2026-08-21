@@ -141,12 +141,27 @@ function openSection(d, label) {
   clickIt(d, tab);
 }
 
-/** Home → my candidate → a constituency → the campaign sheet. */
+/**
+ * Home → my candidate → all my seats → a constituency → the campaign sheet.
+ *
+ * Tapping a party on the scoreboard opens who they are and how they stand,
+ * which is what somebody usually wants; the full seat list is one more tap
+ * from there. The suite walks the same path a player does.
+ */
 const openCampaignSheet = async (d, seatIndex) => {
   openSection(d, 'Home');
   await settle();
   clickIt(d, q(d, '.lb-row.is-you'));
   await settle();
+  const allSeats = qq(d, 'button').find((b) => /All my seats/i.test(b.textContent));
+  if (!allSeats) throw new Error('no way through to my seats');
+  clickIt(d, allSeats);
+  await settle();
+  const viewAll = qq(d, 'button').find((b) => /View all 117/.test(b.textContent));
+  if (viewAll) {
+    clickIt(d, viewAll);
+    await settle();
+  }
   const row = qq(d, '.area-row')[seatIndex || 0];
   if (!row) throw new Error('no areas listed');
   clickIt(d, row);
@@ -656,23 +671,35 @@ await settle();
 clickIt(dom, q(dom, '.lb-row.is-you'));
 await settle();
 
-check('2. tapping my candidate opens my areas', !!q(dom, '.areas'));
-check('2. it names the candidate', q(dom, '.ar-name').textContent.length > 2,
-  q(dom, '.ar-name').textContent);
-check('2. with their seats and their money',
-  /seats leading/.test(q(dom, '.ar-figures').textContent) &&
-  /available/.test(q(dom, '.ar-figures').textContent),
-  q(dom, '.ar-figures').textContent.replace(/\s+/g, ' '));
-/* The candidate page opens as a summary. All 117 are one tap further in,
-   which is the whole point of §16-§20: five rows that matter, not a scroll
-   through every seat in Punjab. */
-check('16. it opens as a summary, not as 117 rows',
-  qq(dom, '.area-row').length <= 10 && !q(dom, '.seat-search'),
-  qq(dom, '.area-row').length + ' rows');
+/*
+ * Tapping a party opens who they are and how they stand — §9 and §28. The
+ * seat list is one tap further in, which is the right order: the usual
+ * question is "how are they doing", not "where exactly".
+ */
+check('9. tapping my candidate opens their page', !!q(dom, '.cd'));
+check('9. it names the candidate', q(dom, '.cd-name').textContent.length > 2,
+  q(dom, '.cd-name').textContent);
+check('28. with seats, support and district control',
+  /seats/.test(q(dom, '.cd-figs').textContent) &&
+  /support/.test(q(dom, '.cd-figs').textContent) &&
+  /districts/.test(q(dom, '.cd-figs').textContent),
+  q(dom, '.cd-figs').textContent.replace(/\s+/g, ' '));
+check('9. and my own money, because it is mine',
+  /available/i.test(q(dom, '.cd-figs').textContent),
+  q(dom, '.cd-figs').textContent.replace(/\s+/g, ' '));
 check('17. with a chart of leading, close and behind',
   qq(dom, '.ring-arc').length === 3 && !!q(dom, '.ar-ring-centre'));
 check('17. the chart is real SVG, not an unknown element',
   q(dom, '.ring').namespaceURI === 'http://www.w3.org/2000/svg');
+check('9. the districts controlled are listed', /Districts controlled/.test(text(dom)));
+check('9. and the five strongest seats', /Top 5 strongest seats/.test(text(dom)));
+
+clickIt(dom, qq(dom, 'button').find((b) => /All my seats/i.test(b.textContent)));
+await settle();
+check('9. with a way through to every seat', !!q(dom, '.areas'));
+check('16. which opens as a summary, not as 117 rows',
+  qq(dom, '.area-row').length <= 10 && !q(dom, '.seat-search'),
+  qq(dom, '.area-row').length + ' rows');
 check('18. statewide support is shown for all four parties',
   qq(dom, '.ar-support-row').length === 4);
 check('18. and is labelled as game data rather than a poll',
@@ -808,10 +835,16 @@ openSection(dom, 'Home');
 await settle();
 clickIt(dom, qq(dom, '.lb-row').find((n) => !n.classList.contains('is-you')));
 await settle();
-check('15. a rival page opens', !!q(dom, '.areas'));
-check('15. their seats are public', /seats leading/.test(q(dom, '.ar-figures').textContent));
-check('15. their money is not', /private/i.test(q(dom, '.ar-figures').textContent),
-  q(dom, '.ar-figures').textContent.replace(/\s+/g, ' '));
+check('15. a rival page opens', !!q(dom, '.cd'));
+check('15. their seats and districts are public',
+  /seats/.test(q(dom, '.cd-figs').textContent) &&
+  /districts/.test(q(dom, '.cd-figs').textContent),
+  q(dom, '.cd-figs').textContent.replace(/\s+/g, ' '));
+check('15. their money is not', /private/i.test(q(dom, '.cd-figs').textContent),
+  q(dom, '.cd-figs').textContent.replace(/\s+/g, ' '));
+check('15. and no figure on the page is their cash',
+  !/available/i.test(q(dom, '.cd-figs').textContent),
+  q(dom, '.cd-figs').textContent.replace(/\s+/g, ' '));
 check('16. and there are no campaign controls', qq(dom, '.act-use').length === 0);
 openSection(dom, 'Home');
 
@@ -877,13 +910,42 @@ await settleRound(dom);
 solo = dom.window.CMP.app.getGame();
 check('the clock running out settles the round', solo.stage === 'results', solo.stage);
 check('the scoreboard appears', !!q(dom, '.round-results'));
-check('it ranks all four candidates', qq(dom, '.board-row').length === 4,
-  qq(dom, '.board-row').length + ' rows');
-check('every candidate has a drawn portrait', qq(dom, '.board-row .portrait').length === 4);
+
+/*
+ * Two screens, in order: what changed, then who leads. The news first, the
+ * table second — a scoreboard that has barely moved is not what anybody is
+ * waiting to see.
+ */
+check('4. what changed comes first',
+  /Seats changed|No major seat changes/.test(q(dom, '.round-results').textContent),
+  q(dom, '.round-results').textContent.slice(0, 80));
+check('5. and the standings are not on that screen yet',
+  !q(dom, '.board-row'), qq(dom, '.board-row').length + ' rows');
+check('1. round one decided every seat', qq(dom, '.rr-change').length > 0,
+  qq(dom, '.rr-change').length + ' shown');
+check('8. no more than five are listed at once',
+  qq(dom, '.rr-change').length <= 5, qq(dom, '.rr-change').length + ' shown');
+check('7. each names the seat and who took it',
+  qq(dom, '.rr-change').every((n) => !!n.querySelector('.rr-change-name')
+    && !!n.querySelector('.rr-badge.is-to')));
+check('8. with a way to see the rest',
+  !!qq(dom, 'button').find((b) => /more change/i.test(b.textContent)),
+  qq(dom, 'button').map((b) => b.textContent).join(' | ').slice(0, 120));
+
 check('play is locked while the round is counted',
   !q(dom, '.action-card') && !q(dom, '.panel-tab'));
-check('a seat-change section is shown', /Seats changed/.test(q(dom, '.round-results').textContent));
-check('the leader position is stated',
+
+/* 10. Continue, and the standings follow. */
+clickIt(dom, qq(dom, 'button').find((b) => /^Continue$/i.test(b.textContent)));
+await settle();
+check('10. continuing shows who is leading',
+  /Who’s leading/i.test(q(dom, '.round-results').textContent),
+  q(dom, '.round-results').textContent.slice(0, 60));
+check('10. it ranks all four candidates', qq(dom, '.board-row').length === 4,
+  qq(dom, '.board-row').length + ' rows');
+check('10. and states the majority',
+  /59/.test(q(dom, '.results-totals').textContent));
+check('10. and how far the leader is from it',
   /more seats? needed|Majority reached/.test(q(dom, '.position').textContent),
   q(dom, '.position').textContent.slice(0, 60));
 
@@ -900,6 +962,15 @@ check('and the menu is back', qq(dom, '.g-menu-item').length === 10);
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
+// 55. Territory changes hands slowly and pays every round it stays, so the
+// round it moves is the round worth reporting.
+check('55. the round summary reports districts held',
+  /Districts held/.test(q(dom, '.summary-card').textContent),
+  q(dom, '.summary-card').textContent.replace(/\s+/g, ' ').slice(0, 200));
+check('55. and the seats, cash and support that moved',
+  /Seats led/.test(q(dom, '.summary-card').textContent) &&
+  /Cash in hand/.test(q(dom, '.summary-card').textContent) &&
+  /Average support/.test(q(dom, '.summary-card').textContent));
 check('it says which round finished', /Round 1 complete/.test(q(dom, '.summary-card').textContent));
 check('it reports the money spent this round',
   new RegExp(dom.window.CMP.ui.money.words(spentInRound1)).test(q(dom, '.summary-card').textContent),
@@ -913,9 +984,26 @@ check('the summary can be dismissed', !q(dom, '.summary-card'));
 clickIt(dom, menuItem(dom, 'Loan'));
 await settle();
 check('17. a loan section is offered', !!q(dom, '.loan-offers'));
-check('17. the interest is stated', /20%/.test(q(dom, '.sum-lines').textContent));
-check('17. and when it falls due',
-  /4 rounds later/.test(q(dom, '.sum-lines').textContent));
+
+const loanText = () => q(dom, '.screen-election').textContent;
+check('17. the interest is stated', /20%/.test(loanText()));
+check('17. and when it falls due', /4 rounds later/.test(loanText()));
+
+/*
+ * 16. The bank lends against capacity, so the screen leads with what this
+ * campaign can actually borrow rather than a figure it will refuse later.
+ */
+check('16. the amount available to borrow is stated',
+  /Available to borrow/i.test(loanText()));
+check('15. and what it was worked out from',
+  /Cash in hand/i.test(loanText()) &&
+  /Allowances before it falls due/i.test(loanText()),
+  loanText().slice(0, 200));
+check('18. nothing above the affordable amount is offered',
+  qq(dom, '.loan-offer').every((b) => {
+    const asked = Number(b.dataset.amount || 0);
+    return !asked || asked <= dom.window.CMP.campaign.maxLoan(dom.window.CMP.app.getGame());
+  }));
 check('17. a few amounts are offered, not every increment',
   qq(dom, '.loan-offer').length >= 3 && qq(dom, '.loan-offer').length <= 5,
   qq(dom, '.loan-offer').length + ' offers');

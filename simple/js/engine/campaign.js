@@ -513,19 +513,83 @@ CMP.campaign = (function () {
    * refusal. Quoting and taking share this, so the confirmation screen can
    * never show terms that would then be declined.
    */
+  /**
+   * What a campaign can actually pay back.
+   *
+   * Cash it holds, plus the round allowances it is certain to receive before
+   * the bill falls due, plus the grants its current districts are already
+   * paying — less everything it already owes.
+   *
+   * Nothing speculative is counted. Not seats, which are not money. Not
+   * campaign winnings, which may never arrive. Not grants from districts it
+   * has not taken. A lender who counts hopes as income is not lending, and a
+   * game that lets you borrow against them is just handing out money with a
+   * delay on it.
+   */
+  function repaymentCapacity(game, atRound) {
+    var cfg = CMP.FINANCE.loan;
+    var round = atRound || (game.round || 1);
+    var total = CMP.ROUNDS.total;
+    var due = Math.min(total, round + cfg.repayAfterRounds);
+
+    // Allowances certain to arrive between now and the due round.
+    var roundsToCome = Math.max(0, due - round);
+    var income = roundsToCome * ((CMP.CAMPAIGN.income || {}).perRound || 0);
+
+    // Grants already being paid by districts already held. Region-locked, so
+    // they count toward capacity but are spent where they were earned.
+    var held = districtsHeldBy(game.support, game.partyId);
+    var opening = game.openingDistricts || [];
+    var perRound = held.reduce(function (t, d) {
+      return opening.indexOf(d.id) === -1 ? t + d.grant : t;
+    }, 0);
+    var grants = roundsToCome * perRound;
+
+    var owed = debtOf(game);
+
+    return {
+      cash: remaining(game),
+      income: income,
+      grants: grants,
+      owed: owed,
+      total: Math.max(0, remaining(game) + income + grants - owed),
+      dueRound: due,
+    };
+  }
+
+  /**
+   * The largest loan this campaign could service, rounded to the increment.
+   *
+   * Solved backwards from capacity: a loan of X costs X*(1+rate) to clear, so
+   * the most that fits inside capacity C is C/(1+rate).
+   */
+  function maxLoan(game) {
+    var cfg = CMP.FINANCE.loan;
+    var capacity = repaymentCapacity(game).total;
+    var affordable = Math.floor(capacity / (1 + cfg.interestRate));
+    var capped = Math.min(affordable, cfg.maxAmount, cfg.debtLimit - debtOf(game));
+    var stepped = Math.floor(capped / cfg.increments) * cfg.increments;
+    return Math.max(0, stepped);
+  }
+
   function loanOffer(game, amount) {
     var cfg = CMP.FINANCE.loan;
     amount = Math.round((amount || 0) / cfg.increments) * cfg.increments;
 
     var interest = Math.round(amount * cfg.interestRate);
+    var capacity = repaymentCapacity(game);
+    var most = maxLoan(game);
+
     var offer = {
       amount: amount,
       interestRate: cfg.interestRate,
       interest: interest,
       repay: amount + interest,
-      dueRound: (game.round || 1) + cfg.repayAfterRounds,
+      dueRound: capacity.dueRound,
       debtNow: debtOf(game),
       debtLimit: cfg.debtLimit,
+      capacity: capacity,
+      maxAffordable: most,
       ok: true,
       error: null,
     };
@@ -537,6 +601,15 @@ CMP.campaign = (function () {
     }
 
     if (game.borrowingBlocked) return refuse('No bank will lend to you after your default.');
+
+    // Nobody lends to a campaign that is already behind on one. The balance
+    // has to be cleared before there is any question of another.
+    var behind = (game.loans || []).some(function (l) {
+      return !l.settled && l.missedCount;
+    });
+    if (behind) {
+      return refuse('Clear your missed payment before borrowing again.');
+    }
     if (amount < cfg.minAmount) return refuse('The smallest loan is ' + money(cfg.minAmount) + '.');
     if (amount > cfg.maxAmount) return refuse('The largest single loan is ' + money(cfg.maxAmount) + '.');
     if ((game.round || 1) > cfg.noBorrowingAfterRound) {
@@ -547,6 +620,19 @@ CMP.campaign = (function () {
     if (offer.debtNow + offer.repay > cfg.debtLimit) {
       return refuse('That would take you past your debt limit of ' + money(cfg.debtLimit) + '.');
     }
+
+    // The affordability rule. Nobody is lent money they have no way to repay,
+    // which also closes the obvious exploit: borrow far more than you can
+    // service, spend it all, and let the default be somebody else's problem.
+    if (amount > most) {
+      return refuse(
+        most > 0
+          ? 'Your projected repayment capacity does not support this loan. The most you can borrow is ' +
+            money(most) + '.'
+          : 'Your current repayment capacity is too low for a loan.'
+      );
+    }
+
     return offer;
   }
 
@@ -565,6 +651,9 @@ CMP.campaign = (function () {
       repay: offer.repay,
       takenRound: game.round,
       dueRound: offer.dueRound,
+      paid: 0,
+      penalties: 0,
+      missedCount: 0,
       settled: false,
       defaulted: false,
     });
@@ -572,59 +661,91 @@ CMP.campaign = (function () {
   }
 
   /**
-   * Loans falling due this round. A player who cannot cover one pays what
-   * they can and defaults on the rest.
+   * Loans first, before anything else in the round.
    *
-   * Default is deliberately worse than the money involved: heat, a
-   * restriction, lost support and no further credit. Without that, the best
-   * play would be to borrow the maximum every round and never repay.
+   * A campaign pays what it owes out of what it has, and only what is left
+   * after that can be spent. Doing it the other way round would let anybody
+   * borrow, spend the lot, and arrive at the due round with nothing — which
+   * is not a strategy, it is a bug with a plan.
+   *
+   * A payment that cannot be met is not a default and does not make the debt
+   * disappear. Whatever the campaign has goes toward it, the rest carries
+   * into the next round, and the outstanding balance takes a penalty. It
+   * keeps carrying, and keeps taking the penalty, until it is cleared.
    */
   function settleLoans(game, summary) {
     var cfg = CMP.FINANCE.default;
+    var penaltyRate = CMP.FINANCE.loan.missedPenaltyRate || 0.3;
 
     (game.loans || []).forEach(function (loan) {
       if (loan.settled || loan.dueRound > game.round) return;
 
-      if (game.cash >= loan.repay) {
-        game.cash -= loan.repay;
-        game.repaid += loan.repay;
-        game.interestPaid += loan.interest;
+      // What is still owed on this loan: the scheduled repayment, less
+      // anything already paid toward it, plus any penalties added since.
+      var outstanding = Math.max(0, loan.repay - (loan.paid || 0));
+      if (outstanding <= 0) {
         loan.settled = true;
-        ledger(game, { kind: 'repayment', label: 'Loan repaid', amount: -loan.repay });
+        return;
+      }
+
+      var pay = Math.min(game.cash, outstanding);
+      if (pay > 0) {
+        game.cash -= pay;
+        game.repaid += pay;
+        loan.paid = (loan.paid || 0) + pay;
+        ledger(game, { kind: 'repayment', label: 'Loan repayment', amount: -pay });
+      }
+
+      var left = outstanding - pay;
+
+      if (left <= 0) {
+        loan.settled = true;
+        game.interestPaid += loan.interest;
         summary.repayments.push({
           id: loan.id,
-          paid: loan.repay,
+          paid: pay,
           interest: loan.interest,
           defaulted: false,
-          text: 'Loan repaid with interest.',
+          text: loan.missedCount
+            ? 'Loan cleared, with penalties.'
+            : 'Loan repaid with interest.',
         });
         return;
       }
 
-      var paid = game.cash;
-      game.cash = 0;
-      game.repaid += paid;
-      loan.settled = true;
-      loan.defaulted = true;
-      game.defaults += 1;
-      game.heat = clamp(game.heat + cfg.heat, 0, config().heat.max);
-      if (cfg.borrowingBlocked) game.borrowingBlocked = true;
+      /*
+       * Not cleared. The balance stands, a penalty is added to it, and it is
+       * due again next round.
+       */
+      var penalty = Math.round(left * penaltyRate);
+      loan.repay = (loan.paid || 0) + left + penalty;
+      loan.penalties = (loan.penalties || 0) + penalty;
+      loan.missedCount = (loan.missedCount || 0) + 1;
+      loan.dueRound = game.round + 1;
 
-      var until = game.round + cfg.restrictRounds;
-      game.restrictedUntilTurn = Math.max(game.restrictedUntilTurn || 0, until);
-      applyAcross(game, cfg.support, cfg.seats);
+      game.missedPayments = (game.missedPayments || 0) + 1;
+      game.heat = clamp(game.heat + (cfg.heat || 0) / 2, 0, config().heat.max);
+
+      ledger(game, {
+        kind: 'penalty',
+        label: 'Missed payment penalty',
+        amount: -penalty,
+      });
 
       summary.repayments.push({
         id: loan.id,
-        paid: paid,
-        shortfall: loan.repay - paid,
-        interest: loan.interest,
-        defaulted: true,
-        restrictedUntil: until,
-        text: cfg.text,
+        paid: pay,
+        shortfall: left,
+        penalty: penalty,
+        outstanding: left + penalty,
+        missed: true,
+        dueRound: loan.dueRound,
+        text: 'Payment missed. ' + Math.round(penaltyRate * 100) + '% added; ' +
+          'the balance is due again next round.',
       });
-      summary.defaulted = true;
+      summary.missedPayment = true;
     });
+
 
     return game;
   }
@@ -681,6 +802,7 @@ CMP.campaign = (function () {
       seatsBefore: open.seats,
       supportBefore: open.support,
       actionsPlayed: game.roundActions || 0,
+      districtsBefore: game.districtsHeld || 0,
       repayments: [],
       events: [],
     };
@@ -708,8 +830,8 @@ CMP.campaign = (function () {
       o.heat = clamp(o.heat - cool, 0, config().heat.max);
     });
 
-    var counts = seatCounts(game.support);
-    game.seatsWon = counts[game.partyId] || 0;
+    // The round is settled: seats are awarded now, not while it was running.
+    var counts = settleSeats(game);
     (game.opponents || []).forEach(function (o) {
       o.seatsBefore = o.seatsLed || 0;
       o.seatsLed = counts[o.partyId] || 0;
@@ -724,6 +846,17 @@ CMP.campaign = (function () {
     summary.seatsChange = game.seatsWon - open.seats;
     summary.supportAfter = averageSupport(game.support, game.partyId);
     summary.supportChange = round1(summary.supportAfter - open.support);
+
+    // Territory, and what it will pay next round while it is held. Districts
+    // the deal handed over pay nothing, so they are counted but not billed.
+    var heldNow = districtsHeldBy(game.support, game.partyId);
+    var openingHeld = game.openingDistricts || [];
+    game.districtsHeld = heldNow.length;
+    summary.districtsAfter = heldNow.length;
+    summary.districtsChange = heldNow.length - (summary.districtsBefore || 0);
+    summary.grantIncome = heldNow.reduce(function (t, d) {
+      return openingHeld.indexOf(d.id) === -1 ? t + d.grant : t;
+    }, 0);
 
     game.summary = summary;
     game.history.push({
@@ -781,11 +914,14 @@ CMP.campaign = (function () {
    * round would be meaningless.
    */
   function diffLeaders(previous, current) {
-    if (!previous || !Object.keys(previous).length) return [];
     var changes = [];
+    previous = previous || {};
     Object.keys(current).forEach(function (key) {
-      var from = previous[key];
-      if (from && from !== current[key]) {
+      var from = previous[key] || null;
+      // A seat with no previous leader has just been decided rather than
+      // changed. Round one settles all 117 that way, which is the whole
+      // point of everybody starting on nothing.
+      if (from !== current[key]) {
         changes.push({ seat: Number(key), from: from, to: current[key] });
       }
     });
@@ -1407,6 +1543,39 @@ CMP.campaign = (function () {
     return counts;
   }
 
+  /*
+   * What a party holds right now.
+   *
+   * Every election opens with all four parties on nothing. The board
+   * underneath is dealt from the sitting MLAs and decides who is *ahead*
+   * in each seat, but being ahead is not holding it: seats are awarded when a
+   * round is settled, and until the first one is, the scoreboard reads
+   * 0 - 0 - 0 - 0.
+   *
+   * That is both truer to an election and better as a game — nobody starts
+   * twenty seats up on a deal they had no part in, and round one matters.
+   */
+  function heldSeats(game) {
+    var counts = {};
+    CMP.PARTIES.forEach(function (p) {
+      counts[p.id] = 0;
+    });
+    var settled = game && game.seatTotals;
+    if (!settled) return counts;
+    Object.keys(settled).forEach(function (id) {
+      counts[id] = settled[id] || 0;
+    });
+    return counts;
+  }
+
+  /** Settle the board: who holds what, from here until the next round. */
+  function settleSeats(game) {
+    game.seatTotals = seatCounts(game.support);
+    game.seatsDecided = true;
+    game.seatsWon = game.seatTotals[game.partyId] || 0;
+    return game.seatTotals;
+  }
+
   /** Mean support across the whole board, for one party. */
   function averageSupport(support, partyId) {
     var numbers = Object.keys(support || {});
@@ -1475,10 +1644,14 @@ CMP.campaign = (function () {
     roundIsLive: roundIsLive,
     isFinalRound: isFinalRound,
     loanOffer: loanOffer,
+    maxLoan: maxLoan,
+    repaymentCapacity: repaymentCapacity,
     takeLoan: takeLoan,
     settleLoans: settleLoans,
     rollEvent: rollEvent,
     seatCounts: seatCounts,
+    heldSeats: heldSeats,
+    settleSeats: settleSeats,
     averageSupport: averageSupport,
     runElection: runElection,
     playAs: playAs,

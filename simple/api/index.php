@@ -816,18 +816,25 @@ switch (route()) {
                 }
             }
 
+            /*
+             * Everybody opens on nothing.
+             *
+             * The board underneath is dealt from the sitting MLAs and decides
+             * who is *ahead* in each seat; being ahead is not holding it.
+             * Seats are awarded when round one is settled, so the scoreboard
+             * opens 0 - 0 - 0 - 0 and the first round actually matters.
+             */
             foreach ($g['players'] as $pid => $p) {
-                $partyId = (string) ($p['partyId'] ?? '');
-                $g['players'][$pid]['seatsLed'] = $partyId === ''
-                    ? 0
-                    : $engine->seatsLed($board, $partyId);
+                $g['players'][$pid]['seatsLed'] = 0;
                 $g['players'][$pid]['summary'] = null;
             }
+            $g['seatTotals'] = null;
+            $g['seatsDecided'] = false;
 
-            // The opening leader map. Round one then has something to compare
-            // against, so its results screen reports real changes rather than
-            // announcing all 117 seats at once.
-            $g['leaders'] = Rounds::currentLeaders($board);
+            // No leader map yet: with nothing decided, round one reports every
+            // seat it settles as newly won rather than as a change from a
+            // position nobody earned.
+            $g['leaders'] = (object) [];
             $g['leadParty'] = null;
             $g['lastResult'] = null;
             $GLOBALS['profiles']->countGameStarted();
@@ -922,7 +929,8 @@ switch (route()) {
                 'offer' => $campaign->loanOffer(
                     $game['players'][$playerId],
                     $amount,
-                    (int) ($game['round'] ?? 1)
+                    (int) ($game['round'] ?? 1),
+                    Rounds::boardOf($game)
                 ),
                 'game' => Lobby::publicView($game, $playerId),
             ]);
@@ -940,7 +948,8 @@ switch (route()) {
             [$player, $offer] = $engine->takeLoan(
                 $g['players'][$playerId],
                 $amount,
-                (int) ($g['round'] ?? 1)
+                (int) ($g['round'] ?? 1),
+                Rounds::boardOf($g)
             );
             if (!$offer['ok']) {
                 throw new LobbyError($offer['error'], 'loan_refused');

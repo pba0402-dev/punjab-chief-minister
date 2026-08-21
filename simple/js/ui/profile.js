@@ -45,6 +45,81 @@ CMP.ui.profile = (function () {
     ]);
   }
 
+  /*
+   * Charts, one at a time.
+   *
+   * Five charts stacked down a phone is a report; one chart with a row of
+   * tabs above it is something somebody actually looks at. The metric is
+   * remembered while the screen is open and nothing else moves when it
+   * changes.
+   */
+  var CHARTS = [
+    { id: 'seats', label: 'Seats', of: function (r) { return r.seats; }, max: 117 },
+    { id: 'result', label: 'Results', of: function (r) { return r.won ? 1 : 0; }, max: 1 },
+  ];
+
+  function chartBlock(profile) {
+    var metric = CHARTS[0];
+    var node = el('div', { class: 'ch' });
+
+    // Oldest first: a chart of a career reads left to right.
+    var history = (profile.history || []).slice().reverse();
+
+    function paint() {
+      var values = history.map(metric.of);
+      var top = Math.max(metric.max === 1 ? 1 : Math.max.apply(null, values.concat([1])), 1);
+
+      mount(node, [
+        el('div', { class: 'ch-tabs' }, CHARTS.map(function (c) {
+          return el('button', {
+            class: 'ch-tab' + (c.id === metric.id ? ' is-on' : ''),
+            type: 'button',
+            text: c.label,
+            onclick: function () {
+              metric = c;
+              paint();
+            },
+          });
+        })),
+
+        el('div', { class: 'ch-bars' }, history.map(function (row, i) {
+          var v = values[i];
+          var party = CMP.getParty(row.party);
+          var height = Math.max(3, Math.round((v / top) * 100));
+          return el('div', {
+            class: 'ch-bar-wrap',
+            title: 'Election ' + (i + 1) + ': ' + row.seats + ' seats, ' +
+              (row.won ? 'won' : 'lost'),
+          }, [
+            el('span', {
+              class: 'ch-bar' + (row.won ? ' is-win' : ''),
+              style: {
+                height: height + '%',
+                background: metric.id === 'result'
+                  ? (row.won ? 'var(--wheat)' : 'var(--line)')
+                  : (party ? party.colour : 'var(--muted-2)'),
+              },
+            }),
+          ]);
+        })),
+
+        el('p', {
+          class: 'ch-note',
+          text: metric.id === 'seats'
+            ? history.length + ' elections · best ' + profile.bestResult + ' seats'
+            : profile.won + ' won of ' + profile.played + ' · ' + profile.winRate + '%',
+        }),
+      ]);
+    }
+
+    paint();
+
+    return el('section', { class: 'pf-section' }, [
+      el('h2', { class: 'h-block-title', text: 'Record' }),
+      node,
+    ]);
+  }
+
   /** The profile screen. */
   function render(opts) {
     var bodyNode = el('div', { class: 'pf-body' });
@@ -164,6 +239,9 @@ CMP.ui.profile = (function () {
           el('h2', { class: 'h-block-title', text: 'Achievements' }),
           achievementsList(profile.achievements),
         ]),
+
+        /* ---- charts ---- */
+        (profile.history || []).length ? chartBlock(profile) : null,
 
         /* ---- history ---- */
         (profile.history || []).length

@@ -334,8 +334,11 @@ final class Rounds
 
         // 5 + 6. Leaders and projected seats, recounted once from the settled
         // board so every client is reading the same arithmetic.
+        // The round is settled: seats are awarded now, not while it ran.
         $game['board'] = $board;
         $seats = $engine->seatCounts($board);
+        $game['seatTotals'] = $seats;
+        $game['seatsDecided'] = true;
 
         foreach ($order as $pid) {
             $player = $game['players'][$pid];
@@ -353,6 +356,25 @@ final class Rounds
             $s['heatChange'] = round($s['heatAfter'] - $s['heatBefore'], 1);
             $s['supportAfter'] = $partyId === '' ? 0.0 : $engine->averageSupport($board, $partyId);
             $s['supportChange'] = round($s['supportAfter'] - $s['supportBefore'], 1);
+
+            // Territory, and what it pays while it is held. Districts the deal
+            // handed over are counted but pay nothing.
+            $before = (int) ($player['districtsHeld'] ?? 0);
+            $heldNow = $partyId === ''
+                ? []
+                : $engine->territory()->heldBy(Territory::leadersOf($board), $partyId);
+            $opening = $player['openingDistricts'] ?? [];
+            $grantIncome = 0;
+            foreach ($heldNow as $d) {
+                if (!in_array($d['id'], $opening, true)) {
+                    $grantIncome += (int) $d['grant'];
+                }
+            }
+            $player['districtsHeld'] = count($heldNow);
+            $s['districtsBefore'] = $before;
+            $s['districtsAfter'] = count($heldNow);
+            $s['districtsChange'] = count($heldNow) - $before;
+            $s['grantIncome'] = $grantIncome;
 
             $player['summary'] = $s;
             $summaries[$pid] = $s;
@@ -459,18 +481,19 @@ final class Rounds
      */
     public static function diffLeaders(array $previous, array $current): array
     {
-        if (!$previous) {
-            return [];
-        }
         $changes = [];
-        foreach ($current as $key => $to) {
-            $from = $previous[$key] ?? null;
-            if ($from !== null && $from !== $to) {
-                $changes[] = ['seat' => (int) $key, 'from' => $from, 'to' => $to];
+        foreach ($current as $seat => $to) {
+            // A seat with no previous leader has just been decided rather
+            // than changed. Round one settles all 117 that way, which is the
+            // whole point of everybody starting on nothing.
+            $from = $previous[(string) $seat] ?? null;
+            if ($from !== $to) {
+                $changes[] = ['seat' => (int) $seat, 'from' => $from, 'to' => $to];
             }
         }
         usort($changes, static fn($a, $b) => $a['seat'] <=> $b['seat']);
         return $changes;
+
     }
 
     /**

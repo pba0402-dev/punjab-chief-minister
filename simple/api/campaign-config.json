@@ -797,13 +797,17 @@
       "_comment": [
         "Twenty per cent, due four rounds later.",
         "",
-        "Two rounds was right when a campaign had five crore for the whole",
-        "election. Against five crore a round it forced a default every time: a",
-        "fifteen crore loan wants eighteen back out of ten crore of income, so the",
-        "only outcome was the penalty. Four rounds makes borrowing a real choice —",
-        "twenty crore of income against an eighteen crore bill — rather than a trap",
-        "with a sign on it."
-      ]
+        "A loan is lent against capacity, not appetite: cash in hand, the round",
+        "allowances certain to arrive before it falls due, and the grants already",
+        "being paid by districts already held — less what is already owed. Nothing",
+        "speculative counts, so nobody can borrow against seats they might win.",
+        "",
+        "A payment that cannot be met is not a default and does not clear the",
+        "debt. What the campaign has goes toward it, the balance carries into the",
+        "next round, and missedPenaltyRate is added to whatever is left. It keeps",
+        "carrying and keeps taking the penalty until it is cleared."
+      ],
+      "missedPenaltyRate": 0.3
     },
     "default": {
       "heat": 22,

@@ -435,59 +435,186 @@ CMP.ui.scoreboard = (function () {
     opts = opts || {};
     var result = null;
 
-    var headNode = el('div', { class: 'results-head' });
-    var bannerNode = el('div', { class: 'results-banners' });
-    var boardNode = el('div', { class: 'results-board' });
-    var totalsNode = el('div', { class: 'results-totals' });
-    var changesNode = el('div', { class: 'results-changes' });
-    var positionNode = el('div', { class: 'results-position' });
+    /*
+     * Two screens, in this order, every round.
+     *
+     * What changed comes first, because that is the news: which seats moved
+     * and who took them from whom. Only then the standings. Showing the table
+     * first buries the story under a scoreboard that has barely moved — four
+     * numbers a round or two different is not what anybody is waiting to see.
+     */
+    var stage = 'changes';
+    var showAllChanges = false;
 
-    // Three blocks, in the order the brief asks for them: where everyone
-    // stands, which seats changed hands, and who is leading. Movements were
-    // dropped because every row already carries its own change, and the
-    // position panel because the leader line says the same thing.
-    var root = el('section', { class: 'round-results' }, [
-      headNode,
-      bannerNode,
-      boardNode,
-      totalsNode,
-      el('div', { class: 'results-section' }, [
-        el('h3', { class: 'results-title', text: 'Seats changed' }),
-        changesNode,
-      ]),
-      positionNode,
-    ]);
+    var root = el('section', { class: 'round-results' });
 
-    function render(next, secondsLeft) {
-      if (next) result = next;
-      if (!result) return;
-
-      mount(headNode, [
+    function head(title, kicker, secondsLeft) {
+      return el('div', { class: 'results-head' }, [
         el('div', {}, [
-          el('span', { class: 'results-kicker', text: 'Punjab Assembly' }),
-          el('h2', {
-            class: 'results-heading',
-            text: result.isFinalRound
-              ? 'Final round complete'
-              : 'Round ' + result.round + ' results',
-          }),
+          el('span', { class: 'results-kicker', text: kicker }),
+          el('h2', { class: 'results-heading', text: title }),
         ]),
         typeof secondsLeft === 'number'
           ? el('div', { class: 'results-next' }, [
-              el('span', { class: 'stat-label', text: result.isFinalRound ? 'Counting in' : 'Next round in' }),
+              el('span', {
+                class: 'stat-label',
+                text: result.isFinalRound ? 'Counting in' : 'Next round in',
+              }),
               el('strong', { class: 'results-next-value', text: Math.max(0, secondsLeft) + 's' }),
             ])
           : null,
       ]);
+    }
 
-      mount(bannerNode, banners(result));
-      mount(boardNode, [leaderboard(result, opts.you ? opts.you() : null, { compact: true })]);
-      mount(totalsNode, [
-        el('span', {}, ['Total ', el('strong', { text: String(result.totalSeats) })]),
-        el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
-      ]);
-      mount(changesNode, [seatChanges(result)]);
-      mount(positionNode, [position(result)]);
+    /* ------------------------------------------------ screen one */
+
+    /**
+     * What moved.
+     *
+     * A seat that had no leader and now has one is *won*, not changed —
+     * round one settles all 117 that way, so it says so rather than listing
+     * a hundred flips from nobody.
+     */
+    function changesScreen(secondsLeft) {
+      /*
+       * Your own seats first.
+       *
+       * Round one decides all 117 at once, so which five appear at the top
+       * decides whether this screen is news or a list. The ones that matter
+       * to the person reading are the ones they took and the ones they lost.
+       */
+      var mineNow = opts.you && opts.you();
+      var changes = (result.changes || []).slice().sort(function (a, b) {
+        var aMine = (a.to === mineNow ? 2 : 0) + (a.from === mineNow ? 1 : 0);
+        var bMine = (b.to === mineNow ? 2 : 0) + (b.from === mineNow ? 1 : 0);
+        return bMine - aMine || a.seat - b.seat;
+      });
+      var shown = showAllChanges ? changes : changes.slice(0, 5);
+      var hidden = changes.length - shown.length;
+
+      if (!changes.length) {
+        return [
+          head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
+          el('div', { class: 'rr-quiet' }, [
+            el('strong', { class: 'rr-quiet-title', text: 'No major seat changes' }),
+            el('span', {
+              class: 'rr-quiet-note',
+              text: 'All current leaders held their positions.',
+            }),
+          ]),
+          el('button', {
+            class: 'btn btn-primary btn-wide',
+            type: 'button',
+            text: 'See who’s leading',
+            onclick: function () {
+              stage = 'leading';
+              render();
+            },
+          }),
+        ];
+      }
+
+      return [
+        head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
+        el('h3', { class: 'results-title', text: 'Seats changed' }),
+
+        el('ul', { class: 'rr-changes' }, shown.map(function (change, i) {
+          var from = change.from ? partyOf(change.from) : null;
+          var to = partyOf(change.to);
+          var mine = opts.you && opts.you();
+          var won = mine && change.to === mine;
+          var lost = mine && change.from === mine;
+
+          return el('li', {
+            class: 'rr-change' + (won ? ' is-won' : lost ? ' is-lost' : ''),
+            style: {
+              '--from': from ? from.colour : 'var(--line)',
+              '--to': to.colour,
+              animationDelay: i * 70 + 'ms',
+            },
+          }, [
+            el('span', {
+              class: 'rr-change-tag',
+              text: won ? 'Seat won' : lost ? 'Seat lost' : from ? 'New leader' : 'Seat decided',
+            }),
+            el('strong', { class: 'rr-change-name', text: seatName(change.seat) }),
+            el('span', { class: 'rr-change-flip' }, [
+              from
+                ? el('span', { class: 'rr-badge is-from', text: from.short })
+                : el('span', { class: 'rr-badge is-none', text: '—' }),
+              el('span', { class: 'rr-arrow', 'aria-hidden': 'true', text: '→' }),
+              el('span', { class: 'rr-badge is-to', text: to.short }),
+            ]),
+            el('span', {
+              class: 'rr-change-note',
+              text: to.short + ' takes the lead.',
+            }),
+          ]);
+        })),
+
+        hidden > 0
+          ? el('button', {
+              class: 'btn btn-quiet btn-wide',
+              type: 'button',
+              text: '+ ' + hidden + ' more change' + (hidden === 1 ? '' : 's') + ' · view all',
+              onclick: function () {
+                showAllChanges = true;
+                render();
+              },
+            })
+          : null,
+
+        el('button', {
+          class: 'btn btn-primary btn-wide',
+          type: 'button',
+          text: 'Continue',
+          onclick: function () {
+            stage = 'leading';
+            render();
+          },
+        }),
+      ];
+    }
+
+    /* ------------------------------------------------ screen two */
+
+    function leadingScreen(secondsLeft) {
+      return [
+        head('Who’s leading?', 'After round ' + result.round, secondsLeft),
+        leaderboard(result, opts.you ? opts.you() : null, { compact: true }),
+        el('div', { class: 'results-totals' }, [
+          el('span', {}, ['Total ', el('strong', { text: String(result.totalSeats) })]),
+          el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
+        ]),
+        position(result),
+        el('button', {
+          class: 'btn btn-quiet btn-wide',
+          type: 'button',
+          text: 'Back to what changed',
+          onclick: function () {
+            stage = 'changes';
+            render();
+          },
+        }),
+      ];
+    }
+
+    /* ---------------------------------------------------- render */
+
+    function render(next, secondsLeft) {
+      if (next) {
+        // A new round's results start on the first screen again.
+        if (!result || next.round !== result.round) {
+          stage = 'changes';
+          showAllChanges = false;
+        }
+        result = next;
+      }
+      if (!result) return;
+
+      mount(root, stage === 'changes'
+        ? changesScreen(secondsLeft)
+        : leadingScreen(secondsLeft));
     }
 
     return { root: root, render: render };

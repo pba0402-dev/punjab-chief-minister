@@ -515,13 +515,80 @@ final class Campaign
      * refusal. Quoting and taking share this so the confirmation screen can
      * never show terms the server would then decline.
      */
-    public function loanOffer(array $player, int $amount, int $round): array
+    /**
+     * What a campaign can actually pay back.
+     *
+     * Cash it holds, plus the round allowances certain to arrive before the
+     * bill falls due, plus the grants its current districts already pay —
+     * less everything already owed.
+     *
+     * Nothing speculative counts. Not seats, which are not money. Not
+     * campaign winnings, which may never arrive. Not grants from districts it
+     * has not taken. A lender who counts hopes as income is not lending.
+     *
+     * @return array{cash:int,income:int,grants:int,owed:int,total:int,dueRound:int}
+     */
+    public function repaymentCapacity(array $player, array $board, int $round): array
+    {
+        $cfg = $this->finance()['loan'];
+        $rounds = $this->rounds();
+        $due = min((int) $rounds['total'], $round + (int) $cfg['repayAfterRounds']);
+        $toCome = max(0, $due - $round);
+
+        $income = $toCome * (int) (($this->config['income'] ?? [])['perRound'] ?? 0);
+
+        $partyId = (string) ($player['partyId'] ?? '');
+        $perRound = 0;
+        if ($partyId !== '') {
+            $opening = $player['openingDistricts'] ?? [];
+            foreach ($this->territory()->heldBy(Territory::leadersOf($board), $partyId) as $d) {
+                if (!in_array($d['id'], $opening, true)) {
+                    $perRound += (int) $d['grant'];
+                }
+            }
+        }
+        $grants = $toCome * $perRound;
+
+        $cash = $this->remaining($player);
+        $owed = $this->debtOf($player);
+
+        return [
+            'cash' => $cash,
+            'income' => $income,
+            'grants' => $grants,
+            'owed' => $owed,
+            'total' => max(0, $cash + $income + $grants - $owed),
+            'dueRound' => $due,
+        ];
+    }
+
+    /** The largest loan this campaign could service, to the increment. */
+    public function maxLoan(array $player, array $board, int $round): int
+    {
+        $cfg = $this->finance()['loan'];
+        $capacity = $this->repaymentCapacity($player, $board, $round)['total'];
+        $affordable = (int) floor($capacity / (1 + (float) $cfg['interestRate']));
+        $capped = min(
+            $affordable,
+            (int) $cfg['maxAmount'],
+            (int) $cfg['debtLimit'] - $this->debtOf($player)
+        );
+        $step = (int) $cfg['increments'];
+        return max(0, (int) (floor($capped / $step) * $step));
+    }
+
+    public function loanOffer(array $player, int $amount, int $round, array $board = []): array
     {
         $cfg = $this->finance()['loan'];
         $step = (int) $cfg['increments'];
         $amount = (int) (round($amount / $step) * $step);
 
+        $capacity = $this->repaymentCapacity($player, $board, $round);
+        $most = $this->maxLoan($player, $board, $round);
+
         $offer = [
+            'capacity' => $capacity,
+            'maxAffordable' => $most,
             'amount' => $amount,
             'interestRate' => (float) $cfg['interestRate'],
             'interest' => (int) round($amount * (float) $cfg['interestRate']),
@@ -545,6 +612,14 @@ final class Campaign
         if (!empty($player['borrowingBlocked'])) {
             return $refuse('No bank will lend to you after your default.');
         }
+
+        // Nobody lends to a campaign already behind on one. The balance has to
+        // be cleared before there is any question of another.
+        foreach (($player['loans'] ?? []) as $l) {
+            if (empty($l['settled']) && !empty($l['missedCount'])) {
+                return $refuse('Clear your missed payment before borrowing again.');
+            }
+        }
         if ($amount < (int) $cfg['minAmount']) {
             return $refuse('The smallest loan is ' . self::money((int) $cfg['minAmount']) . '.');
         }
@@ -560,13 +635,27 @@ final class Campaign
             return $refuse('That would take you past your debt limit of '
                 . self::money((int) $cfg['debtLimit']) . '.');
         }
+
+        // The affordability rule. Nobody is lent money they have no way to
+        // repay, which also closes the obvious exploit: borrow far more than
+        // you can service, spend it, and let the default be somebody else's
+        // problem.
+        if ($amount > $most) {
+            return $refuse(
+                $most > 0
+                    ? 'Your projected repayment capacity does not support this loan. '
+                        . 'The most you can borrow is ' . self::money($most) . '.'
+                    : 'Your current repayment capacity is too low for a loan.'
+            );
+        }
+
         return $offer;
     }
 
     /** Take a loan on the quoted terms. Returns [player, offer]. */
-    public function takeLoan(array $player, int $amount, int $round): array
+    public function takeLoan(array $player, int $amount, int $round, array $board = []): array
     {
-        $offer = $this->loanOffer($player, $amount, $round);
+        $offer = $this->loanOffer($player, $amount, $round, $board);
         if (!$offer['ok']) {
             return [$player, $offer];
         }
@@ -600,63 +689,99 @@ final class Campaign
      * optimal play would be to borrow the maximum every round and simply never
      * repay, which would make the whole mechanic free.
      */
+    /**
+     * Loans first, before anything else in the round.
+     *
+     * A campaign pays what it owes out of what it has, and only what is left
+     * can be spent. The other order would let anybody borrow, spend the lot,
+     * and arrive at the due round with nothing — not a strategy, a bug with a
+     * plan.
+     *
+     * A payment that cannot be met is not a default and does not clear the
+     * debt. What there is goes toward it, the balance carries into the next
+     * round, and the outstanding amount takes a penalty. It keeps carrying,
+     * and keeps taking the penalty, until it is cleared.
+     */
     public function settleLoans(array $player, int $round, array $summary): array
     {
         $cfgDefault = $this->finance()['default'];
+        $rate = (float) ($this->finance()['loan']['missedPenaltyRate'] ?? 0.3);
 
         foreach (($player['loans'] ?? []) as $i => $loan) {
             if (!empty($loan['settled']) || (int) $loan['dueRound'] > $round) {
                 continue;
             }
-            $owed = (int) $loan['repay'];
-            $cash = (int) $player['cash'];
 
-            if ($cash >= $owed) {
-                $player['cash'] = $cash - $owed;
-                $player['repaid'] = (int) ($player['repaid'] ?? 0) + $owed;
-                $player['interestPaid'] = (int) ($player['interestPaid'] ?? 0) + (int) $loan['interest'];
+            $outstanding = max(0, (int) $loan['repay'] - (int) ($loan['paid'] ?? 0));
+            if ($outstanding <= 0) {
                 $player['loans'][$i]['settled'] = true;
+                continue;
+            }
+
+            $pay = min((int) $player['cash'], $outstanding);
+            if ($pay > 0) {
+                $player['cash'] = (int) $player['cash'] - $pay;
+                $player['repaid'] = (int) ($player['repaid'] ?? 0) + $pay;
+                $player['loans'][$i]['paid'] = (int) ($loan['paid'] ?? 0) + $pay;
+                $player = $this->ledger($player, [
+                    'round' => $round,
+                    'kind' => 'repayment',
+                    'label' => 'Loan repayment',
+                    'amount' => -$pay,
+                ]);
+            }
+
+            $left = $outstanding - $pay;
+
+            if ($left <= 0) {
+                $player['loans'][$i]['settled'] = true;
+                $player['interestPaid'] = (int) ($player['interestPaid'] ?? 0)
+                    + (int) $loan['interest'];
                 $summary['repayments'][] = [
                     'id' => $loan['id'],
-                    'paid' => $owed,
+                    'paid' => $pay,
                     'interest' => (int) $loan['interest'],
                     'defaulted' => false,
-                    'text' => 'Loan repaid with interest.',
+                    'text' => !empty($loan['missedCount'])
+                        ? 'Loan cleared, with penalties.'
+                        : 'Loan repaid with interest.',
                 ];
                 continue;
             }
 
-            // Short. Take what there is and record the default.
-            $player['cash'] = 0;
-            $player['repaid'] = (int) ($player['repaid'] ?? 0) + $cash;
-            $player['loans'][$i]['settled'] = true;
-            $player['loans'][$i]['defaulted'] = true;
-            $player['defaults'] = (int) ($player['defaults'] ?? 0) + 1;
+            $penalty = (int) round($left * $rate);
+            $player['loans'][$i]['repay'] = (int) ($player['loans'][$i]['paid'] ?? 0)
+                + $left + $penalty;
+            $player['loans'][$i]['penalties'] = (int) ($loan['penalties'] ?? 0) + $penalty;
+            $player['loans'][$i]['missedCount'] = (int) ($loan['missedCount'] ?? 0) + 1;
+            $player['loans'][$i]['dueRound'] = $round + 1;
 
+            $player['missedPayments'] = (int) ($player['missedPayments'] ?? 0) + 1;
             $player['heat'] = self::clamp(
-                (float) $player['heat'] + (float) $cfgDefault['heat'],
+                (float) $player['heat'] + (float) $cfgDefault['heat'] / 2,
                 0,
                 (float) $this->config['heat']['max']
             );
-            if (!empty($cfgDefault['borrowingBlocked'])) {
-                $player['borrowingBlocked'] = true;
-            }
-            $until = $round + (int) $cfgDefault['restrictRounds'];
-            $player['record']['restrictedUntil'] = max(
-                (int) ($player['record']['restrictedUntil'] ?? 0),
-                $until
-            );
+
+            $player = $this->ledger($player, [
+                'round' => $round,
+                'kind' => 'penalty',
+                'label' => 'Missed payment penalty',
+                'amount' => -$penalty,
+            ]);
 
             $summary['repayments'][] = [
                 'id' => $loan['id'],
-                'paid' => $cash,
-                'shortfall' => $owed - $cash,
-                'interest' => (int) $loan['interest'],
-                'defaulted' => true,
-                'restrictedUntil' => $until,
-                'text' => $cfgDefault['text'],
+                'paid' => $pay,
+                'shortfall' => $left,
+                'penalty' => $penalty,
+                'outstanding' => $left + $penalty,
+                'missed' => true,
+                'dueRound' => $round + 1,
+                'text' => 'Payment missed. ' . round($rate * 100) . '% added; '
+                    . 'the balance is due again next round.',
             ];
-            $summary['defaulted'] = true;
+            $summary['missedPayment'] = true;
         }
 
         return [$player, $summary];

@@ -334,6 +334,13 @@ async function act(c, label) {
   c.click(mine);
   await sleep(80);
 
+  // The candidate's page opens first — who they are and how they stand. The
+  // seat list is one tap further in, which is the order a player wants.
+  const toSeats = c.qq('button').find((b) => /All my seats/i.test(b.textContent));
+  if (!toSeats) return false;
+  c.click(toSeats);
+  await sleep(80);
+
   const seat = c.qq('.area-row')[0];
   if (!seat) return false;
   c.click(seat);

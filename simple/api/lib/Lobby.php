@@ -447,7 +447,11 @@ final class Lobby
 
         $board = $game['board'] ?? [];
         $board = is_array($board) ? $board : (array) $board;
-        $seats = self::seatCounts($board);
+
+        // What is held, not what is ahead. Until round one is settled every
+        // party holds nothing, whatever the board underneath says.
+        $settled = $game['seatTotals'] ?? null;
+        $seats = is_array($settled) ? $settled : array_fill_keys(self::PARTIES, 0);
 
         [$readyCount, $readyOf] = Rounds::readyCount($game);
 

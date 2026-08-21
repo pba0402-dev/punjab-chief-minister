@@ -353,6 +353,12 @@ check('the same seed draws the same face in any window',
 check('different seeds draw different faces',
   JSON.stringify(drawA) !== JSON.stringify(host.dom.window.CMP.ui.portrait.describe('seed-xyz')));
 
+// Round results now open on what changed; the standings, with faces, are one
+// tap further in. Walk there the way a player does.
+const toStandings = host.qq('button').find((b) => /^Continue$|who.s leading/i.test(b.textContent));
+if (toStandings) host.click(toStandings);
+await sleep(120);
+
 const faces = host.qq('.board-row .portrait');
 check('every candidate on screen has a drawn portrait', faces.length === 4, faces.length + ' drawn');
 check('portraits are vector drawings, not images',

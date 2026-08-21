@@ -435,6 +435,13 @@ async function openCampaignSheet(client) {
   openSection(client, 'Home');
   await sleep(60);
   client.click(client.q('.lb-row.is-you'));
+  await sleep(60);
+  // The candidate's page opens first; the seat list is one tap further in.
+  const toSeats = client.qq('button').find((b) => /All my seats/i.test(b.textContent));
+  if (toSeats) client.click(toSeats);
+  await sleep(60);
+  const seeAll = client.qq('button').find((b) => /View all 117/.test(b.textContent));
+  if (seeAll) client.click(seeAll);
   await sleep(80);
   client.click(client.qq('.area-row')[0]);
   await sleep(80);
@@ -523,7 +530,8 @@ const tabButton = (client, label) =>
 // does. CAMPAIGN is where that lives now.
 host.click(tabButton(host, 'Campaign'));
 await host.until('areas', () => !!host.q('.area-row'));
-host.click(host.qq('button').find((b) => /View all 117/.test(b.textContent)));
+const seeEvery = host.qq('button').find((b) => /View all 117/.test(b.textContent));
+if (seeEvery) host.click(seeEvery);
 await host.until('all areas', () => host.qq('.area-row').length > 20);
 check('my areas splits the board by how the race stands',
   host.qq('.area-status').length > 0,
@@ -635,6 +643,25 @@ check('the result names the election', /Punjab Election Result/.test(host.text()
 check('every party is listed', host.qq('.result-row').length >= 4, String(host.qq('.result-row').length));
 check('the seat totals are shown', /Total/.test(host.q('.result-totals').textContent));
 check('the majority is stated as 59', /59/.test(host.q('.result-totals').textContent));
+
+// 26. The whole assembly as one ring, before anybody reads a number.
+// One arc per party that stood, which includes the unplayable Others bucket:
+// it holds real seats and leaving it out would make the ring lie about 117.
+const partiesStanding = host.qq('.result-row').length;
+check('26. the seat distribution is drawn as a donut',
+  !!host.q('.rd-block') && host.qq('.rd-block .ring-arc').length === partiesStanding,
+  host.qq('.rd-block .ring-arc').length + ' arcs for ' + partiesStanding + ' parties');
+check('26. with a row per party and its share',
+  host.qq('.rd-key-row').length === partiesStanding &&
+  host.qq('.rd-key-share').every((n) => /%$/.test(n.textContent)),
+  host.qq('.rd-key-share').map((n) => n.textContent).join(' '));
+check('26. and the shares add to the whole assembly',
+  Math.abs(host.qq('.rd-key-share')
+    .reduce((t, n) => t + parseFloat(n.textContent), 0) - 100) < 0.6,
+  host.qq('.rd-key-share').map((n) => n.textContent).join(' '));
+check('26. and the majority marked on it',
+  /59 seats is a majority/.test(host.q('.rd-note').textContent),
+  host.q('.rd-note') ? host.q('.rd-note').textContent : 'missing');
 
 const seatSum = host
   .qq('.result-seats')

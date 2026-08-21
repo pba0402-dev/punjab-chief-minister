@@ -82,6 +82,7 @@ CMP.ui.election = (function () {
     var oversight = null;
     var seatHistory = {};
     var lastRound = 0;
+    var openingShown = false;
 
     /* ------------------------------------------------------ structure */
 
@@ -115,6 +116,19 @@ CMP.ui.election = (function () {
 
     // All 117, searchable — the way to reach a seat by name rather than by
     // whose it is. Built once and reused, so the search box keeps its text.
+    var candidateView = CMP.ui.candidate.create({
+      onBack: function () {
+        openParty = null;
+        setSection('home');
+      },
+      onOpenSeat: function (number) {
+        openSeatDetail(number);
+      },
+      onAllSeats: function (id) {
+        openCandidateSeats(id);
+      },
+    });
+
     var myAreasView = CMP.ui.myAreas.create({
       onAllocate: function (actionId, seats, amount) {
         return allocate(actionId, seats, amount);
@@ -285,7 +299,22 @@ CMP.ui.election = (function () {
     }
 
     /** Open a candidate's areas — your own strategy centre, or a rival's position. */
+    /*
+     * Tapping a party opens who they are and how they stand — not 117 rows.
+     *
+     * The full seat list is one more tap from there, which is the right order:
+     * most of the time the question is "how are they doing", and only
+     * sometimes "where exactly".
+     */
     function openCandidate(partyId) {
+      openParty = partyId;
+      openSeat = null;
+      section = 'candidate';
+      paintBody();
+      toTop();
+    }
+
+    function openCandidateSeats(partyId) {
       openParty = partyId;
       openSeat = null;
       section = 'areas';
@@ -737,6 +766,46 @@ CMP.ui.election = (function () {
       if (opts.onEndRoundSolo) opts.onEndRoundSolo();
     }
 
+    /*
+     * The one line worth saying before the first round.
+     *
+     * Everybody is on nothing, which is a genuine change from how this used
+     * to open, so it is stated once and then got out of the way. Shown for a
+     * moment on round one only — a splash that appears every round would be
+     * something to dismiss rather than something to read.
+     */
+    function maybeShowOpening() {
+      if (openingShown || !game || game.round !== 1 || game.stage !== 'playing') return;
+      openingShown = true;
+
+      var sheet = el('div', { class: 'sheet is-opening' }, [
+        el('div', { class: 'sheet-panel op-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('span', { class: 'op-kicker', text: 'Election started' }),
+          el('p', { class: 'op-line', text: 'All players begin with 0 seats.' }),
+          el('p', { class: 'op-line is-quiet', text: 'The battle for 117 constituencies begins now.' }),
+          el('strong', { class: 'op-round', text: 'Round 1 of ' + (game.roundsTotal || CMP.ROUNDS.total) }),
+          el('button', {
+            class: 'btn btn-primary btn-wide',
+            type: 'button',
+            text: 'Begin',
+            onclick: close,
+          }),
+        ]),
+      ]);
+
+      function close() {
+        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+      }
+      sheet.addEventListener('click', function (e) {
+        if (e.target === sheet) close();
+      });
+      document.body.appendChild(sheet);
+
+      // Gone by itself if nobody touches it: this is an announcement, not a
+      // question.
+      window.setTimeout(close, 4000);
+    }
+
     /** The two-column menu. Lives on the home screen, not above every screen. */
     function menuGrid() {
       return el('nav', { class: 'g-menu', 'aria-label': 'Menu' }, SECTIONS.map(function (s) {
@@ -799,7 +868,8 @@ CMP.ui.election = (function () {
       // Every other screen is a destination reached from the menu, so each
       // one carries its own way back.
       var body;
-      if (section === 'areas') body = [areasSection()];
+      if (section === 'candidate') body = [candidateSection()];
+      else if (section === 'areas') body = [areasSection()];
       else if (section === 'money') body = moneySection();
       else if (section === 'grants') body = grantsSection();
       else if (section === 'loan') body = loanSection();
@@ -816,7 +886,7 @@ CMP.ui.election = (function () {
       // does — including the map, which is otherwise a screen with no way
       // off it.
       var meta = sectionById(section);
-      var wantsHead = section !== 'areas';
+      var wantsHead = section !== 'areas' && section !== 'candidate';
       mount(bodyNode, (wantsHead && meta ? [sectionHead(meta.label)] : []).concat(body));
     }
 
@@ -828,7 +898,7 @@ CMP.ui.election = (function () {
      * spending decisions are made.
      */
     function homeSection() {
-      var counts = CMP.campaign.seatCounts(game.support);
+      var counts = CMP.campaign.heldSeats(game);
       var people = roster();
 
       return [
@@ -961,6 +1031,15 @@ CMP.ui.election = (function () {
           },
         }),
       ];
+    }
+
+    function candidateSection() {
+      var id = openParty || game.partyId;
+      var person = roster().filter(function (p) {
+        return p.partyId === id;
+      })[0];
+      candidateView.render(game, id, person, id === game.partyId);
+      return candidateView.root;
     }
 
     function areasSection() {
@@ -1399,19 +1478,66 @@ CMP.ui.election = (function () {
         return !l.settled;
       });
 
-      // A few steps rather than every increment. Ten near-identical buttons is
-      // a list to read, not a decision to make.
-      var amounts = [cfg.minAmount, cfg.maxAmount * 0.3, cfg.maxAmount * 0.5, cfg.maxAmount]
+      /*
+       * What this campaign can actually borrow.
+       *
+       * The lender works it out from cash in hand, the allowances certain to
+       * arrive before the bill falls due, and the grants districts already
+       * held are already paying — less what is already owed. Offering amounts
+       * above that and refusing them afterwards would be a worse screen than
+       * simply not offering them.
+       */
+      var most = CMP.campaign.maxLoan(game);
+      var capacity = CMP.campaign.repaymentCapacity(game);
+
+      var amounts = [cfg.minAmount, most * 0.35, most * 0.7, most]
         .map(function (v) {
           return Math.round(v / cfg.increments) * cfg.increments;
         })
         .filter(function (v, i, all) {
-          return v >= cfg.minAmount && v <= cfg.maxAmount && all.indexOf(v) === i;
+          return v >= cfg.minAmount && v <= most && all.indexOf(v) === i;
         });
 
       return [
         el('section', { class: 'g-block' }, [
           el('h2', { class: 'g-block-title', text: 'Bank loan' }),
+
+          el('div', { class: 'g-money-head' }, [
+            el('span', { class: 'g-money-label', text: 'Available to borrow' }),
+            el('strong', { class: 'g-money-value', text: money.words(most) || '₹0' }),
+          ]),
+
+          el('div', { class: 'sum-lines' }, [
+            el('div', { class: 'sum-line' }, [
+              el('span', { class: 'sum-line-label', text: 'Cash in hand' }),
+              el('strong', { class: 'sum-line-value', text: money.words(capacity.cash) || '₹0' }),
+            ]),
+            el('div', { class: 'sum-line' }, [
+              el('span', { class: 'sum-line-label', text: 'Allowances before it falls due' }),
+              el('strong', { class: 'sum-line-value', text: money.words(capacity.income) || '₹0' }),
+            ]),
+            capacity.grants
+              ? el('div', { class: 'sum-line' }, [
+                  el('span', { class: 'sum-line-label', text: 'Grants already being paid' }),
+                  el('strong', { class: 'sum-line-value', text: money.words(capacity.grants) }),
+                ])
+              : null,
+            capacity.owed
+              ? el('div', { class: 'sum-line is-debt' }, [
+                  el('span', { class: 'sum-line-label', text: 'Already owed' }),
+                  el('strong', { class: 'sum-line-value', text: '−' + money.words(capacity.owed) }),
+                ])
+              : null,
+          ]),
+
+          el('p', {
+            class: 'g-block-note',
+            text: most > 0
+              ? 'Nothing above ' + money.words(most) + ' is offered — the bank lends ' +
+                'against what you can service, not what you would like.'
+              : 'Your current repayment capacity is too low for a loan.',
+          }),
+
           el('div', { class: 'sum-lines' }, [
             el('div', { class: 'sum-line' }, [
               el('span', { class: 'sum-line-label', text: 'Interest' }),
@@ -1437,6 +1563,9 @@ CMP.ui.election = (function () {
                 return el('button', {
                   class: 'loan-offer' + (offer.ok ? '' : ' is-blocked'),
                   type: 'button',
+                  // The exact figure, so nothing reading this screen has to
+                  // parse "₹1.65 crore" back into rupees.
+                  dataset: { amount: String(amount) },
                   disabled: !offer.ok || busy,
                   onclick: function () {
                     borrow(amount);
@@ -1813,6 +1942,7 @@ CMP.ui.election = (function () {
       paintNotice();
       paintBody();
       paintEndRound();
+      maybeShowOpening();
     }
 
     return {

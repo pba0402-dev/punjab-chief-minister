@@ -430,6 +430,18 @@ CMP.ui.round = (function () {
           delta(s.supportChange || 0, '%')),
         row('Seats led', el('strong', { text: String(s.seatsAfter) }),
           delta(s.seatsChange || 0)),
+
+        // Territory changes hands slowly and pays every round it stays, so
+        // the round it moves is the round worth telling somebody about.
+        typeof s.districtsAfter === 'number'
+          ? row('Districts held', el('strong', { text: String(s.districtsAfter) }),
+              delta(s.districtsChange || 0))
+          : null,
+        s.grantIncome
+          ? row('Grant income', el('strong', { class: 'is-grant', text: money.words(s.grantIncome) }),
+              el('span', { class: 'sum-change', text: 'a round' }))
+          : null,
+
         row('Political heat', el('strong', { text: String(Math.round(s.heatAfter || 0)) }),
           delta(s.heatChange || 0, '', true)),
       ]),

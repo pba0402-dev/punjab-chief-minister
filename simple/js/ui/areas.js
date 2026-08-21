@@ -270,7 +270,7 @@ CMP.ui.areas = (function () {
 
     function paintHead() {
       var party = CMP.getParty(partyId);
-      var counts = CMP.campaign.seatCounts(game.support);
+      var counts = CMP.campaign.heldSeats(game);
       var seats = counts[partyId] || 0;
 
       mount(headNode, [

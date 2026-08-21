@@ -101,7 +101,7 @@ final class AI
 
         // Borrowing, before spending, so the money is available this round.
         if ($rand() < (float) $profile['borrowChance']) {
-            $player = self::maybeBorrow($player, $engine, $round, $rand);
+            $player = self::maybeBorrow($player, $engine, $round, $rand, $board);
         }
 
         // Money owed this round or next is not money to spend. An opponent
@@ -330,10 +330,14 @@ final class AI
         array $player,
         Campaign $engine,
         int $round,
-        callable $rand
+        callable $rand,
+        array $board = []
     ): array {
+        // Borrow when the purse is thin against what a round costs, not
+        // against a starting budget nobody is given any more.
         $cash = $engine->remaining($player);
-        if ($cash > $engine->startingBudget() * 0.3) {
+        $roundIncome = (int) (($engine->config()['income'] ?? [])['perRound'] ?? 0);
+        if ($cash > $roundIncome) {
             return $player;
         }
         if ($engine->debtOf($player) > 0) {
@@ -344,16 +348,20 @@ final class AI
         $amount = (int) $cfg['minAmount']
             + (int) (floor($rand() * 4) * (int) $cfg['increments']);
 
-        $offer = $engine->loanOffer($player, $amount, $round);
+        // The lender now works out what this campaign can service, so an
+        // opponent asks for what it wants and takes whatever it is offered.
+        $offer = $engine->loanOffer($player, $amount, $round, $board);
         if (!$offer['ok']) {
-            return $player;
+            $most = (int) ($offer['maxAffordable'] ?? 0);
+            if ($most < (int) $engine->finance()['loan']['minAmount']) {
+                return $player;
+            }
+            $offer = $engine->loanOffer($player, $most, $round, $board);
+            if (!$offer['ok']) {
+                return $player;
+            }
         }
-        // Borrow only what the cash in hand plus the loan could still cover
-        // when the bill lands two rounds later.
-        if ($cash + $offer['amount'] < $offer['repay']) {
-            return $player;
-        }
-        [$player] = $engine->takeLoan($player, $offer['amount'], $round);
+        [$player] = $engine->takeLoan($player, $offer['amount'], $round, $board);
         return $player;
     }
 }

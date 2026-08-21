@@ -145,6 +145,18 @@ const SCENES = {
   'sec-corruption': sectionScene('Corruption'),
   'sec-bribe': sectionScene('Bribe'),
   'sec-seats': sectionScene('Constituencies'),
+  'candidate':
+    playedGame(4) +
+    "setTimeout(function(){" +
+    "  var r=document.querySelector('.lb-row.is-you');if(r)r.click();" +
+    "},80);",
+  'candidate-rival':
+    playedGame(4) +
+    "setTimeout(function(){" +
+    "  var rows=[].slice.call(document.querySelectorAll('.lb-row'));" +
+    "  var rival=rows.filter(function(x){return !x.classList.contains('is-you');})[0];" +
+    "  if(rival)rival.click();" +
+    "},80);",
   'sec-priorities': sectionScene('My Areas'),
   'sec-allies': sectionScene('Alliances'),
 
