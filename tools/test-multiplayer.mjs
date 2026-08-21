@@ -286,9 +286,11 @@ check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
 check("the host's own party is shown", /AAP/.test(host.q('.g-player-party').textContent));
 check('the host sees their candidate', /Simran Kaur Gill/.test(host.q('.g-player').textContent));
-check('the campaign section renders its actions', host.qq('.act').length === 5,
+check('the home screen carries no campaign actions', host.qq('.act').length === 0,
   host.qq('.act').length + ' actions');
-check('a target constituency is chosen', !!host.q('.g-target-name'));
+check('campaigning is not one of the menu items',
+  !host.qq('.g-nav-item').some((n) => /^Campaign$/.test(n.textContent)),
+  host.qq('.g-nav-item').map((n) => n.textContent).join('/'));
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
@@ -345,37 +347,55 @@ for (const c of players) {
   check(c.label + ' starts on ₹5 crore', cashOf(c) === '₹5 crore', cashOf(c));
   check(c.label + ' starts with no debt', !c.q('.g-player-debt'));
 }
-check('the host sees the campaign actions', host.qq('.act').length === 5);
-check('and the high-risk ones are under their own heading', (function () {
+check('the high-risk section stands on its own', (function () {
   openSection(host, 'High Risk');
   const n = host.qq('.act').length;
+  openSection(host, 'Home');
   return n === 4;
-})(), host.qq('.act').length + ' risky actions');
+})());
 check('political heat starts at zero',
   /0 \/ 100/.test(moneyOf(host, 'Political heat') || ''), moneyOf(host, 'Political heat'));
 
 // The host spends; nobody else's purse may move.
+/** Home → my candidate → a constituency → the campaign sheet. */
+async function openCampaignSheet(client) {
+  openSection(client, 'Home');
+  await sleep(60);
+  client.click(client.q('.lb-row.is-you'));
+  await sleep(80);
+  client.click(client.qq('.area-row')[0]);
+  await sleep(80);
+  client.click(client.qq('button').find((b) => /Campaign here/.test(b.textContent)));
+  await sleep(120);
+}
+
 const dealCost = host.dom.window.CMP.getAction('deal').cost;
-openSection(host, 'High Risk');
-const hostCard = host.qq('.act').find((c) => {
+await openCampaignSheet(host);
+check('the campaign sheet opens from a constituency', !!host.q('.campaign-sheet'));
+
+// High-risk moves sit behind a second tap inside the sheet.
+host.click(host.qq('button').find((b) => /High-risk options/.test(b.textContent)));
+await sleep(80);
+const hostCard = host.qq('.campaign-sheet .act').find((c) => {
   const n = c.querySelector('.act-name');
   return n && n.textContent === 'Underground Deal';
 });
 host.click(hostCard.querySelector('.act-use'));
-await sleep(60);
-// Spending money asks first, so agree to it the way a player would.
-const hostGo = host.q('.dialog-buttons .btn-danger, .dialog-buttons .btn-primary');
-check('spending asks for confirmation first', !!hostGo);
-host.click(hostGo);
+await sleep(80);
+check('it then asks how much to spend', !!host.q('.cs-question'));
+
+host.click(host.qq('button').find((b) => /Confirm campaign/.test(b.textContent)));
 const hostSpent = await host.until('spent', () => cashOf(host) !== '₹5 crore', 12000);
 check('the host can spend', hostSpent, cashOf(host));
 
-// The outcome arrives as a sheet; clear it before reading the screen behind.
-check('the outcome is reported to the host', !!host.q('.report-sheet'));
-if (host.q('.report-sheet')) host.click(host.q('.report-sheet .btn-primary'));
+check('the result belongs to the seat', !!host.q('.result-sheet'));
+if (host.q('.result-sheet')) {
+  host.click(host.qq('button').find((b) => /Stay here/.test(b.textContent)));
+}
+await sleep(80);
 
 check(
-  'the server deducted exactly the action cost',
+  'the server deducted exactly what was chosen',
   moneyOf(host, 'Spent') === host.dom.window.CMP.ui.money.words(dealCost),
   moneyOf(host, 'Spent')
 );
@@ -393,18 +413,18 @@ for (const c of [players[1], players[2], players[3]]) {
 }
 
 // A second player spends independently.
-openSection(players[1], 'Campaign');
-const p2Card = players[1].qq('.act').find((c) => {
+await openCampaignSheet(players[1]);
+const p2Card = players[1].qq('.campaign-sheet .act').find((c) => {
   const n = c.querySelector('.act-name');
   return n && n.textContent === 'Public Rally';
 });
 players[1].click(p2Card.querySelector('.act-use'));
-await sleep(60);
-players[1].click(players[1].q('.dialog-buttons .btn-primary, .dialog-buttons .btn-danger'));
+await sleep(80);
+players[1].click(players[1].qq('button').find((b) => /Confirm campaign/.test(b.textContent)));
 const p2Spent = await players[1].until('spent', () => cashOf(players[1]) !== '₹5 crore', 12000);
 check('player 2 can spend their own money', p2Spent);
-if (players[1].q('.report-sheet')) {
-  players[1].click(players[1].q('.report-sheet .btn-primary'));
+if (players[1].q('.result-sheet')) {
+  players[1].click(players[1].qq('button').find((b) => /Stay here/.test(b.textContent)));
 }
 check(
   'the two players have different amounts left',
@@ -419,10 +439,13 @@ section('Constituency detail shows real MLA and fictional race');
 const tabButton = (client, label) =>
   client.qq('.g-nav-item').find((t) => t.textContent === label);
 
-// A constituency is opened from the list of them, the way a player does it.
-host.click(tabButton(host, 'Constituencies'));
-await host.until('list', () => !!host.q('.seat-row'));
-host.click(host.q('.seat-row'));
+// A constituency is opened through the candidate's areas, as a player does.
+host.click(tabButton(host, 'My Areas'));
+await host.until('areas', () => !!host.q('.area-row'));
+check('my areas splits the board by how the race stands',
+  host.qq('.area-status').length > 0,
+  [...new Set(host.qq('.area-status').map((n) => n.textContent))].join('/'));
+host.click(host.q('.area-row'));
 await host.until('seat detail', () => !!host.q('.seat-detail'));
 
 check('a constituency opens from the list', !!host.q('.seat-detail'));
@@ -489,7 +512,7 @@ check('the evidence score is never sent to the browser',
 section('Closing the polls');
 // Closing the polls is not part of a round, so it lives in the menu rather
 // than on the campaign screen.
-host.click(tabButton(host, 'Campaign'));
+host.click(tabButton(host, 'Home'));
 host.click(host.q('.g-menu'));
 await sleep(60);
 const hostSheet = host.q('.sheet-panel');

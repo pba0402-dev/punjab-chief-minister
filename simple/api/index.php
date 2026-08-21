@@ -17,7 +17,7 @@
  *   POST ?action=details {candidateName, slogan, budget}
  *   POST ?action=ready   {ready}
  *   POST ?action=start             -> host only
- *   POST ?action=campaign {actionId, constituency}
+ *   POST ?action=campaign {actionId, constituency, amount}
  *   POST ?action=loan    {amount}  -> quote with {quote:true}
  *   GET  ?action=history {constituency}
  *   POST ?action=leave
@@ -487,12 +487,16 @@ switch (route()) {
         $actionId = preg_replace('/[^a-z]/i', '', (string) input('actionId', ''));
         $target = input('constituency', null);
         $target = ($target === null || $target === '') ? null : (int) $target;
+        // How much the player chose to put behind it. The server clamps it to
+        // what the action allows, so a client cannot spend outside the range.
+        $amount = input('amount', null);
+        $amount = ($amount === null || $amount === '') ? null : (int) $amount;
 
         if ($campaign->action($actionId) === null) {
             fail('Unknown action.', 400, 'bad_action');
         }
 
-        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $actionId, $target) {
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $actionId, $target, $amount) {
             if ($g['phase'] !== 'election') {
                 throw new LobbyError('The election has not started yet.', 'not_started');
             }
@@ -522,7 +526,7 @@ switch (route()) {
             }
 
             $board = Rounds::boardOf($g);
-            $blocked = $engine->blockedReason($player, $board, $actionId, $target);
+            $blocked = $engine->blockedReason($player, $board, $actionId, $target, $amount);
             if ($blocked !== null) {
                 throw new LobbyError($blocked, 'blocked');
             }
@@ -532,7 +536,7 @@ switch (route()) {
             $player['rollCount'] = (int) ($player['rollCount'] ?? 0) + 1;
             $player['round'] = (int) $g['round'];
 
-            [$player, $board, $report] = $engine->play($player, $board, $actionId, $target, $rolls);
+            [$player, $board, $report] = $engine->play($player, $board, $actionId, $target, $rolls, $amount);
 
             $g['board'] = $board;
             $counts = $engine->seatCounts($board);

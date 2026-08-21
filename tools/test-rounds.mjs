@@ -48,10 +48,18 @@ const DATA = path.join(os.tmpdir(), 'cmp-rounds-test-' + Date.now());
 /* Six seconds a round: long enough for four clients to poll at least twice on
    a single-threaded dev server, short enough that fifteen rounds is a minute
    and a half rather than fifteen. */
-const ROUND_SECONDS = 6;
+/* Campaigning is a four-step drill-down — home, candidate, seat, sheet — so a
+   round has to be long enough for four clients to walk it. Six seconds was
+   enough when actions sat on one screen; it is not any more. */
+const ROUND_SECONDS = 11;
 /* Long enough that every client polls the scoreboard at least twice, short
    enough that fifteen breaks do not double the run. */
 const BREAK_SECONDS = 4;
+
+// Read from the config rather than typed out. Three of the four names here
+// used to be invented, so act() had been quietly failing on them and the
+// suite was playing one move a round instead of four.
+let ACTIONS = null; // set once a client is open, from CMP.ACTIONS
 
 let pass = 0;
 const failures = [];
@@ -238,6 +246,9 @@ for (const c of clients) {
   check(c.label + ' reached the campaign screen', started);
 }
 
+ACTIONS = host.dom.window.CMP.actionsByMenu('campaign').map((a) => a.label);
+check('the campaign moves are read from the config', ACTIONS.length === 5,
+  ACTIONS.join(', '));
 check('the round clock is showing', !!host.q('.round-clock'));
 check(
   'every client opens on round 1',
@@ -285,17 +296,49 @@ function worldOf(c) {
 
 /** Spend on something, agreeing to the confirmation the way a player does. */
 async function act(c, label) {
-  const card = c.qq('.action-card').find((n) => {
-    const t = n.querySelector('.action-label');
+  // Home → my candidate → the closest seat → campaign → confirm. That is the
+  // whole loop, so playing it here is what keeps this suite honest about the
+  // flow a player actually uses.
+  const home = c.qq('.g-nav-item').find((n) => n.textContent === 'Home');
+  if (home) c.click(home);
+  await sleep(60);
+
+  const mine = c.q('.lb-row.is-you');
+  if (!mine) return false;
+  c.click(mine);
+  await sleep(80);
+
+  const seat = c.qq('.area-row')[0];
+  if (!seat) return false;
+  c.click(seat);
+  await sleep(80);
+
+  const open = c.qq('button').find((b) => /Campaign here/.test(b.textContent));
+  if (!open) return false;
+  c.click(open);
+  await sleep(120);
+
+  const card = c.qq('.campaign-sheet .act').find((n) => {
+    const t = n.querySelector('.act-name');
     return t && t.textContent === label;
   });
-  if (!card || card.disabled) return false;
-  c.click(card);
-  await sleep(60);
-  const go = c.q('.dialog-buttons .btn-primary, .dialog-buttons .btn-danger');
-  if (!go) return false;
-  c.click(go);
-  await sleep(200);
+  const use = card && card.querySelector('.act-use');
+  if (!use || use.disabled) {
+    const cancel = c.qq('.campaign-sheet button').find((b) => b.textContent === 'Cancel');
+    if (cancel) c.click(cancel);
+    return false;
+  }
+  c.click(use);
+  await sleep(80);
+
+  const confirm = c.qq('button').find((b) => /Confirm campaign/.test(b.textContent));
+  if (!confirm) return false;
+  c.click(confirm);
+  await sleep(250);
+
+  const stay = c.qq('button').find((b) => /Stay here/.test(b.textContent));
+  if (stay) c.click(stay);
+  await sleep(80);
   return true;
 }
 
@@ -316,7 +359,6 @@ async function lateMove(c) {
   return { leaked: !!(res && res.ok && stage === 'results'), stage: stage };
 }
 
-const ACTIONS = ['Public Rally', 'Door-to-Door Campaign', 'Apply for a Grant', 'Local Media Coverage'];
 
 let desyncs = 0;
 let roundsSeen = 0;
@@ -327,10 +369,12 @@ let newLeaders = 0;
 let loanTaken = false;
 const roundLog = [];
 
+let movesPlayed = 0;
+
 for (let round = 1; round <= 15; round++) {
-  // Everybody campaigns, on a different seat each round.
+  // Everybody campaigns, through the real drill-down.
   for (let i = 0; i < clients.length; i++) {
-    await act(clients[i], ACTIONS[(round + i) % ACTIONS.length]);
+    if (await act(clients[i], ACTIONS[(round + i) % ACTIONS.length])) movesPlayed++;
   }
 
   // The host borrows once, early, so repayment and interest are exercised
@@ -445,6 +489,8 @@ function CMPseats(counts) {
 
 console.log('\n' + roundLog.map((l) => '     ' + l).join('\n'));
 
+check('players actually campaigned through the drill-down', movesPlayed >= 25,
+  movesPlayed + ' moves played of ' + (roundsSeen * clients.length) + ' attempted');
 check('the server drove all fifteen rounds', roundsSeen >= 14, roundsSeen + ' rounds observed');
 check('all four clients stayed in step throughout', desyncs === 0, desyncs + ' rounds out of step');
 check('round summaries were shown', summariesSeen > 0, summariesSeen + ' rounds reported');

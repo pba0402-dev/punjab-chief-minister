@@ -61,7 +61,8 @@ switch ($cmd) {
             $payload['board'],
             $payload['actionId'],
             $payload['target'],
-            $payload['rolls']
+            $payload['rolls'],
+            $payload['amount'] ?? null
         );
         echo json_encode([
             'cash' => $player['cash'],

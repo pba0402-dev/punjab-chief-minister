@@ -131,11 +131,16 @@ CMP.net = (function () {
     }));
   }
 
-  /** Play one campaign action. The server rolls the outcome, not us. */
-  function playAction(actionId, constituency) {
+  /**
+   * Play one campaign action. The server rolls the outcome, not us, and it
+   * clamps the amount to what the action allows — a client cannot spend
+   * outside the range by asking nicely.
+   */
+  function playAction(actionId, constituency, amount) {
     return request('campaign', authed({
       actionId: actionId,
       constituency: constituency,
+      amount: amount,
     }));
   }
 

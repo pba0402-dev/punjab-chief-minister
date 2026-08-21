@@ -50,54 +50,93 @@ page served by PHP, since the lobby talks to `api/index.php`.
 
 ## The game screen
 
+Every screen answers one question, and campaigning is a drill-down rather than
+a wall of controls:
+
+| | |
+| --- | --- |
+| **Home** | Who is winning? |
+| **Candidate** | Where am I winning, close, or losing? |
+| **Constituency** | What is happening here? |
+| **Campaign** | How much do I want to spend here? |
+
 Designed for a phone — 320 to 430px — and allowed to breathe on a larger
-screen rather than rebuilt for one. It answers four questions in order, and
-the first three fit above the fold:
+screen rather than rebuilt for one.
 
-1. **Which round is this, and how long have I got.** A sticky strip: round, a
-   dot per move remaining, the clock, a hairline progress bar.
-2. **Who am I and what have I got.** One compact row: portrait, candidate,
-   party, cash, seats. Not four cards.
-3. **Who is winning.** `WHO'S LEADING?` — four candidates ranked by projected
-   seats, each with their face and their place, the leader marked. Then one
-   line for the majority: how many the leader has, and how many more they need.
-4. **Which seats am I winning them from.** `LEADING FROM` groups the board by
-   whoever leads it and names the tightest half-dozen under each party. Every
-   one opens that constituency.
+### Home
 
-Everything else is one tap away on a compact menu that scrolls sideways on a
-phone and wraps on a desktop: **Campaign · Money · Grants · Loan · High Risk ·
-Map · Constituencies**. Only the selected section is on screen. Which menu an
-action belongs to is set in `campaign-config.json`, not in the interface, so
-adding one puts it in the right place without anyone editing a screen.
+A sticky round strip (round, a dot per move remaining, the clock), one compact
+player row, and then the only thing home is for: **WHO'S LEADING?** — four
+candidates ranked by projected seats, each with their face and their place.
+One line for the majority. Then **LEADING FROM**, naming the tightest seats
+under each party.
 
-The design rule throughout is that nothing appears twice. Cash is on the player
-strip and in **Money**, and nowhere else. Seats are on the leaderboard, and
-nowhere else. The previous version stacked every figure the game knows onto one
-page, and the result read like a financial dashboard rather than something you
-play.
+No campaign actions live here at all. Tapping a candidate is how you campaign.
 
-Two things moved out of the way rather than being removed:
+### Candidate — the strategy centre
 
-- **What just happened** after a move is a sheet you dismiss, not a permanent
-  panel. An outcome matters for a moment; the campaign log keeps the record.
-- **Closing the polls** and the **election history** are in the header menu.
-  Neither is part of a round, so neither competes with one.
+Tapping your own row opens your areas: every constituency from your party's
+point of view, split by how the race stands — **Leading**, **Close**,
+**Losing**, **Uncontested** — with a search box and a sort that defaults to
+**closest race first**, because that is where a move changes a seat rather
+than padding a lead.
 
-### A constituency
+Tapping a rival's row opens the same page for them, but only what an election
+makes public: their seats and where they lead. Their cash reads *private*, and
+there are no campaign controls. Anyone watching an election can count seats;
+nobody can read a rival's bank statement.
 
-Compact, and in one order: the seat and its district, who is leading with their
-face and their share, a bar for every party, whether it changed hands, and —
-kept firmly separate at the bottom — the real sitting MLA, labelled as
-reference that takes no part in the game. A round-by-round chart is offered
-behind a toggle for the player who wants to know whether their spending is
-working.
+### Constituency
 
-### All 117
+Who is leading with their face and share, a bar for every party, whether it
+changed hands, and — kept separate at the bottom — the real sitting MLA,
+labelled as reference that takes no part in the game. One primary button:
+**CAMPAIGN HERE**.
 
-The **Constituencies** section is the whole board with a search box and filters
-by who leads, including toss-ups. That is a far better way to find one seat
-than a list on the front page.
+### Campaign
+
+Two steps in a sheet over the top. Pick a move, then decide how much to put
+behind it. High-risk options sit behind a deliberate second tap, so nobody
+stumbles into one looking for a rally.
+
+Afterwards, a short result — the support moving, what it cost — and then
+**next closest seat** or **back to my areas**. The player is never sent out to
+a dashboard and made to navigate back.
+
+The map is the same journey by another route: tap a seat, and CAMPAIGN HERE
+works identically.
+
+Everything that is not campaigning is on a compact menu that scrolls sideways
+on a phone: **Home · My Areas · Money · Grants · Loan · High Risk · Map**.
+Closing the polls and the election history are in the header menu, since
+neither belongs to a round.
+
+## How much to spend
+
+An action's cost is the **middle of a range**, not a price. What you put behind
+a move scales what it achieves, and that is the most interesting decision in a
+round.
+
+The curve is a **square root**, and that choice carries the whole balance of
+the feature: four times the money buys twice the effect. For a fixed budget the
+efficient play is therefore to spread money evenly across every move you have,
+never to dump it into a few — which is exactly what stops a rich campaign
+buying the election in three expensive gestures. Heat scales with the money
+too: putting four times as much behind a risky move is four times as visible.
+
+Measured over 40 campaigns (`node tools/balance-money.mjs 40`):
+
+| | mean seats |
+| --- | --- |
+| spreads its budget evenly | 53.7 |
+| dumps the maximum into every move | 50.1 |
+
+**Spreading beats dumping by 3.6 seats.** Money edge over the old fixed-price
+play: **+0.1 seats**. Aim still matters most, at **+3.6 seats**.
+`npm run test:campaign` fails the build if the curve stops behaving.
+
+The server clamps the amount to what the action allows, so a client cannot
+spend outside the range by asking nicely.
 
 ## The campaign: fifteen rounds of sixty seconds
 
@@ -599,7 +638,9 @@ simple/
     ui/round.js              round clock, the bank and the dialogs
     ui/portrait.js           drawn candidate portraits, from a seed
     ui/scoreboard.js         the leaderboard, seat changes and round results
-    ui/seats.js              leading-from, and all 117 with search and filters
+    ui/seats.js              leading-from, on the home screen
+    ui/areas.js              a candidate's areas: leading, close, losing
+    ui/campaign-sheet.js     pick a move, pick an amount, see the result
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: real MLA above, game race below
     ui/oversight.js          rivals, reporting and your own record

@@ -67,6 +67,56 @@ final class Campaign
         return $this->config['finance'];
     }
 
+    public function spending(): array
+    {
+        return $this->config['spending'];
+    }
+
+    /**
+     * What a move is allowed to cost. An action's own cost is the middle of
+     * the range rather than the price of it.
+     */
+    public function amountRange(array $action): array
+    {
+        $cfg = $this->spending();
+        if (empty($cfg['enabled']) || empty($action['allowsAmount'])) {
+            return ['min' => (int) $action['cost'], 'max' => (int) $action['cost']];
+        }
+        return [
+            'min' => min((int) $cfg['minAmount'], (int) $action['cost']),
+            'max' => (int) round((int) $action['cost'] * (float) $cfg['maxMultiple']),
+        ];
+    }
+
+    /**
+     * How far a given amount scales a move, against the action's base cost.
+     *
+     * A square root: four times the money buys twice the effect. For a fixed
+     * budget that makes spreading money across every available move strictly
+     * better than concentrating it, which is what stops a large purse simply
+     * buying the election in a handful of expensive gestures.
+     */
+    public function scaleFor(array $action, int $amount): float
+    {
+        $cfg = $this->spending();
+        $base = (int) $action['cost'];
+        if (empty($cfg['enabled']) || empty($action['allowsAmount']) || $base <= 0) {
+            return 1.0;
+        }
+        $scale = sqrt($amount / $base);
+        return self::clamp($scale, (float) $cfg['minScale'], (float) $cfg['maxScale']);
+    }
+
+    /** The amount a move will actually cost, clamped to what is allowed. */
+    public function resolveAmount(array $action, $requested): int
+    {
+        $range = $this->amountRange($action);
+        if ($requested === null || $requested === '') {
+            return (int) $action['cost'];
+        }
+        return (int) self::clamp((float) (int) $requested, (float) $range['min'], (float) $range['max']);
+    }
+
     /**
      * Every action a player can take, campaign strategies and the two ways of
      * raising money alike. Grants and underground funding are shaped like any
@@ -97,6 +147,26 @@ final class Campaign
     private static function clamp(float $v, float $lo, float $hi): float
     {
         return $v < $lo ? $lo : ($v > $hi ? $hi : $v);
+    }
+
+    /**
+     * One outcome, scaled by what the player put behind the move. Support,
+     * the knock to an opponent, any money it brings in, and the heat it
+     * raises all move together — a bigger effort is a more visible one.
+     */
+    public static function scaleOutcome(array $outcome, float $scale): array
+    {
+        if ($scale === 1.0) {
+            return $outcome;
+        }
+        foreach (['support', 'opponentSupport', 'funds', 'heat'] as $field) {
+            if (!empty($outcome[$field])) {
+                $outcome[$field] = $field === 'funds'
+                    ? (int) round($outcome[$field] * $scale)
+                    : round($outcome[$field] * $scale, 2);
+            }
+        }
+        return $outcome;
     }
 
     /** Pick one entry from a weighted list. $roll is a float in [0,1). */
@@ -427,7 +497,7 @@ final class Campaign
     }
 
     /** Why this action cannot be played, or null if it can. */
-    public function blockedReason(array $player, array $board, string $actionId, $target): ?string
+    public function blockedReason(array $player, array $board, string $actionId, $target, $amount = null): ?string
     {
         $action = $this->action($actionId);
         if ($action === null) {
@@ -436,7 +506,8 @@ final class Campaign
         if ($this->actionsLeft($player) <= 0) {
             return 'No moves left this round';
         }
-        if ((int) $action['cost'] > $this->remaining($player)) {
+        $spend = $this->resolveAmount($action, $amount);
+        if ($spend > $this->remaining($player)) {
             return 'Insufficient Budget';
         }
         if (!empty($action['needsConstituency'])) {
@@ -458,13 +529,16 @@ final class Campaign
      * The board is shared and the money is not: an action moves support that
      * every player can see, and spends only the player's own cash.
      */
-    public function play(array $player, array $board, string $actionId, $target, array $rolls): array
+    public function play(array $player, array $board, string $actionId, $target, array $rolls, $amount = null): array
     {
         $action = $this->action($actionId);
         $outcome = self::weightedPick($action['outcomes'], $rolls['outcome']);
         $key = $target === null ? null : (string) $target;
 
-        $cost = (int) $action['cost'];
+        // What the player chose to put behind it, and what that buys.
+        $cost = $this->resolveAmount($action, $amount);
+        $scale = $this->scaleFor($action, $cost);
+        $outcome = self::scaleOutcome($outcome, $scale);
         $player['cash'] = max(0, (int) $player['cash'] - $cost);
         $player['spent'] = (int) $player['spent'] + $cost;
         $player['roundSpent'] = (int) ($player['roundSpent'] ?? 0) + $cost;
@@ -511,7 +585,8 @@ final class Campaign
             // campaign that goes wrong goes wrong across several seats too.
             if (!empty($action['reach']) && !empty($outcome['support'])) {
                 $reach = $action['reach'];
-                $extra = (int) $reach['seats'] - 1;
+                // More money is seen in more places.
+                $extra = (int) round(((int) $reach['seats']) * $scale) - 1;
                 if ($extra > 0) {
                     [$board, $spilled] = $this->applyAcross(
                         $board,
@@ -551,6 +626,8 @@ final class Campaign
             'group' => $action['group'],
             'constituency' => $key === null ? null : (int) $key,
             'cost' => $cost,
+            'baseCost' => (int) $action['cost'],
+            'scale' => round($scale, 2),
             'funds' => $funds,
             'outcomeId' => $outcome['id'],
             'outcomeLabel' => $outcome['label'],

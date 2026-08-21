@@ -130,6 +130,65 @@ CMP.campaign = (function () {
    * Can this action be played right now? Returns { ok, reason }.
    * The UI uses the reason verbatim, so it has to read like a sentence.
    */
+  /* -------------------------------------------------------- spending */
+
+  /**
+   * What a move is allowed to cost. An action's own cost is the middle of the
+   * range rather than the price of it.
+   */
+  function amountRange(action) {
+    var cfg = CMP.CAMPAIGN.spending;
+    if (!cfg || !cfg.enabled || !action.allowsAmount) {
+      return { min: action.cost, max: action.cost };
+    }
+    return {
+      min: Math.min(cfg.minAmount, action.cost),
+      max: Math.round(action.cost * cfg.maxMultiple),
+    };
+  }
+
+  /**
+   * How far a given amount scales a move, against the action's base cost.
+   *
+   * A square root: four times the money buys twice the effect. For a fixed
+   * budget that makes spreading money across every available move strictly
+   * better than concentrating it, which is what stops a large purse simply
+   * buying the election in a handful of expensive gestures.
+   */
+  function scaleFor(action, amount) {
+    var cfg = CMP.CAMPAIGN.spending;
+    if (!cfg || !cfg.enabled || !action.allowsAmount || !action.cost) return 1;
+    return clamp(Math.sqrt(amount / action.cost), cfg.minScale, cfg.maxScale);
+  }
+
+  /** The amount a move will actually cost, clamped to what is allowed. */
+  function resolveAmount(action, requested) {
+    if (requested === null || requested === undefined || requested === '') return action.cost;
+    var range = amountRange(action);
+    return Math.round(clamp(Number(requested), range.min, range.max));
+  }
+
+  /**
+   * One outcome, scaled by what the player put behind the move. Support, the
+   * knock to an opponent, any money it brings in, and the heat it raises all
+   * move together — a bigger effort is a more visible one.
+   */
+  function scaleOutcome(outcome, scale) {
+    if (scale === 1) return outcome;
+    var out = {};
+    Object.keys(outcome).forEach(function (k) {
+      out[k] = outcome[k];
+    });
+    ['support', 'opponentSupport', 'funds', 'heat'].forEach(function (field) {
+      if (out[field]) {
+        out[field] = field === 'funds'
+          ? Math.round(out[field] * scale)
+          : Math.round(out[field] * scale * 100) / 100;
+      }
+    });
+    return out;
+  }
+
   /** How many more moves are left in the current round. */
   function actionsLeft(game) {
     var cap = CMP.ROUNDS.actionsPerRound || 0;
@@ -137,11 +196,13 @@ CMP.campaign = (function () {
     return Math.max(0, cap - (game.roundActions || 0));
   }
 
-  function canPlay(game, actionId, target) {
+  function canPlay(game, actionId, target, amount) {
     var action = CMP.getAction(actionId);
     if (!action) return { ok: false, reason: 'Unknown action.' };
     if (actionsLeft(game) <= 0) return { ok: false, reason: 'No moves left this round' };
-    if (action.cost > remaining(game)) return { ok: false, reason: 'Insufficient Budget' };
+    if (resolveAmount(action, amount) > remaining(game)) {
+      return { ok: false, reason: 'Insufficient Budget' };
+    }
     if (action.needsConstituency && !target) {
       return { ok: false, reason: 'Choose a constituency first' };
     }
@@ -615,9 +676,9 @@ CMP.campaign = (function () {
   }
 
   /** Play one action for an opponent. Returns the report, or null. */
-  function playAs(game, actor, actionId, target, rolls) {
+  function playAs(game, actor, actionId, target, rolls, amount) {
     var res = asActor(game, actor, function (view) {
-      return play(view, actionId, target, rolls);
+      return play(view, actionId, target, rolls, amount);
     });
     return res && res.ok ? res.report : null;
   }
@@ -652,16 +713,20 @@ CMP.campaign = (function () {
    *
    * Mutates `game` and returns a report for the UI.
    */
-  function play(game, actionId, target, rolls) {
-    var check = canPlay(game, actionId, target);
+  function play(game, actionId, target, rolls, amount) {
+    var check = canPlay(game, actionId, target, amount);
     if (!check.ok) return { ok: false, reason: check.reason };
 
     var action = CMP.getAction(actionId);
-    var outcome = weightedPick(action.outcomes, rolls.outcome);
 
-    game.cash = Math.max(0, game.cash - action.cost);
-    game.spent += action.cost;
-    game.roundSpent = (game.roundSpent || 0) + action.cost;
+    // What the player chose to put behind it, and what that buys.
+    var cost = resolveAmount(action, amount);
+    var scale = scaleFor(action, cost);
+    var outcome = scaleOutcome(weightedPick(action.outcomes, rolls.outcome), scale);
+
+    game.cash = Math.max(0, game.cash - cost);
+    game.spent += cost;
+    game.roundSpent = (game.roundSpent || 0) + cost;
     game.roundActions = (game.roundActions || 0) + 1;
 
     // Money an outcome brings in. Grants are recorded apart from undisclosed
@@ -681,7 +746,8 @@ CMP.campaign = (function () {
     // a fraction of whatever actually happened, so a costly campaign that goes
     // wrong goes wrong across several seats too.
     if (action.reach && target && outcome.support) {
-      var extra = action.reach.seats - 1;
+      // More money is seen in more places.
+      var extra = Math.round(action.reach.seats * scale) - 1;
       if (extra > 0) {
         applied.reach = applyAcross(game, outcome.support * action.reach.share, extra, target);
       }
@@ -706,7 +772,9 @@ CMP.campaign = (function () {
       group: action.group,
       constituency: target || null,
       round: game.round,
-      cost: action.cost,
+      cost: cost,
+      baseCost: action.cost,
+      scale: Math.round(scale * 100) / 100,
       funds: funds,
       outcomeId: outcome.id,
       outcomeLabel: outcome.label,
@@ -1000,6 +1068,9 @@ CMP.campaign = (function () {
     remaining: remaining,
     debtOf: debtOf,
     actionsLeft: actionsLeft,
+    amountRange: amountRange,
+    scaleFor: scaleFor,
+    resolveAmount: resolveAmount,
     canPlay: canPlay,
     play: play,
     beginRound: beginRound,

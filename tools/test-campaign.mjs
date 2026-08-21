@@ -863,6 +863,72 @@ check('a close race is flagged only when the top two are near',
 check('the totals on the scoreboard add up to the board',
   board3.totalSeats === CMP.TOTAL_SEATS, String(board3.totalSeats));
 
+section('Choosing how much to spend');
+
+/*
+ * A move costs what the player puts behind it, not a fixed price. The curve
+ * is a square root, which is the whole balance of the feature: four times the
+ * money buys twice the effect, so for a fixed budget spreading beats dumping
+ * and a large purse cannot buy the election in three expensive gestures.
+ */
+const scaled = CMP.getAction('rally');
+const range = CMP.campaign.amountRange(scaled);
+
+check('an action offers a range, not a price', range.max > range.min,
+  range.min + '..' + range.max);
+check('the base cost sits inside it', scaled.cost >= range.min && scaled.cost <= range.max);
+check('spending the base cost changes nothing',
+  CMP.campaign.scaleFor(scaled, scaled.cost) === 1);
+check('four times the money buys about twice the effect',
+  Math.abs(CMP.campaign.scaleFor(scaled, scaled.cost * 4) - 2) < 0.01,
+  String(CMP.campaign.scaleFor(scaled, scaled.cost * 4)));
+check('a quarter of it buys about half',
+  Math.abs(CMP.campaign.scaleFor(scaled, scaled.cost / 4) - 0.5) < 0.06,
+  String(CMP.campaign.scaleFor(scaled, scaled.cost / 4)));
+check('the scale is clamped at both ends',
+  CMP.campaign.scaleFor(scaled, 1) >= CMP.CAMPAIGN.spending.minScale &&
+  CMP.campaign.scaleFor(scaled, scaled.cost * 1000) <= CMP.CAMPAIGN.spending.maxScale);
+check('an amount outside the range is pulled back into it',
+  CMP.campaign.resolveAmount(scaled, 999999999) === range.max &&
+  CMP.campaign.resolveAmount(scaled, 1) === range.min);
+check('undisclosed funding has no amount to choose',
+  CMP.campaign.amountRange(CMP.getAction('underground')).min ===
+  CMP.campaign.amountRange(CMP.getAction('underground')).max);
+
+// The money actually leaves the purse, and the effect follows it.
+const small = freshGame();
+const big = freshGame();
+const pinned = { outcome: 0.5, consequence: 0.99, consequencePick: 0.5 };
+const smallRes = CMP.campaign.play(small, 'rally', 73, pinned, range.min);
+const bigRes = CMP.campaign.play(big, 'rally', 73, pinned, range.max);
+
+check('the smaller move costs less', small.spent === range.min, String(small.spent));
+check('the larger move costs more', big.spent === range.max, String(big.spent));
+check('and the larger one moves more support',
+  bigRes.report.support > smallRes.report.support,
+  smallRes.report.support + ' vs ' + bigRes.report.support);
+check('but not proportionally more',
+  bigRes.report.support < smallRes.report.support * (range.max / range.min),
+  'x' + (bigRes.report.support / smallRes.report.support).toFixed(1) +
+  ' effect for x' + (range.max / range.min).toFixed(0) + ' money');
+check('the report says what was actually spent',
+  bigRes.report.cost === range.max && bigRes.report.baseCost === scaled.cost);
+
+const phpSmall = php('play', JSON.stringify({
+  player: { partyId: 'aap', budget: CMP.STARTING_BUDGET, cash: CMP.STARTING_BUDGET,
+    spent: 0, heat: 0, granted: 0, raised: 0, actions: [] },
+  board: JSON.parse(JSON.stringify(freshGame().support)),
+  actionId: 'rally',
+  target: 73,
+  rolls: { ...pinned, spare: 0.1 },
+  amount: range.min,
+}));
+check('PHP charges the same chosen amount', phpSmall.spent === small.spent,
+  phpSmall.spent + ' vs ' + small.spent);
+check('and scales the effect identically',
+  Math.abs(phpSmall.report.support - smallRes.report.support) < 0.05,
+  phpSmall.report.support + ' vs ' + smallRes.report.support);
+
 section('Money must not decide the game');
 
 /*

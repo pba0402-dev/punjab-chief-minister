@@ -1,23 +1,26 @@
 /**
  * The game screen.
  * ------------------------------------------------------------------
- * A phone-sized screen that answers, in order and without scrolling:
+ * Every screen answers one question, and campaigning is a drill-down rather
+ * than a wall:
  *
- *   which round is this and how long have I got
- *   who am I, what have I got, how many seats
- *   who is winning
- *   which seats am I winning them from
+ *   HOME          who is winning
+ *   CANDIDATE     where am I winning, close, or losing
+ *   CONSTITUENCY  what is happening here
+ *   CAMPAIGN      how much do I want to spend here
  *
- * Everything else is one tap away behind a compact menu. Only the selected
- * section is on screen at a time; nothing is shown twice. That is the whole
- * design rule here — the previous version stacked every figure the game knows
- * onto one page and the result read like a financial dashboard rather than
- * something you play.
+ * That is the core loop. Home carries no campaign actions at all — tapping
+ * your own candidate opens your areas, tapping a seat opens it, and CAMPAIGN
+ * HERE opens the controls. The map is the same journey by another route.
+ *
+ * Tapping a rival's row opens their position too, but only what an election
+ * makes public: seats and support. Never their cash, their heat, or what they
+ * have been doing quietly.
  *
  * The screen resolves nothing itself. It calls opts.play() and opts.borrow(),
  * which are the local engine in solo and the server in multiplayer, and it
  * never shows the odds behind a risky action: a cost, a risk word and an
- * impact word, and the player decides with that.
+ * expected effect, and the player decides with that.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -29,21 +32,25 @@ CMP.ui.election = (function () {
   var mount = CMP.ui.dom.mount;
   var money = CMP.ui.money;
 
+  // Campaigning is not in this menu. It happens through the candidate, the
+  // constituency and the CAMPAIGN HERE button — which is the point of the
+  // whole layout.
   var SECTIONS = [
-    { id: 'campaign', label: 'Campaign' },
+    { id: 'home', label: 'Home' },
+    { id: 'areas', label: 'My Areas' },
     { id: 'money', label: 'Money' },
     { id: 'grants', label: 'Grants' },
     { id: 'loan', label: 'Loan' },
     { id: 'corruption', label: 'High Risk' },
     { id: 'map', label: 'Map' },
-    { id: 'seats', label: 'Constituencies' },
   ];
 
   function create(opts) {
     var game = null;
     var selected = null;      // the seat a campaign action would target
     var openSeat = null;      // the seat whose detail panel is open
-    var section = 'campaign';
+    var openParty = null;     // the candidate whose areas are open
+    var section = 'home';
     var lastReport = null;
     var notice = null;
     var busy = false;
@@ -75,9 +82,13 @@ CMP.ui.election = (function () {
     });
     mount(resultsNode, [resultsView.root]);
 
-    var seatBrowser = CMP.ui.seats.browser({
+    var areasView = CMP.ui.areas.create({
       onOpen: function (number) {
         openSeatDetail(number);
+      },
+      onBack: function () {
+        openParty = null;
+        setSection('home');
       },
     });
 
@@ -171,15 +182,31 @@ CMP.ui.election = (function () {
     function setSection(next) {
       section = next;
       openSeat = null;
+      if (next === 'areas' && !openParty) openParty = game.partyId;
+      if (next !== 'areas') openParty = null;
       paintNav();
       paintBody();
+    }
+
+    /** Open a candidate's areas — your own strategy centre, or a rival's position. */
+    function openCandidate(partyId) {
+      openParty = partyId;
+      openSeat = null;
+      section = 'areas';
+      paintNav();
+      paintBody();
+      toTop();
     }
 
     function openSeatDetail(number) {
       openSeat = Number(number);
       selected = Number(number);
       paintBody();
-      root.scrollIntoView ? root.scrollIntoView({ block: 'start' }) : null;
+      toTop();
+    }
+
+    function toTop() {
+      if (root.scrollIntoView) root.scrollIntoView({ block: 'start' });
     }
 
     /**
@@ -400,19 +427,24 @@ CMP.ui.election = (function () {
         return;
       }
 
-      if (section === 'campaign') mount(bodyNode, campaignSection());
+      if (section === 'home') mount(bodyNode, homeSection());
+      else if (section === 'areas') mount(bodyNode, [areasSection()]);
       else if (section === 'money') mount(bodyNode, moneySection());
       else if (section === 'grants') mount(bodyNode, actionsSection('grants', 'Grants',
         'Fund visible work and apply for support. No heat, and the money is never certain.'));
       else if (section === 'loan') mount(bodyNode, loanSection());
       else if (section === 'corruption') mount(bodyNode, riskSection());
       else if (section === 'map') mount(bodyNode, [mapSection()]);
-      else if (section === 'seats') mount(bodyNode, [seatsSection()]);
     }
 
     /* ---------------------------------------------------- campaign home */
 
-    function campaignSection() {
+    /**
+     * Home answers one question: who is winning. No campaign actions live
+     * here — tapping a candidate opens their areas, and that is where the
+     * spending decisions are made.
+     */
+    function homeSection() {
       var counts = CMP.campaign.seatCounts(game.support);
       var people = roster();
 
@@ -424,19 +456,20 @@ CMP.ui.election = (function () {
           CMP.ui.seats.leadingFrom(game, people, {
             onOpen: openSeatDetail,
             onViewAll: function () {
-              setSection('seats');
+              openCandidate(game.partyId);
             },
           }),
         ]),
-        el('section', { class: 'g-block' }, [
-          el('div', { class: 'g-block-head' }, [
-            el('h2', { class: 'g-block-title', text: 'Campaign' }),
-            targetChip(),
-          ]),
-          actionList('campaign'),
-        ]),
-        logBlock(),
       ];
+    }
+
+    function areasSection() {
+      var partyId = openParty || game.partyId;
+      var who = roster().filter(function (p) {
+        return p.partyId === partyId;
+      })[0];
+      areasView.render(game, partyId, who, partyId === game.partyId);
+      return areasView.root;
     }
 
     /** WHO'S LEADING — the centrepiece. */
@@ -461,9 +494,13 @@ CMP.ui.election = (function () {
       return el('section', { class: 'g-block' }, [
         el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
         el('ol', { class: 'lb' }, rows.map(function (row, i) {
-          return el('li', {
+          return el('li', {}, [el('button', {
             class: 'lb-row' + (i === 0 ? ' is-leading' : '') + (row.isYou ? ' is-you' : ''),
+            type: 'button',
             style: { '--party': row.party.colour, '--party-ink': row.party.ink || '#fff' },
+            onclick: function () {
+              openCandidate(row.party.id);
+            },
           }, [
             el('span', { class: 'lb-rank', text: String(i + 1) }),
             row.seed
@@ -471,14 +508,20 @@ CMP.ui.election = (function () {
               : el('span', { class: 'lb-flag', text: row.party.short }),
             el('span', { class: 'lb-who' }, [
               el('strong', { class: 'lb-name', text: row.candidate || row.party.name }),
-              el('span', { class: 'lb-party', text: row.party.short }),
+              el('span', { class: 'lb-party' }, [
+                row.party.short,
+                // With four faces on screen, finding your own should take no
+                // effort at all.
+                row.isYou ? el('span', { class: 'board-tag is-you', text: 'you' }) : null,
+              ]),
             ]),
             el('span', { class: 'lb-seats', text: String(row.seats) }),
             el('span', {
               class: 'lb-status' + (i === 0 ? ' is-leading' : ''),
               text: i === 0 ? 'Leading' : PLACE[i],
             }),
-          ]);
+            el('span', { class: 'lb-chev', 'aria-hidden': 'true', text: '›' }),
+          ])]);
         })),
       ]);
     }
@@ -518,24 +561,10 @@ CMP.ui.election = (function () {
 
     /* ------------------------------------------------------- action list */
 
-    function targetChip() {
-      var def = seatDef(selected);
-      return el('button', {
-        class: 'g-target',
-        type: 'button',
-        onclick: function () {
-          setSection('seats');
-        },
-      }, [
-        el('span', { class: 'g-target-label', text: 'Target' }),
-        el('span', { class: 'g-target-name', text: def ? def.name : 'Choose' }),
-        el('span', { class: 'g-target-chev', 'aria-hidden': 'true', text: '›' }),
-      ]);
-    }
-
     /**
-     * One compact row per action: what it is, what it costs, how risky, and a
-     * button. No paragraphs — a short line each at most.
+     * One compact row per action, for the sections that still list them —
+     * grants and high risk. Campaigning proper goes through the constituency
+     * sheet, where an amount can be chosen alongside the move.
      */
     function actionList(menu) {
       var actions = CMP.actionsByMenu(menu);
@@ -550,7 +579,10 @@ CMP.ui.election = (function () {
           el('span', { class: 'act-body' }, [
             el('strong', { class: 'act-name', text: action.label }),
             el('span', { class: 'act-meta' }, [
-              el('span', { class: 'act-cost', text: action.cost ? money.words(action.cost) : 'No cost' }),
+              el('span', {
+                class: 'act-cost',
+                text: action.cost ? money.words(action.cost) : 'No cost',
+              }),
               el('span', { class: 'act-risk' + (risky ? ' is-high' : ''), text: action.riskLabel }),
             ]),
           ]),
@@ -580,6 +612,22 @@ CMP.ui.election = (function () {
           actionList(menu),
         ]),
       ];
+    }
+
+    /** Which seat these section-level actions would land on. */
+    function targetChip() {
+      var def = seatDef(selected);
+      return el('button', {
+        class: 'g-target',
+        type: 'button',
+        onclick: function () {
+          openCandidate(game.partyId);
+        },
+      }, [
+        el('span', { class: 'g-target-label', text: 'Target' }),
+        el('span', { class: 'g-target-name', text: def ? def.name : 'Choose' }),
+        el('span', { class: 'g-target-chev', 'aria-hidden': 'true', text: '›' }),
+      ]);
     }
 
     /* -------------------------------------------------------------- money */
@@ -811,6 +859,10 @@ CMP.ui.election = (function () {
 
     /* --------------------------------------------------------------- map */
 
+    /**
+     * The map is the second route to a constituency. Tapping a seat opens it,
+     * and CAMPAIGN HERE works exactly as it does from the areas list.
+     */
     function mapSection() {
       if (!mapView) {
         mapView = CMP.ui.map.create({
@@ -833,25 +885,72 @@ CMP.ui.election = (function () {
       ]);
     }
 
+    /**
+     * One constituency. Its job is to say what is happening here, and offer
+     * exactly one thing to do about it — the campaign controls open over the
+     * top rather than unrolling underneath.
+     */
     function seatPanel() {
+      var canCampaign = !isCounting() && CMP.campaign.roundIsLive(game);
+
       return CMP.ui.constituency.render(game, openSeat, {
         players: roster(),
         history: historyFor(openSeat),
         onBack: function () {
           openSeat = null;
           paintBody();
+          toTop();
         },
-        footer: el('button', {
-          class: 'btn btn-primary btn-wide',
-          type: 'button',
-          text: 'Campaign here',
-          onclick: function () {
-            selected = openSeat;
-            openSeat = null;
-            setSection('campaign');
-          },
-        }),
+        footer: canCampaign
+          ? el('button', {
+              class: 'btn btn-primary btn-wide btn-campaign',
+              type: 'button',
+              text: 'Campaign here',
+              onclick: function () {
+                campaignHere(openSeat);
+              },
+            })
+          : el('p', { class: 'g-block-note', text: 'The round is closed. Wait for the next one.' }),
       });
+    }
+
+    /**
+     * Pick a move and an amount, play it, show what it did, and offer the
+     * next seat. The player never gets sent back out to a dashboard to do it
+     * again — that round trip was the whole problem with the old flow.
+     */
+    function campaignHere(seat) {
+      selected = Number(seat);
+
+      CMP.ui.campaignSheet
+        .open(game, seat, {
+          play: function (actionId, target, amount) {
+            return Promise.resolve(opts.play(actionId, target, amount));
+          },
+          onNotice: setNotice,
+        })
+        .then(function (played) {
+          if (!played) return;
+
+          notice = null;
+          lastReport = played.report;
+          game = played.game || game;
+
+          var next = CMP.ui.areas.nextClosest(game, game.partyId, seat);
+          render(game);
+
+          return CMP.ui.campaignSheet.result(game, seat, played.report, played.before, {
+            nextSeat: next,
+            onNext: function (number) {
+              openSeatDetail(number);
+              campaignHere(number);
+            },
+            onAreas: function () {
+              openSeat = null;
+              openCandidate(game.partyId);
+            },
+          });
+        });
     }
 
     /* --------------------------------------------------------------- log */

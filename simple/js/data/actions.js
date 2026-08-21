@@ -105,7 +105,8 @@ CMP.CAMPAIGN = {
           "text": "Turnout was modest. Some gain, not much."
         }
       ],
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "media",
@@ -148,7 +149,8 @@ CMP.CAMPAIGN = {
         "seats": 4,
         "share": 0.55
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "community",
@@ -191,7 +193,8 @@ CMP.CAMPAIGN = {
         "seats": 3,
         "share": 0.5
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "outreach",
@@ -230,7 +233,8 @@ CMP.CAMPAIGN = {
           "text": "A cold reception in places. Modest gain."
         }
       ],
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "deal",
@@ -281,7 +285,8 @@ CMP.CAMPAIGN = {
         "seats": 5,
         "share": 0.55
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "influence",
@@ -324,7 +329,8 @@ CMP.CAMPAIGN = {
         "seats": 4,
         "share": 0.55
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "negative",
@@ -368,7 +374,8 @@ CMP.CAMPAIGN = {
         "seats": 3,
         "share": 0.5
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "lastpush",
@@ -411,7 +418,8 @@ CMP.CAMPAIGN = {
         "seats": 6,
         "share": 0.6
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     }
   ],
   "consequences": [
@@ -762,7 +770,8 @@ CMP.CAMPAIGN = {
           "text": "No funding at all. At least the development was noticed."
         }
       ],
-      "menu": "grants"
+      "menu": "grants",
+      "allowsAmount": true
     },
     "underground": {
       "id": "underground",
@@ -810,7 +819,8 @@ CMP.CAMPAIGN = {
           "text": "Nothing came. The conversation, however, was noticed."
         }
       ],
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": false
     }
   },
   "events": {
@@ -987,6 +997,20 @@ CMP.CAMPAIGN = {
       "One Punjab, one future"
     ],
     "heatBackoff": 0.5
+  },
+  "spending": {
+    "enabled": true,
+    "minAmount": 500000,
+    "maxMultiple": 4,
+    "minScale": 0.45,
+    "maxScale": 2,
+    "quickAmounts": [
+      500000,
+      1000000,
+      2500000,
+      5000000,
+      10000000
+    ]
   }
 };
 

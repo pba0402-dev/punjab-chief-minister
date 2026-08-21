@@ -66,11 +66,31 @@ const dearest = (ids, game, limit) =>
 const cheapest = (ids, game, limit) =>
   affordable(ids, game, limit).sort((a, b) => a.cost - b.cost)[0];
 
+/*
+ * How much to put behind each move. `base` pays the sticker price; `heavy`
+ * puts the maximum the action allows behind every move; `spread` divides
+ * whatever is left by the moves still to come.
+ *
+ * Under a square-root curve, spreading should beat dumping — that is the
+ * whole reason for the curve, and these two strategies exist to prove it
+ * rather than assume it.
+ */
+const SPEND = {
+  base: () => null,
+  heavy: (g, action) => CMP.campaign.amountRange(action).max,
+  spread: (g, action, round) => {
+    const movesLeft = Math.max(1, (CMP.ROUNDS.total - round + 1) * CMP.ROUNDS.actionsPerRound);
+    return Math.floor(g.cash / movesLeft);
+  },
+};
+
 const STRATEGIES = {
-  careful: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal' },
-  bigspender: { borrow: true, pick: (g, l) => dearest(SAFE, g, l), aim: 'marginal' },
-  gambler: { borrow: true, pick: (g, l) => dearest(RISKY, g, l), aim: 'marginal' },
-  scattergun: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'spread' },
+  careful: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'base' },
+  bigspender: { borrow: true, pick: (g, l) => dearest(SAFE, g, l), aim: 'marginal', spend: 'base' },
+  gambler: { borrow: true, pick: (g, l) => dearest(RISKY, g, l), aim: 'marginal', spend: 'base' },
+  scattergun: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'spread', spend: 'base' },
+  heavyhitter: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'heavy' },
+  spreader: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'spread' },
 };
 
 function playCampaign(name, seed) {
@@ -114,11 +134,12 @@ function playCampaign(name, seed) {
         plan.aim === 'marginal'
           ? pool[Math.floor(rand() * 8)] || pool[0]
           : pool[Math.floor(rand() * pool.length)] || pool[0];
+      const amount = SPEND[plan.spend](game, action, round);
       CMP.campaign.play(game, action.id, action.needsConstituency ? seat.number : null, {
         outcome: rand(),
         consequence: rand(),
         consequencePick: rand(),
-      });
+      }, amount);
     }
 
     // A round settles into a results break; the next opens when it ends.
@@ -200,6 +221,10 @@ console.log(
 );
 console.log(
   'aim edge   (careful - scattergun): ' + (seatsOf('careful') - seatsOf('scattergun')).toFixed(1) + ' seats'
+);
+console.log(
+  'spread vs dump (spreader - heavyhitter): ' +
+  (seatsOf('spreader') - seatsOf('heavyhitter')).toFixed(1) + ' seats'
 );
 console.log('');
 console.log('want: the money edge small and the aim edge larger — spending more should help,');

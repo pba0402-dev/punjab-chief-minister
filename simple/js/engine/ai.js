@@ -114,11 +114,15 @@ CMP.ai = (function () {
         if (!target) break;
       }
 
+      // Spreading evenly across the moves available is the efficient play
+      // under a square-root curve, so that is what an opponent does.
+      var amount = chooseAmount(opponent, action, round);
+
       var report = CMP.campaign.playAs(game, opponent, action.id, target, {
         outcome: rand(),
         consequence: rand(),
         consequencePick: rand(),
-      });
+      }, amount);
       if (!report) break;
       moves.push({
         actionId: report.actionId,
@@ -129,6 +133,18 @@ CMP.ai = (function () {
     }
 
     return moves;
+  }
+
+  /**
+   * How much to put behind a move: what is left, divided by the moves still
+   * expected, clamped to what the action allows.
+   */
+  function chooseAmount(opponent, action, round) {
+    if (!action.allowsAmount) return null;
+    var movesLeft = Math.max(1, (CMP.ROUNDS.total - round + 1) * CMP.ROUNDS.actionsPerRound);
+    var budget = Math.floor((opponent.cash || 0) / movesLeft);
+    var range = CMP.campaign.amountRange(action);
+    return Math.max(range.min, Math.min(range.max, budget));
   }
 
   /**

@@ -108,7 +108,8 @@
           "text": "Turnout was modest. Some gain, not much."
         }
       ],
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "media",
@@ -151,7 +152,8 @@
         "seats": 4,
         "share": 0.55
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "community",
@@ -194,7 +196,8 @@
         "seats": 3,
         "share": 0.5
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "outreach",
@@ -233,7 +236,8 @@
           "text": "A cold reception in places. Modest gain."
         }
       ],
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     },
     {
       "id": "deal",
@@ -284,7 +288,8 @@
         "seats": 5,
         "share": 0.55
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "influence",
@@ -327,7 +332,8 @@
         "seats": 4,
         "share": 0.55
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "negative",
@@ -371,7 +377,8 @@
         "seats": 3,
         "share": 0.5
       },
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": true
     },
     {
       "id": "lastpush",
@@ -414,7 +421,8 @@
         "seats": 6,
         "share": 0.6
       },
-      "menu": "campaign"
+      "menu": "campaign",
+      "allowsAmount": true
     }
   ],
   "consequences": [
@@ -863,7 +871,8 @@
           "text": "No funding at all. At least the development was noticed."
         }
       ],
-      "menu": "grants"
+      "menu": "grants",
+      "allowsAmount": true
     },
     "underground": {
       "id": "underground",
@@ -911,7 +920,8 @@
           "text": "Nothing came. The conversation, however, was noticed."
         }
       ],
-      "menu": "corruption"
+      "menu": "corruption",
+      "allowsAmount": false
     }
   },
   "events": {
@@ -1151,5 +1161,40 @@
     "",
     "This lives in the config rather than the interface so adding an action",
     "puts it in the right place without anyone editing a screen."
-  ]
+  ],
+  "spending": {
+    "_comment": [
+      "How much to put behind a move is now the player's decision, not a fixed",
+      "price. Each action has a base cost; spending more or less than it scales",
+      "what the move achieves.",
+      "",
+      "The curve is a square root, and that choice carries the whole balance of",
+      "the feature. Spending four times the base cost buys twice the effect, not",
+      "four times it — so for a fixed budget the most efficient play is to spread",
+      "money evenly across every move you have, never to dump it into a few.",
+      "That is exactly the behaviour we want: money should buy a real advantage",
+      "without letting a rich campaign simply purchase the election in three",
+      "expensive gestures.",
+      "",
+      "The clamps stop both ends running away. Below minScale a token amount",
+      "would otherwise look like a bargain, since a move costs one of the three",
+      "a round whatever is spent; above maxScale a single move could swing a seat",
+      "outright.",
+      "",
+      "Heat scales with the money too. Putting four times the money behind a",
+      "risky move is four times as visible, and it should be."
+    ],
+    "enabled": true,
+    "minAmount": 500000,
+    "maxMultiple": 4,
+    "minScale": 0.45,
+    "maxScale": 2,
+    "quickAmounts": [
+      500000,
+      1000000,
+      2500000,
+      5000000,
+      10000000
+    ]
+  }
 }

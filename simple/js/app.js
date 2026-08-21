@@ -473,9 +473,9 @@ CMP.app = (function () {
    * Solo rolls locally; multiplayer asks the server, because a client must
    * not be able to choose its own outcome or set its own budget.
    */
-  function playAction(actionId, constituency) {
+  function playAction(actionId, constituency, amount) {
     if (game && game.mode === 'multiplayer') {
-      return CMP.net.playAction(actionId, constituency).then(function (res) {
+      return CMP.net.playAction(actionId, constituency, amount).then(function (res) {
         if (!res.ok) return { ok: false, reason: res.error };
         var mine = mineFrom(res.game);
         if (mine) applyServerPlayer(mine);
@@ -484,7 +484,7 @@ CMP.app = (function () {
     }
 
     var rolls = CMP.rng.rollsFor(game);
-    var res = CMP.campaign.play(game, actionId, constituency, rolls);
+    var res = CMP.campaign.play(game, actionId, constituency, rolls, amount);
     if (!res.ok) return { ok: false, reason: res.reason };
     game.seatsWon = CMP.campaign.seatsLed(game);
     CMP.storage.save(game);

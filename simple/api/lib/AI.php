@@ -129,7 +129,13 @@ final class AI
                 }
             }
 
-            if ($engine->blockedReason($player, $board, $action['id'], $target) !== null) {
+            // How much to put behind it. Spreading evenly across the moves
+            // available is the efficient play under a square-root curve, so
+            // that is what an opponent does: its remaining cash divided by the
+            // moves it expects to have left.
+            $amount = self::chooseAmount($player, $action, $engine, $round);
+
+            if ($engine->blockedReason($player, $board, $action['id'], $target, $amount) !== null) {
                 break;
             }
 
@@ -140,7 +146,14 @@ final class AI
             $player['rollCount'] = (int) ($player['rollCount'] ?? 0) + 1;
             $player['round'] = $round;
 
-            [$player, $board, $report] = $engine->play($player, $board, $action['id'], $target, $rolls);
+            [$player, $board, $report] = $engine->play(
+                $player,
+                $board,
+                $action['id'],
+                $target,
+                $rolls,
+                $amount
+            );
             $moves[] = [
                 'actionId' => $report['actionId'],
                 'label' => $report['label'],
@@ -150,6 +163,24 @@ final class AI
         }
 
         return [$player, $board, $moves];
+    }
+
+    /**
+     * How much to put behind a move. An opponent budgets rather than always
+     * paying the sticker price: what it has left, divided by the moves it can
+     * still expect to make, clamped to what the action allows.
+     */
+    private static function chooseAmount(array $player, array $action, Campaign $engine, int $round): ?int
+    {
+        if (empty($action['allowsAmount'])) {
+            return null;
+        }
+        $rounds = $engine->rounds();
+        $movesLeft = max(1, ((int) $rounds['total'] - $round + 1) * (int) $rounds['actionsPerRound']);
+        $budget = (int) floor($engine->remaining($player) / $movesLeft);
+
+        $range = $engine->amountRange($action);
+        return (int) max($range['min'], min($range['max'], $budget));
     }
 
     /**
