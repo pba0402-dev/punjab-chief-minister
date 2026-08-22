@@ -274,3 +274,85 @@
   .map-summary { gap: 6px; }
   .map-summary-rows { gap: 7px; }
 }
+
+/* -------------------------------------------- who is ahead in a district */
+
+/*
+ * A district is a group of seats, and colouring the whole thing in one colour
+ * would hide the seats — which are the truth of the board. So the border
+ * carries it: tinted where somebody is ahead, solid where every seat in it
+ * has been won and it is theirs for good.
+ */
+.map-district-line.has-leader {
+  stroke: var(--party);
+  stroke-opacity: 0.5;
+}
+.map-district-line.is-controlled {
+  stroke-opacity: 0.95;
+  stroke-width: 2.4;
+}
+
+.readout-district {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding-right: 9px;
+  margin-right: 3px;
+  border-right: 1px solid var(--line);
+}
+.readout-district-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--cream);
+}
+.readout-district-seats {
+  font-size: 0.6rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.readout-district-lead {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--party, var(--muted));
+}
+.readout-district-lead.is-controlled::after { content: ' ✓'; }
+.readout-district-lead.is-open { color: var(--muted-2); }
+
+@media (max-width: 430px) {
+  /* The district gets its own line rather than fighting the seat for one. */
+  .readout-district {
+    width: 100%;
+    padding: 0 0 5px;
+    margin: 0 0 5px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+/* ------------------------------------------------- a seat that is finished */
+
+/*
+ * The tick is always drawn and only ever shown where a seat is won, so the
+ * map never rebuilds 117 glyphs to change one. Unlike the seat numbers it
+ * does not wait for a zoom: a permanent win is the one thing on this board
+ * that cannot be undone, and it should read at any scale.
+ */
+.map-seat-tick {
+  fill: #fff;
+  font-family: var(--font);
+  font-size: calc(13px / var(--map-k));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(10, 8, 5, 0.8);
+  stroke-width: calc(3px / var(--map-k));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.map-seat-tick.is-on { opacity: 1; }
+.map-seat-tick.is-outside { display: none; }
+
+/* With the tick carrying it, a won cell needs less of an outline. */
+.map-labels.show-nums .map-seat-tick.is-on { font-size: calc(11px / var(--map-k)); }

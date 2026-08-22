@@ -322,9 +322,34 @@ check('7. the round allowance is stated on the setup screen',
   /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
 check('12. and offers faces to choose from',
   qq(dom, '.av-option').length >= 20, qq(dom, '.av-option').length + ' avatars');
-check('12. drawn, never photographed',
-  qq(dom, '.av-option svg').length === qq(dom, '.av-option').length &&
-  qq(dom, '.av-option img').length === 0);
+/*
+ * 12. Every face is an image file, found by the id the save stores.
+ *
+ * The portraits used to be drawn inline; they are PNGs now, loaded from
+ * assets/portraits/ and keyed by id, so what has to hold is that each option
+ * asks for a picture and asks for it under the right name. jsdom fetches
+ * nothing, so this is about the request rather than the result — the result
+ * is what the fallback below is for.
+ */
+check('12. every face is an image, one per option',
+  qq(dom, '.av-option .portrait img').length === qq(dom, '.av-option').length,
+  qq(dom, '.av-option .portrait img').length + ' of ' + qq(dom, '.av-option').length);
+check('12. and each is fetched by its own id',
+  qq(dom, '.av-option .portrait').every((n) => {
+    const img = n.querySelector('img');
+    return img && img.getAttribute('src') ===
+      dom.window.CMP.assetUrl('portraits', n.dataset.avatar);
+  }),
+  (q(dom, '.av-option .portrait img') || {}).src);
+check('12. from a relative path, so it works wherever the game is served',
+  qq(dom, '.av-option .portrait img')
+    .every((n) => /^assets\//.test(n.getAttribute('src'))),
+  (q(dom, '.av-option .portrait img') || {}).getAttribute('src'));
+
+// 12. A picture that never arrives leaves a labelled circle, not a hole and
+// not the browser's broken-image glyph.
+check('12. with something legible behind it while it loads',
+  qq(dom, '.av-option .portrait-fallback').length === qq(dom, '.av-option').length);
 check('16. and the round length',
   qq(dom, '.screen-setup .clock-option').length === 3);
 check('16. two minutes by default',
@@ -345,7 +370,8 @@ check('11. the preview names the player and the party',
   /PUNJAB DEVELOPMENT PARTY/.test(q(dom, '.pv-party').textContent),
   q(dom, '.pv-name').textContent + ' / ' + q(dom, '.pv-party').textContent);
 check('11. with the symbol and the badge on it',
-  !!q(dom, '.pv-badge svg') && q(dom, '.pv-short').textContent === 'PDP');
+  !!q(dom, '.pv-badge .sym') && q(dom, '.pv-short').textContent === 'PDP',
+  q(dom, '.pv-badge') ? q(dom, '.pv-badge').innerHTML.slice(0, 80) : 'no badge');
 
 clickIt(dom, qq(dom, '.sym-option')[3]);
 clickIt(dom, qq(dom, '.col-option')[5]);
@@ -452,6 +478,93 @@ check('23. and says what the four appearances mean',
     .every((w) => new RegExp(w, 'i').test(q(dom, '.legend-key').textContent)),
   q(dom, '.legend-key') ? q(dom, '.legend-key').textContent : 'no key');
 check('1. the leaderboard is on it too', !!q(dom, '.lb'));
+
+/*
+ * 1-3. A region replaces the board rather than cropping it.
+ *
+ * The camera used to be a transform inside a fixed viewBox, so choosing Majha
+ * framed Majha and left the other two regions drawn just outside — where a
+ * pinch found them again. Two things have to be true now: nothing outside the
+ * region is drawn, and the camera has actually moved to fit what is.
+ */
+const mapSvg = () => q(dom, '.punjab-map');
+const regionButton = (name) =>
+  qq(dom, '.map-regions .term-option').find((b) => b.textContent === name);
+const viewBoxOf = () => mapSvg().getAttribute('viewBox').split(' ').map(Number);
+
+const punjabBox = viewBoxOf();
+check('3. Punjab opens with the whole board in frame',
+  punjabBox[2] === dom.window.CMP.GEOMETRY.viewBox.width, punjabBox.join(' '));
+check('1. and all 117 seats drawn',
+  qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
+
+clickIt(dom, regionButton('Majha'));
+await settle();
+await new Promise((r) => setTimeout(r, 500));
+
+const majhaSeats = dom.window.CMP.CONSTITUENCIES
+  .filter((c) => dom.window.CMP.regionOfSeat(c.number) === 'majha').length;
+const shown = qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside'));
+
+check('1. choosing Majha draws only Majha', shown.length === majhaSeats,
+  shown.length + ' drawn of ' + majhaSeats + ' in Majha');
+check('1. every other region is gone from the board',
+  shown.every((c) => dom.window.CMP.regionOfSeat(Number(c.dataset.seat)) === 'majha'));
+check('1. and so is the Punjab outline',
+  q(dom, '.map-outline').classList.contains('is-outside'));
+
+const majhaBox = viewBoxOf();
+check('3. the camera moved to fit it',
+  majhaBox[2] < punjabBox[2] * 0.9,
+  majhaBox.map((n) => Math.round(n)).join(' ') + ' vs ' + punjabBox.join(' '));
+check('3. nobody has to zoom out afterwards',
+  majhaBox[2] > 0 && majhaBox[3] > 0);
+
+/*
+ * 18. And a line above it saying how this part stands, from the game's own
+ * board rather than from anything stored or invented.
+ */
+check('18. the summary names the region on screen',
+  /Majha/i.test(q(dom, '.map-summary').textContent),
+  q(dom, '.map-summary').textContent.slice(0, 60));
+
+clickIt(dom, regionButton('Doaba'));
+await settle();
+await new Promise((r) => setTimeout(r, 500));
+const doabaShown = qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside'));
+check('1. switching to Doaba draws only Doaba',
+  doabaShown.every((c) => dom.window.CMP.regionOfSeat(Number(c.dataset.seat)) === 'doaba') &&
+  doabaShown.length > 0,
+  doabaShown.length + ' drawn');
+check('3. and reframes for it',
+  viewBoxOf().join(' ') !== majhaBox.join(' '));
+check('18. the summary follows the region',
+  /Doaba/i.test(q(dom, '.map-summary').textContent),
+  q(dom, '.map-summary').textContent.slice(0, 60));
+
+clickIt(dom, regionButton('All Punjab'));
+await settle();
+await new Promise((r) => setTimeout(r, 500));
+check('1. All Punjab brings the whole board back',
+  qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
+check('3. at the full extent',
+  viewBoxOf()[2] === punjabBox[2], viewBoxOf().join(' '));
+
+/*
+ * 8. The legend names the parties.
+ *
+ * They are invented at the start of every game, so a colour on its own means
+ * nothing — and somebody who called their party the Unity Punjab Front did
+ * not call it UPF.
+ */
+const legendNames = qq(dom, '.map-legend .legend-label').map((n) => n.textContent);
+check('8. the legend names every party in the game',
+  dom.window.CMP.PARTIES.every((party) => legendNames.indexOf(party.name) !== -1),
+  legendNames.join(' / '));
+check('8. and says what it is a legend of',
+  /leading/i.test(q(dom, '.legend-title').textContent),
+  q(dom, '.legend-title') ? q(dom, '.legend-title').textContent : 'no title');
+
 
 /*
  * 19. The money is in the header, and the card it replaced is gone.
@@ -988,6 +1101,59 @@ check('15. an opening investment is capped',
 check('15. and the panel says why',
   /First campaign here/.test(q(dom, '.cs-cap').textContent),
   q(dom, '.cs-cap').textContent.slice(0, 60));
+
+/*
+ * 11. The slider survives being dragged.
+ *
+ * It used to repaint the whole panel on every input event, which threw away
+ * the very input the finger was holding — so the browser had nothing left to
+ * drag and each movement needed a fresh press. That reads as a slider that
+ * moves one step at a time, and it is the thing to guard: the node identity
+ * has to be the same before and after a drag, and the figures have to have
+ * moved anyway.
+ */
+const sliderNode = q(dom, '.cs-range');
+const valueBefore = q(dom, '.cs-amount-value').textContent;
+
+function dragTo(value) {
+  sliderNode.value = String(value);
+  sliderNode.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+}
+
+const lo = Number(sliderNode.min);
+const hi = Number(sliderNode.max);
+[0.25, 0.5, 0.75, 1].forEach((f) => dragTo(Math.round(lo + (hi - lo) * f)));
+await settle();
+
+check('11. dragging the slider keeps the same slider',
+  q(dom, '.cs-range') === sliderNode);
+check('11. and the amount followed it',
+  q(dom, '.cs-amount-value').textContent !== valueBefore ||
+    Number(sliderNode.value) === hi,
+  valueBefore + ' -> ' + q(dom, '.cs-amount-value').textContent);
+check('11. the invest button says what it will spend',
+  q(dom, '.campaign-sheet .btn-primary').textContent ===
+    'Invest ' + q(dom, '.cs-amount-value').textContent,
+  q(dom, '.campaign-sheet .btn-primary').textContent);
+check('11. and the summary agrees with both',
+  qq(dom, '.cs-summary .dialog-line')
+    .some((n) => n.textContent.indexOf(q(dom, '.cs-amount-value').textContent) !== -1),
+  qq(dom, '.cs-summary .dialog-line').map((n) => n.textContent).join(' | '));
+
+// 11. Fine enough to be a drag rather than a handful of stops.
+check('11. the slider moves continuously, not in jumps',
+  (hi - lo) / Number(sliderNode.step) >= 40,
+  Math.round((hi - lo) / Number(sliderNode.step)) + ' positions');
+
+// 12. And it stops where the rule stops.
+check('12. it says this is a first entry',
+  !!q(dom, '.cs-entry-tag') &&
+  /max/i.test(q(dom, '.cs-entry-tag').textContent),
+  q(dom, '.cs-entry-tag') ? q(dom, '.cs-entry-tag').textContent : 'no tag');
+check('12. and cannot be dragged past the cap',
+  hi === dom.window.CMP.CAMPAIGN.spending.entryMaximum,
+  hi + ' vs ' + dom.window.CMP.CAMPAIGN.spending.entryMaximum);
+dragTo(hi);
 
 const chosenAmount = Number(q(dom, '.cs-range').value);
 const cashBeforeCampaign = dom.window.CMP.app.getGame().cash;

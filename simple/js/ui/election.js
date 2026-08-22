@@ -1946,6 +1946,24 @@ CMP.ui.election = (function () {
       CMP.ui.campaignSheet
         .open(game, seat, {
           district: districtId || CMP.campaign.areaOf(seat),
+          /*
+           * The board follows the panel.
+           *
+           * Switching the target to a district frames the district; picking a
+           * seat inside it frames the seat. The map stays behind the sheet
+           * throughout, so the answer to "where is this" is always visible
+           * rather than something to go and look up.
+           */
+          onFocus: function (kind, id) {
+            if (!mapView) return;
+            if (kind === 'seat') {
+              mapView.select(id);
+              mapView.focusSeat(id);
+            } else {
+              mapView.highlightDistrict(id);
+              mapView.focusDistrict(id);
+            }
+          },
           play: function (actionId, target, amount) {
             return Promise.resolve(opts.play(actionId, target, amount));
           },

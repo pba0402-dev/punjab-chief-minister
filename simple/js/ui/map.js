@@ -61,6 +61,7 @@ CMP.ui.map = (function () {
     var cellNodes = {};
     var lineNodes = [];
     var labelNodes = {};
+    var tickNodes = {};
 
     /*
      * The camera is the viewBox.
@@ -233,6 +234,7 @@ CMP.ui.map = (function () {
       cellNodes = {};
       lineNodes = [];
       labelNodes = {};
+      tickNodes = {};
       mount(cellLayer, []);
       mount(borderLayer, []);
       mount(labelLayer, []);
@@ -279,6 +281,26 @@ CMP.ui.map = (function () {
         });
         labelNodes[c.number] = label;
         labelLayer.appendChild(label);
+
+        /*
+         * The tick for a seat that is finished.
+         *
+         * The legend promises one and the stroke around a won cell was not
+         * it: a colour and an outline both say "somebody is ahead here", and
+         * the whole point of a won seat is that it is a different kind of
+         * thing. Built once and shown when it applies, because building 117
+         * of these on every repaint is a cost the map does not need.
+         */
+        var tick = svgEl('text', {
+          class: 'map-seat-tick',
+          x: a[0],
+          y: a[1],
+          'text-anchor': 'middle',
+          'dominant-baseline': 'central',
+          text: '✓',
+        });
+        tickNodes[c.number] = tick;
+        labelLayer.appendChild(tick);
       });
     }
 
@@ -312,6 +334,9 @@ CMP.ui.map = (function () {
         node.classList.toggle('is-won', !!won);
         node.classList.toggle('is-contested', !won && !!band && band.id === 'tossup');
         node.classList.toggle('is-selected', selected === c.number);
+
+        var tick = tickNodes[c.number];
+        if (tick) tick.classList.toggle('is-on', !!won);
 
         if (won) {
           node.setAttribute('fill', CMP.getParty(won.party).colour);
@@ -357,9 +382,65 @@ CMP.ui.map = (function () {
         );
       }
 
+      paintDistrictLines();
       paintSummary();
       paintLegend();
       showReadout(selected);
+    }
+
+    /**
+     * Who is ahead in each district, on its own border.
+     *
+     * A district is a group of seats and colouring it in one colour would
+     * hide the seats, which are the truth — so the border carries it instead.
+     * The rule is seats led, and a district every seat of which is won reads
+     * as controlled rather than merely ahead.
+     */
+    function districtLeader(d) {
+      var won = game.wonSeats || {};
+      var counts = {};
+      var wonCount = 0;
+      var owner = null;
+
+      d.seats.forEach(function (n) {
+        var w = won[String(n)];
+        if (w) {
+          wonCount += 1;
+          counts[w.party] = (counts[w.party] || 0) + 1;
+          return;
+        }
+        var lead = CMP.ui.constituency.leaderOf(game.support[n] || {});
+        if (lead) counts[lead.partyId] = (counts[lead.partyId] || 0) + 1;
+      });
+
+      var best = null;
+      Object.keys(counts).forEach(function (id) {
+        if (!best || counts[id] > counts[best]) best = id;
+      });
+      if (wonCount === d.seats.length && best) owner = best;
+      return { party: best, owner: owner, seats: best ? counts[best] : 0 };
+    }
+
+    function paintDistrictLines() {
+      var byName = {};
+      (CMP.DISTRICTS || []).forEach(function (d) {
+        byName[d.name] = d;
+        byName[d.id] = d;
+      });
+
+      var cache = {};
+      lineNodes.forEach(function (entry) {
+        var d = byName[entry.district];
+        if (!d) return;
+        if (!cache[d.id]) cache[d.id] = districtLeader(d);
+        var lead = cache[d.id];
+        var party = lead.party ? CMP.getParty(lead.party) : null;
+
+        entry.node.classList.toggle('has-leader', !!party);
+        entry.node.classList.toggle('is-controlled', !!lead.owner);
+        if (party) entry.node.style.setProperty('--party', party.colour);
+        else entry.node.style.removeProperty('--party');
+      });
     }
 
     function inRegion(num) {
@@ -502,10 +583,44 @@ CMP.ui.map = (function () {
       );
     }
 
-    /** The line under the map: which seat, who leads it, by how much. */
+    /**
+     * The line under the map: where you are pointing, and who holds it.
+     *
+     * The district comes first when there is one, because the panel can spend
+     * on either and the two readings are different — leading nine seats of a
+     * district and leading this one are not the same news.
+     */
+    function districtLine() {
+      if (!selectedDistrict) return null;
+      var d = CMP.getDistrict && CMP.getDistrict(selectedDistrict);
+      if (!d) return null;
+
+      var lead = districtLeader(d);
+      var party = lead.party ? CMP.getParty(lead.party) : null;
+
+      return el('span', { class: 'readout-district' }, [
+        el('span', { class: 'readout-district-name', text: d.name }),
+        el('span', {
+          class: 'readout-district-seats',
+          text: d.seats.length + ' seats',
+        }),
+        party
+          ? el('span', {
+              class: 'readout-district-lead' + (lead.owner ? ' is-controlled' : ''),
+              style: { '--party': party.colour },
+              text: (lead.owner ? party.short + ' controls' : party.short + ' ahead in ') +
+                (lead.owner ? '' : lead.seats + ' of ' + d.seats.length),
+            })
+          : el('span', { class: 'readout-district-lead is-open', text: 'No leader' }),
+      ]);
+    }
+
     function showReadout(num) {
       if (num === null || num === undefined || !game.support[num]) {
-        mount(readout, [el('span', { class: 'muted', text: 'Hover or tap a constituency.' })]);
+        mount(readout, [
+          districtLine(),
+          el('span', { class: 'muted', text: 'Hover or tap a constituency.' }),
+        ]);
         return;
       }
       var def = null;
@@ -518,6 +633,7 @@ CMP.ui.map = (function () {
       var band = lead ? CMP.campaign.ratingFor(lead.margin) : null;
 
       mount(readout, [
+        districtLine(),
         el('span', { class: 'readout-ac', text: 'AC ' + def.number }),
         el('strong', { class: 'readout-name', text: def.name }),
         lead
@@ -754,6 +870,8 @@ CMP.ui.map = (function () {
         if (node) node.classList.toggle('is-outside', out);
         var label = labelNodes[c.number];
         if (label) label.classList.toggle('is-outside', out);
+        var tick = tickNodes[c.number];
+        if (tick) tick.classList.toggle('is-outside', out);
       });
       lineNodes.forEach(function (entry) {
         entry.node.classList.toggle('is-outside', !all && entry.region !== region);

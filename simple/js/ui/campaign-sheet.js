@@ -55,6 +55,8 @@ CMP.ui.campaignSheet = (function () {
    * @param opts.district  a district id, when the target is the whole thing
    * @param opts.play      (actionId, seat, amount) -> result
    * @param opts.playBulk  (actionId, seats, total) -> result
+   * @param opts.onFocus   ('district'|'seat', id) -> void, so the map can
+   *                       follow what the panel is talking about
    */
   function open(game, seat, opts) {
     opts = opts || {};
@@ -67,6 +69,13 @@ CMP.ui.campaignSheet = (function () {
       var amount = null;
       var busy = false;
       var settled = false;
+
+      /** Ask the map to frame whatever the panel is now about. */
+      function focusMap() {
+        if (!opts.onFocus) return;
+        if (target === 'seat' && seat) opts.onFocus('seat', Number(seat));
+        else if (district) opts.onFocus('district', district.id);
+      }
 
       var body = el('div', { class: 'cs-body' });
       var panel = el('div', {
@@ -159,6 +168,40 @@ CMP.ui.campaignSheet = (function () {
 
       /* ----------------------------------------------------- painting */
 
+      /*
+       * The parts of the panel that the amount changes.
+       *
+       * Held rather than rebuilt, because rebuilding is what made the slider
+       * feel broken: `oninput` used to repaint the whole panel, which threw
+       * away the very input the finger was holding. The browser then had
+       * nothing to keep dragging, so every movement needed a fresh press —
+       * which reads as a slider that only moves one step at a time.
+       */
+      var live = {};
+
+      /** Write the amount into everything that shows it. Never rebuilds. */
+      function syncAmount(lim) {
+        var text = money.words(amount) || '₹0';
+        if (live.value) live.value.textContent = text;
+        if (live.invest && !busy) live.invest.textContent = 'Invest ' + text;
+        if (live.spend) live.spend.textContent = text;
+        if (live.after) {
+          live.after.textContent = money.words(Math.max(0, lim.pot - amount)) || '₹0';
+        }
+        if (live.less) live.less.disabled = amount <= lim.min;
+        if (live.more) live.more.disabled = amount >= lim.max;
+        if (live.range && Number(live.range.value) !== amount) {
+          live.range.value = String(amount);
+        }
+        // WebKit will not paint a range's filled portion on its own, so the
+        // track is a gradient and this is where the stop goes.
+        if (live.range) {
+          var span = lim.max - lim.min;
+          var pc = span > 0 ? ((amount - lim.min) / span) * 100 : 0;
+          live.range.style.setProperty('--fill', Math.max(0, Math.min(100, pc)) + '%');
+        }
+      }
+
       function title() {
         if (target === 'district' && district) return district.name;
         var def = seatDef(seat);
@@ -213,28 +256,74 @@ CMP.ui.campaignSheet = (function () {
           el('span', { class: 'cs-target-label', text: 'Target' }),
           el('div', { class: 'term-options' }, [
             el('button', {
-              class: 'term-option' + (target === 'district' ? ' is-active' : ''),
+              class: 'term-option' + (target === 'district' ? ' is-selected' : ''),
               type: 'button',
               text: 'District',
               onclick: function () {
                 target = 'district';
                 amount = null;
                 paint();
+                focusMap();
               },
             }),
             el('button', {
-              class: 'term-option' + (target === 'seat' ? ' is-active' : ''),
+              class: 'term-option' + (target === 'seat' ? ' is-selected' : ''),
               type: 'button',
-              text: 'One seat',
+              text: 'Seat',
               disabled: !seat,
               onclick: function () {
                 target = 'seat';
                 amount = null;
                 paint();
+                focusMap();
               },
             }),
           ]),
         ]);
+      }
+
+      /*
+       * Which seat, when the target is one seat.
+       *
+       * A district is up to fourteen constituencies and the map at district
+       * zoom is not a comfortable place to hit one of them, so they are also
+       * a row here — coloured by who leads each, ticked where the race is
+       * over. Picking one moves the map with it, so the panel and the board
+       * never describe different places.
+       */
+      function seatPicker() {
+        if (target !== 'seat' || !district) return null;
+
+        return el('div', { class: 'cs-seats' },
+          district.seats.map(function (n) {
+            var def = seatDef(n);
+            var won = CMP.campaign.wonBy(game, n);
+            var lead = won
+              ? { partyId: won.party }
+              : CMP.ui.constituency.leaderOf(game.support[n] || {});
+            var party = lead ? CMP.getParty(lead.partyId) : null;
+
+            return el('button', {
+              class: 'cs-seat' + (Number(seat) === n ? ' is-active' : '') +
+                (won ? ' is-won' : ''),
+              type: 'button',
+              style: party ? { '--party': party.colour } : null,
+              title: def ? def.name : 'AC ' + n,
+              onclick: function () {
+                seat = n;
+                amount = null;
+                paint();
+                focusMap();
+              },
+            }, [
+              el('span', { class: 'cs-seat-num', text: String(n) }),
+              el('span', {
+                class: 'cs-seat-name',
+                text: def ? def.name : 'AC ' + n,
+              }),
+              won ? el('span', { class: 'cs-seat-tick', text: '\u2713' }) : null,
+            ]);
+          }));
       }
 
       function modeToggle() {
@@ -298,15 +387,28 @@ CMP.ui.campaignSheet = (function () {
           positions(),
           wonNote(),
           targetToggle(),
+          seatPicker(),
           modeToggle(),
 
           el('div', { class: 'cs-amount' }, [
             el('div', { class: 'cs-amount-head' }, [
               el('span', { class: 'cs-amount-label', text: 'Invest' }),
-              el('strong', { class: 'cs-amount-value', text: money.words(amount) || '₹0' }),
+              lim.cap
+                ? el('span', { class: 'cs-entry-tag' }, [
+                    el('span', { class: 'cs-entry-tag-label', text: 'First entry' }),
+                    el('span', {
+                      class: 'cs-entry-tag-max',
+                      text: 'max ' + money.words(lim.cap),
+                    }),
+                  ])
+                : null,
+              (live.value = el('strong', {
+                class: 'cs-amount-value',
+                text: money.words(amount) || '₹0',
+              })),
             ]),
             el('div', { class: 'cs-stepper' }, [
-              el('button', {
+              (live.less = el('button', {
                 class: 'cs-step',
                 type: 'button',
                 'aria-label': 'Less',
@@ -314,23 +416,27 @@ CMP.ui.campaignSheet = (function () {
                 disabled: amount <= lim.min,
                 onclick: function () {
                   amount = Math.max(lim.min, amount - step);
-                  paint();
+                  syncAmount(lim);
                 },
-              }),
-              el('input', {
+              })),
+              (live.range = el('input', {
                 class: 'cs-range',
                 type: 'range',
                 min: String(lim.min),
                 max: String(lim.max),
-                step: String(Math.max(500000, step / 5)),
+                // Fine enough that dragging is continuous rather than clicking
+                // between a handful of stops, and still round enough that
+                // letting go lands on a number worth saying out loud.
+                step: String(Math.max(100000,
+                  Math.round((lim.max - lim.min) / 200 / 100000) * 100000)),
                 value: String(amount),
                 'aria-label': 'Amount to invest',
                 oninput: function (e) {
                   amount = Number(e.target.value);
-                  paint();
+                  syncAmount(lim);
                 },
-              }),
-              el('button', {
+              })),
+              (live.more = el('button', {
                 class: 'cs-step',
                 type: 'button',
                 'aria-label': 'More',
@@ -338,9 +444,9 @@ CMP.ui.campaignSheet = (function () {
                 disabled: amount >= lim.max,
                 onclick: function () {
                   amount = Math.min(lim.max, amount + step);
-                  paint();
+                  syncAmount(lim);
                 },
-              }),
+              })),
             ]),
             lim.cap
               ? el('p', {
@@ -357,19 +463,20 @@ CMP.ui.campaignSheet = (function () {
 
           el('dl', { class: 'cs-summary' }, [
             line('Available', money.words(lim.pot) || '₹0'),
-            line('Investment', money.words(amount)),
+            liveLine('spend', 'Investment', money.words(amount)),
             line('Risk', action.riskLabel),
-            line('After this', money.words(Math.max(0, lim.pot - amount)) || '₹0', true),
+            liveLine('after', 'After this',
+              money.words(Math.max(0, lim.pot - amount)) || '₹0', true),
           ]),
 
           affordable
-            ? el('button', {
+            ? (live.invest = el('button', {
                 class: 'btn btn-primary btn-wide',
                 type: 'button',
                 text: busy ? 'Investing…' : 'Invest ' + money.words(amount),
                 disabled: busy,
                 onclick: run,
-              })
+              }))
             : el('p', {
                 class: 'cs-cannot',
                 text: 'Not enough to campaign here. You can spend ' +
@@ -377,6 +484,19 @@ CMP.ui.campaignSheet = (function () {
               }),
           closeButton('Cancel'),
         ]);
+
+        // Paint the track's fill, and bring the seat being talked about into
+        // view — a picker scrolled to seat 11 while the panel is headed
+        // "Amritsar Central" is a picker arguing with its own title.
+        syncAmount(lim);
+        var active = body.querySelector('.cs-seat.is-active');
+        if (active && active.scrollIntoView) {
+          try {
+            active.scrollIntoView({ block: 'nearest', inline: 'center' });
+          } catch (e) {
+            /* older browsers take no options, and it does not matter */
+          }
+        }
       }
 
       function head() {
@@ -402,6 +522,16 @@ CMP.ui.campaignSheet = (function () {
         return el('div', { class: 'dialog-line' + (strong ? ' is-strong' : '') }, [
           el('dt', { text: label }),
           el('dd', { text: value }),
+        ]);
+      }
+
+      /** The same, but the value is kept so dragging can write to it. */
+      function liveLine(key, label, value, strong) {
+        var dd = el('dd', { text: value });
+        live[key] = dd;
+        return el('div', { class: 'dialog-line' + (strong ? ' is-strong' : '') }, [
+          el('dt', { text: label }),
+          dd,
         ]);
       }
 

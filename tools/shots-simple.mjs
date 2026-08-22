@@ -172,6 +172,64 @@ const SCENES = {
     "  if(b)b.click();" +
     "},120);",
 
+  /*
+   * The campaign panel in seat mode, over the map.
+   *
+   * The whole decision on one sheet: where, which seat of the district, how
+   * much, and whether to take a risk with it.
+   */
+  'map-seat-mode':
+    startGame() +
+    "setTimeout(function(){" +
+    "  var c=document.querySelector('.map-cell[data-seat=\"17\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "  setTimeout(function(){" +
+    "    var b=[].slice.call(document.querySelectorAll('.cs-target .term-option'))" +
+    "      .filter(function(x){return x.textContent==='Seat';})[0];" +
+    "    if(b)b.click();" +
+    "  },80);" +
+    "},140);",
+
+  /*
+   * A board with a campaign behind it.
+   *
+   * Every other map scene is round one on an empty board, which is honest but
+   * shows none of the colour the map exists to carry. This plays a dozen
+   * rounds first, so the audit sees leaders, contested seats and won ones.
+   */
+  'map-live':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});" +
+    "for(var r=0;r<12;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  CMP.campaign.startNextRound(g);" +
+    "}" +
+    // The round after the last one is open, so the board is what shows
+    // rather than the results sequence — which has its own scenes.
+    "g.lastResult=null;" +
+    // A district taken outright and a couple of seats besides, so the ticks,
+    // the solid district border and the won column are all on screen. Twelve
+    // rounds of even spending reaches none of them on its own.
+    "var d=CMP.getDistrict('hoshiarpur');" +
+    "(d?d.seats:[]).concat([39,40]).forEach(function(n){" +
+    "  g.wonSeats[String(n)]={party:g.partyId,round:9,share:82};" +
+    "});" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');",
+
+  /*
+   * The face and symbol pickers, so the audit sees the actual images.
+   *
+   * Everything else shows a portrait at 28-46px in a corner; this is the one
+   * screen where they are the subject.
+   */
+  'asset-pickers':
+    "CMP.app.goTo('setup');" +
+    "setTimeout(function(){window.scrollTo(0,400);},400);",
+
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +

@@ -637,15 +637,25 @@ for (const c of clients) {
   check(c.label + ' reached the result screen', arrived);
 }
 
-// The count runs seat by seat rather than landing complete, so catch it
-// mid-way before skipping to the end.
+/*
+ * The count runs seat by seat rather than landing complete, so catch it
+ * mid-way before skipping to the end.
+ *
+ * Waiting for the first declaration rather than reading whatever is on screen
+ * the instant the result opens: the count is a live thing, and a test that
+ * asks it what it has done before it has done anything is asking too early.
+ * That was worth one intermittent failure a run or two.
+ */
 const counting = host.q('.count-live');
 check('the count is shown seat by seat', !!counting);
 if (counting) {
   const progress = host.q('.count-progress').textContent;
   const declaredNow = Number((progress.match(/^(\d+)/) || [0, 0])[1]);
   check('it starts partway through, not complete', declaredNow < 117, progress);
-  check('it names the seats as they are declared', host.qq('.count-seat').length > 0);
+  await host.until('the first seats are declared',
+    () => host.qq('.count-seat').length > 0, 8000);
+  check('it names the seats as they are declared', host.qq('.count-seat').length > 0,
+    host.q('.count-progress').textContent);
   check('it shows running totals per party', host.qq('.count-row').length >= 4);
   check('and states the majority needed', /59 seats needed/.test(counting.textContent));
 }
