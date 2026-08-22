@@ -531,3 +531,146 @@
   .cn-row { gap: 9px; }
   .cn-fig strong { font-size: 0.82rem; }
 }
+
+/* ------------------------------------ round results: wins and conflicts */
+
+/*
+ * Both sit above the list of leader changes, and both need to look unlike
+ * it — a permanent win and a burned crore are different news from a seat
+ * that changed hands and may change back.
+ */
+
+.rr-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.rr-block .results-title { margin: 0; }
+.rr-block-more {
+  margin: 0;
+  font-size: 0.66rem;
+  color: var(--muted-2);
+}
+
+.rr-wins,
+.rr-conflicts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rr-win {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'tick name badge'
+    'note note note';
+  align-items: center;
+  gap: 2px 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--to, var(--line));
+  border-radius: var(--radius-sm);
+  /* The winner's colour behind it, faintly — this seat belongs to somebody
+     now, and saying so in words alone under-sells it. */
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--to) 16%, transparent), transparent 62%),
+    var(--ink-2);
+  animation: rr-in 0.32s ease both;
+}
+.rr-win.is-mine { border-width: 2px; padding: 8px 10px; }
+
+.rr-win-tick {
+  grid-area: tick;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--to, var(--good));
+}
+.rr-win-name {
+  grid-area: name;
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rr-win .rr-badge { grid-area: badge; }
+.rr-win-note {
+  grid-area: note;
+  margin-top: 3px;
+  font-size: 0.66rem;
+  color: var(--muted-2);
+}
+
+.rr-conflict {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'mark name parties'
+    'note note note';
+  align-items: center;
+  gap: 2px 9px;
+  padding: 9px 11px;
+  border: 1px dashed var(--line-2, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  animation: rr-in 0.32s ease both;
+}
+.rr-conflict.is-mine { border-color: var(--danger); }
+
+.rr-conflict-mark {
+  grid-area: mark;
+  font-size: 0.85rem;
+  color: var(--muted-2);
+}
+.rr-conflict.is-mine .rr-conflict-mark { color: var(--danger); }
+.rr-conflict-name {
+  grid-area: name;
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rr-conflict-parties {
+  grid-area: parties;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.rr-conflict-note {
+  grid-area: note;
+  margin-top: 3px;
+  font-size: 0.66rem;
+  color: var(--muted-2);
+}
+
+/*
+ * On the narrowest phones the badges drop to their own row rather than
+ * disappearing. Who won the seat, and who burned money against whom, is the
+ * whole point of both rows — it is the last thing to cut, not the first.
+ */
+@media (max-width: 379px) {
+  .rr-win {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'tick name'
+      'badge badge'
+      'note note';
+  }
+  .rr-win .rr-badge { justify-self: start; margin-top: 4px; }
+
+  .rr-conflict {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'mark name'
+      'parties parties'
+      'note note';
+  }
+  .rr-conflict-parties { justify-content: flex-start; margin-top: 4px; }
+}

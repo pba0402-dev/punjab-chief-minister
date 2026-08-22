@@ -28,10 +28,10 @@ if (!Array.isArray(config.actions) || !config.actions.length) problems.push('no 
 
 const ids = new Set();
 
-/* Bribe moves live in their own list so the config reads as two separate
-   menus, but they are the same shape and go through the same validation. */
+/* There used to be a separate list of bribe moves. There is one corruption
+   action now and it lives with the others, so this is normally empty — but
+   it is still validated, because the shape is still supported. */
 const bribeActions = (config.bribe || {}).actions || [];
-if (!bribeActions.length) problems.push('bribe.actions missing');
 
 for (const a of [...(config.actions || []), ...bribeActions]) {
   if (ids.has(a.id)) problems.push('duplicate action id: ' + a.id);
@@ -145,7 +145,7 @@ if (loan.noBorrowingAfterRound + loan.repayAfterRounds > r.total) {
 
 /* The two ways of raising money mid-campaign resolve through the same code
    path as every other action, so they have to be shaped like one. */
-for (const key of ['grant', 'underground']) {
+for (const key of ['grant']) {
   const f = (config.funding || {})[key];
   if (!f) {
     problems.push('funding.' + key + ' missing');
@@ -222,14 +222,14 @@ CMP.ALLIANCES = CMP.CAMPAIGN.alliances;
 
 /**
  * Campaign strategies and the two ways of raising money, in one list. Grants
- * and undisclosed funding are shaped like any other action — a cost and a
- * weighted outcome table — so the engine resolves all three the same way and
- * the interface needs no special case for them.
+ * is shaped like any other action — a cost and a weighted outcome table — so
+ * the engine resolves them all the same way and the interface needs no
+ * special case for it.
  */
 CMP.ACTIONS = CMP.CAMPAIGN.actions
   .concat(CMP.CAMPAIGN.bribe.actions)
   .concat(
-    ['grant', 'underground'].map(function (id) {
+    ['grant'].map(function (id) {
       var entry = JSON.parse(JSON.stringify(CMP.CAMPAIGN.funding[id]));
       entry.group = 'funding';
       return entry;
@@ -266,9 +266,9 @@ const safe = config.actions.filter((a) => a.group === 'safe').length;
 const risky = config.actions.filter((a) => a.group === 'risky').length;
 console.log('starting budget: ₹' + config.startingBudget.toLocaleString('en-IN'));
 console.log('actions: ' + safe + ' safe, ' + risky + ' risky, ' +
-  bribeActions.length + ' bribe, 2 funding');
+  bribeActions.length + ' bribe, 1 funding');
 console.log('menus:   ' + MENUS.map((m) =>
-  m + ' ' + [...config.actions, ...bribeActions, config.funding.grant, config.funding.underground]
+  m + ' ' + [...config.actions, ...bribeActions, config.funding.grant]
     .filter((a) => a.menu === m).length).join(', '));
 console.log('rounds: ' + r.total + ' x ' + r.seconds + 's (' +
   r.durationOptions.map((d) => d / 60 + 'm').join('/') + ' offered)');

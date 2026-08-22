@@ -182,6 +182,12 @@ final class Lobby
             // Who led each seat when the last round was settled, so the next
             // one can report what changed hands rather than listing all 117.
             'leaders' => (object) [],
+
+            // Seats won outright, keyed by seat number. A won seat is
+            // finished: nobody campaigns there again, it counts toward
+            // permanent district control, and it survives every reconnection
+            // because it lives here rather than on any client.
+            'wonSeats' => (object) [],
             'leadParty' => null,
             'lastResult' => null,
             'stage' => 'lobby', // lobby | playing | results | final
@@ -233,6 +239,10 @@ final class Lobby
             // of money behind the running totals above.
             'grants' => [],
             'ledger' => [],
+
+            // What this campaign committed to each seat this round, for the
+            // conflict settle at round end. Cleared when the round opens.
+            'areaBids' => [],
             'incomeCredited' => [],
             'grantsCredited' => [],
             'incomeTotal' => 0,
@@ -653,6 +663,7 @@ final class Lobby
             'youAreHost' => $viewerId !== null && $viewerId === $game['hostId'],
             'players' => $slots,
             'parties' => self::partiesOf($game),
+            'wonSeats' => $game['wonSeats'] ?: (object) [],
             'startBlockedReason' => self::startBlockedReason($game),
             'result' => $game['result'] ?? null,
             'coalition' => $game['coalition'] ?? null,

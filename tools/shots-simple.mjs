@@ -36,15 +36,26 @@ function startGame() {
     "CMP.app.goTo('election');";
 }
 
-/** Open the game screen on one of its menu sections. */
+/**
+ * Open the game screen on one of its sections.
+ *
+ * My Areas and Alliances are the two buttons above the map; everything else is
+ * under More, because none of it is opened every round.
+ */
 function sectionScene(label) {
   return startGame() +
     "setTimeout(function(){" +
-    "  var t=document.querySelectorAll('.g-menu-item');" +
-    "  for(var i=0;i<t.length;i++){" +
-    "    var n=t[i].querySelector('.g-menu-label');" +
-    "    if(n&&n.textContent===" + JSON.stringify(label) + ")t[i].click();" +
-    "  }" +
+    "  var name=" + JSON.stringify(label) + ";" +
+    "  var s=[].slice.call(document.querySelectorAll('.g-strategy-item'))" +
+    "    .filter(function(b){var n=b.querySelector('.g-strategy-label');" +
+    "      return n&&n.textContent===name;})[0];" +
+    "  if(s){s.click();return;}" +
+    "  var more=document.querySelector('.g-more');if(more)more.click();" +
+    "  setTimeout(function(){" +
+    "    var it=[].slice.call(document.querySelectorAll('.sheet-item'))" +
+    "      .filter(function(b){return b.textContent.indexOf(name)===0;})[0];" +
+    "    if(it)it.click();" +
+    "  },60);" +
     "},80);";
 }
 
@@ -193,12 +204,20 @@ const SCENES = {
     "  },60);" +
     "},80);",
 
+  // The map, which is the home screen, with the campaign panel over it.
+  'map-panel':
+    startGame() +
+    "setTimeout(function(){" +
+    "  var cell=document.querySelector('.map-cell[data-seat=\"88\"]');" +
+    "  if(cell)cell.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "},120);",
+
   'sec-money': sectionScene('Money'),
   'sec-loan': sectionScene('Loan'),
   'sec-grants': sectionScene('Grants'),
   'sec-corruption': sectionScene('Corruption'),
   'sec-bribe': sectionScene('Bribe'),
-  'sec-seats': sectionScene('Constituencies'),
+  'sec-seats': sectionScene('All 117'),
   'candidate':
     playedGame(4) +
     "setTimeout(function(){" +

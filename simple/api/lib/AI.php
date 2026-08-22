@@ -157,7 +157,8 @@ final class AI
         array $board,
         Campaign $engine,
         string $seed,
-        int $round
+        int $round,
+        array $won = []
     ): array {
         $moves = [];
         if (!empty($player['record']['disqualified'])) {
@@ -200,7 +201,7 @@ final class AI
 
             $target = null;
             if (!empty($action['needsConstituency'])) {
-                $target = self::chooseSeat($board, $partyId, $profile, $rand, $engine, $player);
+                $target = self::chooseSeat($board, $partyId, $profile, $rand, $engine, $player, $won);
                 if ($target === null) {
                     break;
                 }
@@ -210,7 +211,7 @@ final class AI
             // come, plus whatever the region purse can add.
             $amount = self::chooseAmount($player, $action, $engine, $round, $target);
 
-            if ($engine->blockedReason($player, $board, $action['id'], $target, $amount) !== null) {
+            if ($engine->blockedReason($player, $board, $action['id'], $target, $amount, $won) !== null) {
                 break;
             }
 
@@ -387,13 +388,6 @@ final class AI
                     continue;
                 }
             }
-            // Undisclosed money is free and costs 24 heat, which is most of
-            // the way through the floor on its own. Same rule as a risky
-            // strategy: only if it lands under it.
-            if ($action['id'] === 'underground'
-                && ($runningHot || $heat + (float) ($action['heat'] ?? 0) >= $consequencesFrom)) {
-                continue;
-            }
             $affordable[$group][] = $action;
         }
 
@@ -408,10 +402,6 @@ final class AI
             $grant = self::findAction($funding, 'grant');
             if ($grant !== null) {
                 return $grant;
-            }
-            $shady = self::findAction($funding, 'underground');
-            if ($shady !== null && $rand() < (float) $profile['riskAppetite']) {
-                return $shady;
             }
             return null;
         }
@@ -513,7 +503,8 @@ final class AI
         array $profile,
         callable $rand,
         ?Campaign $engine = null,
-        array $player = []
+        array $player = [],
+        array $won = []
     ): ?string {
         if (!$board) {
             return null;
@@ -522,6 +513,11 @@ final class AI
         $closest = static function (array $keys) use ($board, $partyId): array {
             $margins = [];
             foreach ($keys as $key) {
+                // A seat that has been won is finished; nobody campaigns
+                // there again, so it is not a target.
+                if (isset($won[(string) $key])) {
+                    continue;
+                }
                 // An untouched seat is stored as {} so it survives JSON as an
                 // object rather than an empty list.
                 $seat = (array) ($board[(string) $key] ?? []);

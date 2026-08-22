@@ -122,15 +122,20 @@ final class Campaign
     }
 
     /**
-     * Every action a player can take, campaign strategies and the two ways of
-     * raising money alike. The bribe menu, grants and underground funding are
-     * all shaped like any other action — a cost, a weighted outcome table — so
-     * play() resolves them the same way and the UI needs no special case.
+     * Every action a player can take.
+     *
+     * There are three, and one of them is the game: money into a seat. The
+     * negative campaign and the corruption/bribe are the same investment spent
+     * differently. Applying for a grant is shaped like the rest — a cost and a
+     * weighted outcome table — so play() resolves them all the same way.
      */
     public function actions(): array
     {
         $all = array_merge($this->config['actions'], $this->config['bribe']['actions'] ?? []);
-        foreach (['grant', 'underground'] as $id) {
+        foreach (['grant'] as $id) {
+            if (!isset($this->config['funding'][$id])) {
+                continue;
+            }
             $entry = $this->config['funding'][$id];
             $entry['group'] = 'funding';
             $all[] = $entry;
@@ -487,7 +492,7 @@ final class Campaign
      * Pay the grants for every district this player wholly holds, once for
      * the round, into the purse for each district's own region.
      */
-    public function creditDistrictGrants(array $player, array $board, int $round): array
+    public function creditDistrictGrants(array $player, array $board, int $round, array $won = []): array
     {
         $credited = $player['grantsCredited'] ?? [];
         $key = (string) $round;
@@ -502,7 +507,9 @@ final class Campaign
             return $player;
         }
 
-        $held = $this->territory()->heldBy(Territory::leadersOf($board), $partyId);
+        // A grant is paid for a district controlled outright, so it cannot be
+        // lost the round after it starts paying.
+        $held = $this->territory()->heldBy(Territory::wonOf($won), $partyId);
         $player['districtsHeld'] = count($held);
 
         // A grant is for a district taken, not one inherited. The opening
@@ -571,7 +578,7 @@ final class Campaign
      *
      * @return array{cash:int,income:int,grants:int,owed:int,total:int,dueRound:int}
      */
-    public function repaymentCapacity(array $player, array $board, int $round): array
+    public function repaymentCapacity(array $player, array $board, int $round, array $won = []): array
     {
         $cfg = $this->finance()['loan'];
         $rounds = $this->rounds();
@@ -584,7 +591,7 @@ final class Campaign
         $perRound = 0;
         if ($partyId !== '') {
             $opening = $player['openingDistricts'] ?? [];
-            foreach ($this->territory()->heldBy(Territory::leadersOf($board), $partyId) as $d) {
+            foreach ($this->territory()->heldBy(Territory::wonOf($won), $partyId) as $d) {
                 if (!in_array($d['id'], $opening, true)) {
                     $perRound += (int) $d['grant'];
                 }
@@ -606,10 +613,10 @@ final class Campaign
     }
 
     /** The largest loan this campaign could service, to the increment. */
-    public function maxLoan(array $player, array $board, int $round): int
+    public function maxLoan(array $player, array $board, int $round, array $won = []): int
     {
         $cfg = $this->finance()['loan'];
-        $capacity = $this->repaymentCapacity($player, $board, $round)['total'];
+        $capacity = $this->repaymentCapacity($player, $board, $round, $won)['total'];
         $affordable = (int) floor($capacity / (1 + (float) $cfg['interestRate']));
         $capped = min(
             $affordable,
@@ -620,14 +627,14 @@ final class Campaign
         return max(0, (int) (floor($capped / $step) * $step));
     }
 
-    public function loanOffer(array $player, int $amount, int $round, array $board = []): array
+    public function loanOffer(array $player, int $amount, int $round, array $board = [], array $won = []): array
     {
         $cfg = $this->finance()['loan'];
         $step = (int) $cfg['increments'];
         $amount = (int) (round($amount / $step) * $step);
 
-        $capacity = $this->repaymentCapacity($player, $board, $round);
-        $most = $this->maxLoan($player, $board, $round);
+        $capacity = $this->repaymentCapacity($player, $board, $round, $won);
+        $most = $this->maxLoan($player, $board, $round, $won);
 
         $offer = [
             'capacity' => $capacity,
@@ -696,9 +703,9 @@ final class Campaign
     }
 
     /** Take a loan on the quoted terms. Returns [player, offer]. */
-    public function takeLoan(array $player, int $amount, int $round, array $board = []): array
+    public function takeLoan(array $player, int $amount, int $round, array $board = [], array $won = []): array
     {
-        $offer = $this->loanOffer($player, $amount, $round, $board);
+        $offer = $this->loanOffer($player, $amount, $round, $board, $won);
         if (!$offer['ok']) {
             return [$player, $offer];
         }
@@ -861,8 +868,22 @@ final class Campaign
     }
 
     /** Why this action cannot be played, or null if it can. */
-    public function blockedReason(array $player, array $board, string $actionId, $target, $amount = null): ?string
-    {
+    /**
+     * Why an action cannot be played, or null when it can.
+     *
+     * $won is the map of seats already decided. It is passed in rather than
+     * read off the player because it belongs to the game, not to anybody in
+     * it — and because the one place that must never be skipped is the
+     * server, whatever a client believes.
+     */
+    public function blockedReason(
+        array $player,
+        array $board,
+        string $actionId,
+        $target,
+        $amount = null,
+        array $won = []
+    ): ?string {
         $action = $this->action($actionId);
         if ($action === null) {
             return 'Unknown action.';
@@ -873,10 +894,6 @@ final class Campaign
         if ($this->actionsLeft($player) <= 0) {
             return 'No moves left this round';
         }
-        $spend = $this->resolveAmount($action, $amount);
-        if ($spend > $this->spendableOn($player, $target)['total']) {
-            return 'More than you can spend here';
-        }
         if (!empty($action['needsConstituency'])) {
             if ($target === null || $target === '') {
                 return 'Choose a constituency first';
@@ -884,8 +901,193 @@ final class Campaign
             if (!isset($board[(string) $target])) {
                 return 'Unknown constituency';
             }
+            // A seat that has been won is finished. Nobody campaigns there
+            // again, including whoever won it.
+            if (isset($won[(string) $target])) {
+                return 'SEAT_LOCKED';
+            }
+        }
+
+        $spend = $this->resolveAmount($action, $amount);
+
+        // Getting into a seat is capped, so nobody can buy their way in ahead
+        // of everybody else. Once there is a presence the cap is gone.
+        $cap = $this->entryCap($player, $board, $target, $action);
+        if ($cap > 0 && $spend > $cap) {
+            return 'A first campaign here is capped at ' . self::money($cap);
+        }
+
+        if ($spend > $this->spendableOn($player, $target)['total']) {
+            return 'More than you can spend here';
         }
         return null;
+    }
+
+    /** True once this campaign has any influence in a seat. */
+    public function isEstablishedIn(array $player, array $board, $target): bool
+    {
+        if ($target === null || $target === '') {
+            return true;
+        }
+        $seat = (array) ($board[(string) $target] ?? []);
+        return (float) ($seat[(string) ($player['partyId'] ?? '')] ?? 0) > 0;
+    }
+
+    /** The most a campaign may put behind its first move into a seat. */
+    public function entryCap(array $player, array $board, $target, ?array $action = null): int
+    {
+        if ($target === null || $target === '') {
+            return 0;
+        }
+        // Applying for a grant is development work, not buying into a seat.
+        if ($action !== null && ($action['group'] ?? '') === 'funding') {
+            return 0;
+        }
+        if ($this->isEstablishedIn($player, $board, $target)) {
+            return 0;
+        }
+        return (int) (($this->config['spending'] ?? [])['entryMaximum'] ?? 0);
+    }
+
+    /* ---------------------------------------------------- conflicts */
+
+    /**
+     * Campaign conflicts, settled once a round.
+     *
+     * Where two or more campaigns put exactly the same largest sum into the
+     * same seat, none of them gets what it paid for: the influence those
+     * particular investments bought is taken back out, and the money is gone.
+     * Nobody is refunded and nobody wins the exchange.
+     *
+     * It applies as much to five campaigns walking into an open seat for a
+     * crore each — all five bounce off and the seat stays open — as to two
+     * established rivals matching five crore late on.
+     *
+     * Only the decisive investment is void. Everything else those campaigns
+     * did in that seat stands, and they may try again next round.
+     *
+     * @return array{0:array,1:array} [board, conflicts]
+     */
+    public static function settleConflicts(array $players, array $board): array
+    {
+        // The largest single sum each campaign put into each seat.
+        $tops = [];
+        foreach ($players as $player) {
+            $party = (string) ($player['partyId'] ?? '');
+            if ($party === '') {
+                continue;
+            }
+            foreach (($player['areaBids'] ?? []) as $seat => $bids) {
+                $best = null;
+                foreach ($bids as $bid) {
+                    if ($best === null || (float) $bid['amount'] > (float) $best['amount']) {
+                        $best = $bid;
+                    }
+                }
+                if ($best !== null && (float) $best['amount'] > 0) {
+                    $tops[(string) $seat][$party] = $best;
+                }
+            }
+        }
+
+        $conflicts = [];
+        foreach ($tops as $seat => $byParty) {
+            if (count($byParty) < 2) {
+                continue;
+            }
+            $highest = 0.0;
+            foreach ($byParty as $bid) {
+                $highest = max($highest, (float) $bid['amount']);
+            }
+            $matched = array_filter(
+                $byParty,
+                static fn($bid) => (float) $bid['amount'] === $highest
+            );
+            if (count($matched) < 2) {
+                continue;
+            }
+
+            // Take back exactly what those investments bought. The money is
+            // not returned: it was spent.
+            $cell = (array) ($board[$seat] ?? []);
+            foreach ($matched as $party => $bid) {
+                if (!(float) $bid['gained']) {
+                    continue;
+                }
+                $cell[$party] = max(0.0, round((float) ($cell[$party] ?? 0) - (float) $bid['gained'], 1));
+                if (!$cell[$party]) {
+                    unset($cell[$party]);
+                }
+            }
+            $board[$seat] = $cell;
+
+            $conflicts[] = [
+                'seat' => (int) $seat,
+                'amount' => (int) $highest,
+                'parties' => array_values(array_keys($matched)),
+            ];
+        }
+
+        return [$board, $conflicts];
+    }
+
+    /* ------------------------------------------------ seats already won */
+
+    /**
+     * Declare the seats won outright at the end of a round.
+     *
+     * Leading a seat is where it stands today and can be taken back tomorrow.
+     * Winning it is final: nobody campaigns there again, and it is what makes
+     * a district permanently controlled.
+     *
+     * Two conditions, and both matter. A commanding share says nobody else is
+     * close; a floor under the total influence says the seat has actually been
+     * campaigned in rather than being one a party wandered into. Without the
+     * second, a single opening investment in an empty seat would lock it.
+     *
+     * @return array<int,array{seat:int,party:string,round:int}> newly declared
+     */
+    public function settleWins(array &$won, array $board, int $round): array
+    {
+        $cfg = ($this->config['election'] ?? [])['won'] ?? [];
+        $needShare = (float) ($cfg['share'] ?? 0);
+        $needInfluence = (float) ($cfg['influence'] ?? 0);
+        if ($needShare <= 0 || $needInfluence <= 0) {
+            return [];
+        }
+
+        $declared = [];
+        foreach ($board as $key => $cell) {
+            if (isset($won[(string) $key])) {
+                continue;
+            }
+            $seat = (array) $cell;
+
+            $total = 0.0;
+            foreach ($seat as $v) {
+                $total += max(0.0, (float) $v);
+            }
+            if ($total < $needInfluence) {
+                continue;
+            }
+
+            $shares = self::shares($seat);
+            if ($shares === []) {
+                continue;
+            }
+            $party = (string) array_key_first($shares);
+            if ((float) $shares[$party] < $needShare) {
+                continue;
+            }
+
+            $won[(string) $key] = [
+                'party' => $party,
+                'round' => $round,
+                'share' => (float) $shares[$party],
+            ];
+            $declared[] = ['seat' => (int) $key, 'party' => $party, 'round' => $round];
+        }
+        return $declared;
     }
 
     /**
@@ -1034,6 +1236,16 @@ final class Campaign
             'consequence' => $consequence,
             'round' => (int) ($player['round'] ?? 0),
         ];
+
+        // What this particular investment committed to this seat, and what it
+        // bought, so the settle can find a conflict and take back exactly
+        // that. See settleConflicts.
+        if ($key !== null) {
+            $bids = $player['areaBids'] ?? [];
+            $bids[$key] = $bids[$key] ?? [];
+            $bids[$key][] = ['amount' => $cost, 'gained' => round($applied['player'], 1)];
+            $player['areaBids'] = $bids;
+        }
 
         $player['actions'][] = $report;
         if (count($player['actions']) > 60) {

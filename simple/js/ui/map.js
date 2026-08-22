@@ -55,6 +55,7 @@ CMP.ui.map = (function () {
     var geo = CMP.GEOMETRY;
     var game = null;
     var mode = 'map'; // map | tiles
+    var region = 'all'; // all | malwa | majha | doaba
     var selected = null;
     var view = { x: 0, y: 0, k: 1 };
     var cellNodes = {};
@@ -96,7 +97,37 @@ CMP.ui.map = (function () {
       zoomButton('⤢', reset),
     ]);
 
+    /*
+     * Punjab, or one of its three parts.
+     *
+     * All 117 at once is the whole board and too much of it to campaign from
+     * on a phone; a region is about forty seats, which is a thing you can
+     * actually work. Choosing one frames it rather than hiding the rest.
+     */
+    var regionBar = el('div', { class: 'term-options map-regions' });
+
+    function paintRegions() {
+      var options = [{ id: 'all', name: 'All Punjab' }].concat(
+        (CMP.REGIONS || []).map(function (r) {
+          return { id: r.id, name: r.name };
+        })
+      );
+      mount(regionBar, options.map(function (o) {
+        return el('button', {
+          class: 'term-option' + (region === o.id ? ' is-selected' : ''),
+          type: 'button',
+          text: o.name,
+          dataset: { region: o.id },
+          onclick: function () {
+            focusRegion(o.id);
+            paintRegions();
+          },
+        });
+      }));
+    }
+
     var root = el('div', { class: 'map-block' }, [
+      regionBar,
       el('div', { class: 'map-toolbar' }, [modeToggle, zoomControls]),
       el('div', { class: 'map-frame' }, [svg]),
       readout,
@@ -217,13 +248,27 @@ CMP.ui.map = (function () {
         if (!support) return;
 
         var lead = CMP.ui.constituency.leaderOf(support);
+        var won = CMP.campaign.wonBy(game, c.number);
 
-        // A seat nobody has campaigned in is drawn as unclaimed ground rather
-        // than as somebody's — which, before round one, is all 117 of them.
+        /*
+         * Three states, and they look like three states.
+         *
+         * A seat that is won is the winner's colour at full strength with a
+         * tick on it, because it is finished. A seat that is led is that
+         * colour faded by how close the race is. A seat nobody has been to is
+         * unclaimed ground — which, before round one, is all 117.
+         */
+        node.classList.toggle('is-won', !!won);
+        node.classList.toggle('is-selected', selected === c.number);
+
+        if (won) {
+          node.setAttribute('fill', CMP.getParty(won.party).colour);
+          node.setAttribute('fill-opacity', '1');
+          return;
+        }
         if (!lead) {
           node.setAttribute('fill', 'var(--line)');
           node.setAttribute('fill-opacity', '0.35');
-          node.classList.toggle('is-selected', selected === c.number);
           return;
         }
 
@@ -232,7 +277,6 @@ CMP.ui.map = (function () {
 
         node.setAttribute('fill', party.colour);
         node.setAttribute('fill-opacity', BAND_OPACITY[band.id]);
-        node.classList.toggle('is-selected', selected === c.number);
       });
 
       mount(highlightLayer, []);
@@ -268,6 +312,12 @@ CMP.ui.map = (function () {
             el('span', { class: 'legend-count', text: n }),
           ]);
         }).concat([
+          // What the three appearances mean, said once and small.
+          el('span', { class: 'legend-key' }, [
+            el('span', { class: 'legend-key-item', text: '○ open' }),
+            el('span', { class: 'legend-key-item', text: '● leading' }),
+            el('span', { class: 'legend-key-item', text: '✓ won' }),
+          ]),
           el('span', { class: 'legend-majority', text: 'majority ' + CMP.MAJORITY }),
         ])
       );
@@ -355,6 +405,58 @@ CMP.ui.map = (function () {
 
     function reset() {
       view = { x: 0, y: 0, k: 1 };
+      region = 'all';
+      applyView();
+      paint();
+    }
+
+    /**
+     * Put a region in the middle of the frame.
+     *
+     * Worked out from where its seats actually are rather than from a stored
+     * rectangle, so it stays right if the geometry is ever rebuilt.
+     */
+    function focusRegion(id) {
+      region = id;
+      if (id === 'all') {
+        view = { x: 0, y: 0, k: 1 };
+        applyView();
+        paint();
+        return;
+      }
+
+      var xs = [];
+      var ys = [];
+      CMP.CONSTITUENCIES.forEach(function (c) {
+        if (CMP.regionOfSeat(c.number) !== id) return;
+        var shape = shapeOf(c.number);
+        (shape || []).forEach(function (pt) {
+          xs.push(pt[0]);
+          ys.push(pt[1]);
+        });
+      });
+      if (!xs.length) {
+        paint();
+        return;
+      }
+
+      var minX = Math.min.apply(null, xs);
+      var maxX = Math.max.apply(null, xs);
+      var minY = Math.min.apply(null, ys);
+      var maxY = Math.max.apply(null, ys);
+      var pad = 0.08;
+      var w = Math.max(1, (maxX - minX) * (1 + pad * 2));
+      var h = Math.max(1, (maxY - minY) * (1 + pad * 2));
+
+      var k = Math.max(1, Math.min(6,
+        Math.min(geo.viewBox.width / w, geo.viewBox.height / h)));
+      var cx = (minX + maxX) / 2;
+      var cy = (minY + maxY) / 2;
+
+      view.k = k;
+      view.x = geo.viewBox.width / 2 - cx * k;
+      view.y = geo.viewBox.height / 2 - cy * k;
+      clampView();
       applyView();
       paint();
     }
@@ -380,9 +482,59 @@ CMP.ui.map = (function () {
       { passive: false }
     );
 
+    /*
+     * Moving around it with your fingers.
+     *
+     * One finger drags, two pinch, a double tap zooms in. The map is the game
+     * now, so getting about it has to feel like handling a map rather than
+     * like operating a control panel — which is what a pair of small +/−
+     * buttons is.
+     *
+     * Pointer events do all three, so there is one code path for a mouse, a
+     * trackpad and a thumb.
+     */
     var drag = null;
+    var pointers = {};
+    var pinch = null;
+    var lastTap = 0;
+
+    function pointerList() {
+      return Object.keys(pointers).map(function (id) {
+        return pointers[id];
+      });
+    }
+
+    function pinchSpan(a, b) {
+      return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+    }
+
     svg.addEventListener('pointerdown', function (e) {
       var p = toLocal(e.clientX, e.clientY);
+      pointers[e.pointerId] = p;
+
+      var list = pointerList();
+      if (list.length === 2) {
+        // A second finger cancels the drag and starts a pinch.
+        drag = null;
+        pinch = {
+          span: pinchSpan(list[0], list[1]),
+          cx: (list[0].x + list[1].x) / 2,
+          cy: (list[0].y + list[1].y) / 2,
+        };
+        svg.classList.remove('is-dragging');
+        return;
+      }
+      if (list.length > 2) return;
+
+      // A double tap in roughly the same place zooms in on it.
+      var now = Date.now();
+      if (now - lastTap < 320) {
+        lastTap = 0;
+        zoomAt(p.x, p.y, 1.9);
+        return;
+      }
+      lastTap = now;
+
       drag = { px: p.x, py: p.y, vx: view.x, vy: view.y, moved: 0 };
       try {
         svg.setPointerCapture(e.pointerId);
@@ -391,16 +543,34 @@ CMP.ui.map = (function () {
       }
       svg.classList.add('is-dragging');
     });
+
     svg.addEventListener('pointermove', function (e) {
-      if (!drag) return;
       var p = toLocal(e.clientX, e.clientY);
+      if (pointers[e.pointerId]) pointers[e.pointerId] = p;
+
+      var list = pointerList();
+      if (pinch && list.length === 2) {
+        var span = pinchSpan(list[0], list[1]);
+        if (pinch.span > 0 && span > 0) {
+          zoomAt(pinch.cx, pinch.cy, span / pinch.span);
+          pinch.span = span;
+          pinch.cx = (list[0].x + list[1].x) / 2;
+          pinch.cy = (list[0].y + list[1].y) / 2;
+        }
+        return;
+      }
+
+      if (!drag) return;
       view.x = drag.vx + (p.x - drag.px);
       view.y = drag.vy + (p.y - drag.py);
       drag.moved = Math.abs(p.x - drag.px) + Math.abs(p.y - drag.py);
       clampView();
       applyView();
     });
-    function endDrag() {
+
+    function endDrag(e) {
+      if (e && e.pointerId !== undefined) delete pointers[e.pointerId];
+      if (pointerList().length < 2) pinch = null;
       drag = null;
       svg.classList.remove('is-dragging');
     }
@@ -409,6 +579,7 @@ CMP.ui.map = (function () {
     svg.addEventListener('pointerleave', endDrag);
 
     build();
+    paintRegions();
     applyView();
 
     return {
@@ -419,8 +590,15 @@ CMP.ui.map = (function () {
         paint();
       },
       select: select,
+      focusRegion: function (id) {
+        focusRegion(id);
+        paintRegions();
+      },
       getMode: function () {
         return mode;
+      },
+      getRegion: function () {
+        return region;
       },
     };
   }

@@ -24,6 +24,7 @@ CMP.ui.scoreboard = (function () {
   var el = CMP.ui.dom.el;
   var svg = CMP.ui.dom.svg;
   var mount = CMP.ui.dom.mount;
+  var money = CMP.ui.money;
 
   function partyOf(id) {
     return CMP.getParty(id) || { id: id, short: String(id || '?').toUpperCase(), name: id, colour: '#8b93a7' };
@@ -92,9 +93,20 @@ CMP.ui.scoreboard = (function () {
               : null,
           ]),
 
+          /*
+           * Won and leading, apart.
+           *
+           * A won seat is finished and cannot be taken; a led seat is where
+           * that constituency stands today. Adding them into one number would
+           * tell a player they own forty-two seats when twelve of them could
+           * be gone by Thursday.
+           */
           el('span', { class: 'board-seats' }, [
-            el('strong', { text: String(row.seats) }),
-            el('span', { class: 'board-seats-label', text: 'seats' }),
+            el('strong', { text: String(row.won || 0) }),
+            el('span', { class: 'board-seats-label', text: 'won' }),
+            (row.leading || 0) > 0
+              ? el('span', { class: 'board-leading-count', text: '+' + row.leading + ' leading' })
+              : null,
           ]),
 
           el('span', {
@@ -443,8 +455,58 @@ CMP.ui.scoreboard = (function () {
      * first buries the story under a scoreboard that has barely moved — four
      * numbers a round or two different is not what anybody is waiting to see.
      */
-    var stage = 'changes';
+    var stage = 'changes';  // then 'leading', then home
     var showAllChanges = false;
+
+    /*
+     * The results run themselves.
+     *
+     * What changed, then who is leading, then back to the board. A player who
+     * has just spent two minutes deciding things should be told what came of
+     * it without having to ask twice, and the sequence moves on by itself so
+     * nobody is left looking at a screen wondering whether it is finished.
+     *
+     * Every automatic step can be skipped, and any tap cancels the timer: the
+     * moment somebody is reading rather than watching, the clock stops.
+     */
+    var advance = null;
+
+    function stopAdvance() {
+      if (advance !== null) window.clearTimeout(advance);
+      advance = null;
+    }
+
+    function go(next) {
+      stopAdvance();
+      stage = next;
+      render();
+      if (next === 'changes') queue('leading', changesDwell());
+      else if (next === 'leading') queue('done', LEADER_DWELL);
+    }
+
+    function queue(next, ms) {
+      stopAdvance();
+      advance = window.setTimeout(function () {
+        advance = null;
+        if (next === 'done') {
+          if (opts.onFinished) opts.onFinished();
+          return;
+        }
+        go(next);
+      }, ms);
+    }
+
+    /** About a second and a half a change, and never more than eight. */
+    function changesDwell() {
+      // Long enough to read what is on the screen, and no longer. Wins and
+      // conflicts are on this screen too, so they buy time the same way.
+      var rows = Math.min(5, ((result && result.changes) || []).length) +
+        Math.min(6, ((result && result.won) || []).length) +
+        Math.min(6, ((result && result.conflicts) || []).length);
+      return Math.min(9000, 2200 + rows * 1000);
+    }
+
+    var LEADER_DWELL = 5000;
 
     var root = el('section', { class: 'round-results' });
 
@@ -475,6 +537,89 @@ CMP.ui.scoreboard = (function () {
      * round one settles all 117 that way, so it says so rather than listing
      * a hundred flips from nobody.
      */
+    /*
+     * Seats taken for good, and money two campaigns burned on each other.
+     *
+     * Both belong on this screen rather than under it. A permanent win is the
+     * only thing in the game that cannot be undone, and a conflict is the only
+     * time a player spends and gets nothing — finding either of them out by
+     * noticing a tick on the map next round is finding it out too late.
+     */
+    function wonBlock() {
+      var won = result.won || [];
+      if (!won.length) return null;
+      var mine = opts.you && opts.you();
+
+      return el('div', { class: 'rr-block is-won' }, [
+        el('h3', {
+          class: 'results-title',
+          text: won.length === 1 ? 'Seat won' : won.length + ' seats won',
+        }),
+        el('ul', { class: 'rr-wins' }, won.slice(0, 6).map(function (w, i) {
+          var party = partyOf(w.party);
+          return el('li', {
+            class: 'rr-win' + (mine && w.party === mine ? ' is-mine' : ''),
+            style: { '--to': party.colour, animationDelay: i * 70 + 'ms' },
+          }, [
+            el('span', { class: 'rr-win-tick', 'aria-hidden': 'true', text: '✓' }),
+            el('strong', { class: 'rr-win-name', text: seatName(w.seat) }),
+            el('span', { class: 'rr-badge is-to', text: party.short }),
+            el('span', {
+              class: 'rr-win-note',
+              text: mine && w.party === mine
+                ? 'Yours for the rest of the election.'
+                : 'Locked. Nobody can campaign here again.',
+            }),
+          ]);
+        })),
+        won.length > 6
+          ? el('p', {
+              class: 'rr-block-more',
+              text: 'and ' + (won.length - 6) + ' more.',
+            })
+          : null,
+      ]);
+    }
+
+    function conflictBlock() {
+      var conflicts = result.conflicts || [];
+      if (!conflicts.length) return null;
+      var mine = opts.you && opts.you();
+
+      return el('div', { class: 'rr-block is-conflict' }, [
+        el('h3', { class: 'results-title', text: 'Campaign conflict' }),
+        el('ul', { class: 'rr-conflicts' }, conflicts.slice(0, 6).map(function (c, i) {
+          var involved = (c.parties || []).map(partyOf);
+          var yours = mine && (c.parties || []).indexOf(mine) !== -1;
+          return el('li', {
+            class: 'rr-conflict' + (yours ? ' is-mine' : ''),
+            style: { animationDelay: i * 70 + 'ms' },
+          }, [
+            el('span', { class: 'rr-conflict-mark', 'aria-hidden': 'true', text: '⚔' }),
+            el('strong', { class: 'rr-conflict-name', text: seatName(c.seat) }),
+            el('span', { class: 'rr-conflict-parties' }, involved.map(function (p) {
+              return el('span', {
+                class: 'rr-badge is-to',
+                style: { '--to': p.colour },
+                text: p.short,
+              });
+            })),
+            el('span', {
+              class: 'rr-conflict-note',
+              text: involved.length + ' campaigns matched at ' + money.words(c.amount) +
+                '. Nobody gained, nobody was refunded.',
+            }),
+          ]);
+        })),
+        conflicts.length > 6
+          ? el('p', {
+              class: 'rr-block-more',
+              text: 'and ' + (conflicts.length - 6) + ' more.',
+            })
+          : null,
+      ]);
+    }
+
     function changesScreen(secondsLeft) {
       /*
        * Your own seats first.
@@ -493,9 +638,13 @@ CMP.ui.scoreboard = (function () {
       var hidden = changes.length - shown.length;
 
       if (!changes.length) {
+        var quietWon = wonBlock();
+        var quietConflict = conflictBlock();
         return [
           head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
-          el('div', { class: 'rr-quiet' }, [
+          quietWon,
+          quietConflict,
+          quietWon || quietConflict ? null : el('div', { class: 'rr-quiet' }, [
             el('strong', { class: 'rr-quiet-title', text: 'No major seat changes' }),
             el('span', {
               class: 'rr-quiet-note',
@@ -507,8 +656,7 @@ CMP.ui.scoreboard = (function () {
             type: 'button',
             text: 'See who’s leading',
             onclick: function () {
-              stage = 'leading';
-              render();
+              go('leading');
             },
           }),
         ];
@@ -516,6 +664,8 @@ CMP.ui.scoreboard = (function () {
 
       return [
         head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
+        wonBlock(),
+        conflictBlock(),
         el('h3', { class: 'results-title', text: 'Seats changed' }),
 
         el('ul', { class: 'rr-changes' }, shown.map(function (change, i) {
@@ -558,6 +708,7 @@ CMP.ui.scoreboard = (function () {
               type: 'button',
               text: '+ ' + hidden + ' more change' + (hidden === 1 ? '' : 's') + ' · view all',
               onclick: function () {
+                stopAdvance();
                 showAllChanges = true;
                 render();
               },
@@ -569,8 +720,7 @@ CMP.ui.scoreboard = (function () {
           type: 'button',
           text: 'Continue',
           onclick: function () {
-            stage = 'leading';
-            render();
+            go('leading');
           },
         }),
       ];
@@ -588,6 +738,16 @@ CMP.ui.scoreboard = (function () {
         ]),
         position(result),
 
+        el('button', {
+          class: 'btn btn-quiet btn-wide',
+          type: 'button',
+          text: 'Skip',
+          onclick: function () {
+            stopAdvance();
+            if (opts.onFinished) opts.onFinished();
+          },
+        }),
+
         milestoneKind()
           ? el('button', {
               class: 'btn btn-primary btn-wide',
@@ -596,6 +756,7 @@ CMP.ui.scoreboard = (function () {
                 ? 'The round 15 review'
                 : 'Halfway: where this stands',
               onclick: function () {
+                stopAdvance();
                 stage = 'milestone';
                 render();
               },
@@ -607,6 +768,7 @@ CMP.ui.scoreboard = (function () {
           type: 'button',
           text: 'Back to what changed',
           onclick: function () {
+            stopAdvance();
             stage = 'changes';
             render();
           },
@@ -682,6 +844,7 @@ CMP.ui.scoreboard = (function () {
           type: 'button',
           text: 'Back to the standings',
           onclick: function () {
+            stopAdvance();
             stage = 'leading';
             render();
           },
@@ -736,6 +899,7 @@ CMP.ui.scoreboard = (function () {
           type: 'button',
           text: 'Back to the standings',
           onclick: function () {
+            stopAdvance();
             stage = 'leading';
             render();
           },
@@ -747,12 +911,14 @@ CMP.ui.scoreboard = (function () {
 
     function render(next, secondsLeft) {
       if (next) {
-        // A new round's results start on the first screen again.
-        if (!result || next.round !== result.round) {
-          stage = 'changes';
-          showAllChanges = false;
-        }
+        // A new round's results start the sequence again from the top.
+        var fresh = !result || next.round !== result.round;
         result = next;
+        if (fresh) {
+          showAllChanges = false;
+          go('changes');
+          return;
+        }
       }
       if (!result) return;
 
@@ -766,7 +932,7 @@ CMP.ui.scoreboard = (function () {
           : leadingScreen(secondsLeft));
     }
 
-    return { root: root, render: render };
+    return { root: root, render: render, stop: stopAdvance };
   }
 
   return {

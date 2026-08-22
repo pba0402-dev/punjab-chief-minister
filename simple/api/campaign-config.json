@@ -72,356 +72,144 @@
   ],
   "actions": [
     {
-      "id": "rally",
+      "id": "invest",
       "group": "safe",
-      "label": "Public Rally",
-      "icon": "📣",
-      "blurb": "A stage, a crowd and a speech in one constituency.",
+      "label": "Campaign",
+      "icon": "◆",
+      "blurb": "Money into an area. What it buys is decided by how much.",
       "cost": 10000000,
       "heat": 0,
       "riskLabel": "Low risk",
-      "impactLabel": "Moderate gain",
+      "impactLabel": "Builds influence",
       "needsConstituency": true,
       "outcomes": [
         {
           "id": "strong",
           "weight": 25,
-          "label": "A big turnout",
+          "label": "The money landed well",
           "support": 4.5,
           "heat": 0,
-          "text": "The ground was packed and the speech carried. Support is up sharply."
+          "text": "Workers out, halls full, the message carrying. Influence is up sharply."
         },
         {
           "id": "normal",
           "weight": 60,
-          "label": "A solid rally",
+          "label": "A solid campaign",
           "support": 3,
           "heat": 0,
-          "text": "A good crowd and a clean message. Steady gain."
+          "text": "Steady work, well spent. Influence is up."
         },
         {
           "id": "weak",
           "weight": 15,
-          "label": "A thin crowd",
+          "label": "It went quietly",
           "support": 1.2,
           "heat": 0,
-          "text": "Turnout was modest. Some gain, not much."
+          "text": "The money went out and not much came back. A little influence gained."
         }
       ],
       "menu": "campaign",
-      "allowsAmount": true
-    },
-    {
-      "id": "media",
-      "group": "safe",
-      "label": "Media Campaign",
-      "icon": "📺",
-      "blurb": "Cable spots, print and hoardings across the constituency.",
-      "cost": 16500000,
-      "heat": 1,
-      "riskLabel": "Low risk",
-      "impactLabel": "Good gain",
-      "needsConstituency": true,
-      "outcomes": [
-        {
-          "id": "strong",
-          "weight": 30,
-          "label": "The message cuts through",
-          "support": 2.72,
-          "heat": 1,
-          "text": "Your line is being repeated back to you on the street."
-        },
-        {
-          "id": "normal",
-          "weight": 55,
-          "label": "Steady coverage",
-          "support": 1.82,
-          "heat": 1,
-          "text": "Solid visibility for the money."
-        },
-        {
-          "id": "weak",
-          "weight": 15,
-          "label": "Lost in the noise",
-          "support": 0.69,
-          "heat": 2,
-          "text": "Everyone else was advertising too. Limited effect."
-        }
-      ],
-      "reach": {
-        "seats": 4,
-        "share": 0.55
-      },
-      "menu": "campaign",
-      "allowsAmount": true
-    },
-    {
-      "id": "community",
-      "group": "safe",
-      "label": "Community Development",
-      "icon": "🏗️",
-      "blurb": "Fund something visible and useful that people will remember.",
-      "cost": 13500000,
-      "heat": 0,
-      "riskLabel": "Very low risk",
-      "impactLabel": "Moderate, durable gain",
-      "needsConstituency": true,
-      "outcomes": [
-        {
-          "id": "strong",
-          "weight": 30,
-          "label": "Genuinely appreciated",
-          "support": 2.9,
-          "heat": 0,
-          "text": "The work is visible and people credit you for it."
-        },
-        {
-          "id": "normal",
-          "weight": 65,
-          "label": "Well received",
-          "support": 2.02,
-          "heat": 0,
-          "text": "Quiet, solid goodwill."
-        },
-        {
-          "id": "weak",
-          "weight": 5,
-          "label": "Slow to land",
-          "support": 0.88,
-          "heat": 0,
-          "text": "It will be noticed eventually, but not before polling day."
-        }
-      ],
-      "reach": {
-        "seats": 3,
-        "share": 0.5
-      },
-      "menu": "campaign",
-      "allowsAmount": true
-    },
-    {
-      "id": "outreach",
-      "group": "safe",
-      "label": "Village Outreach",
-      "icon": "🚪",
-      "blurb": "Workers walking door to door through the villages.",
-      "cost": 6500000,
-      "heat": 0,
-      "riskLabel": "Low risk",
-      "impactLabel": "Small, cheap gain",
-      "needsConstituency": true,
-      "outcomes": [
-        {
-          "id": "strong",
-          "weight": 25,
-          "label": "Warm reception",
-          "support": 4.5,
-          "heat": 0,
-          "text": "Doors opened and workers were listened to."
-        },
-        {
-          "id": "normal",
-          "weight": 60,
-          "label": "Ground covered",
-          "support": 3.1,
-          "heat": 0,
-          "text": "Slow, steady, dependable."
-        },
-        {
-          "id": "weak",
-          "weight": 15,
-          "label": "Hard going",
-          "support": 1.26,
-          "heat": 1,
-          "text": "A cold reception in places. Modest gain."
-        }
-      ],
-      "menu": "campaign",
-      "allowsAmount": true
-    },
-    {
-      "id": "deal",
-      "group": "risky",
-      "label": "Undisclosed Deal",
-      "icon": "🤝",
-      "blurb": "An arrangement with local powerbrokers, made quietly.",
-      "cost": 40000000,
-      "heat": 18,
-      "riskLabel": "High risk",
-      "impactLabel": "Big swing, or trouble",
-      "needsConstituency": true,
-      "outcomes": [
-        {
-          "id": "large",
-          "weight": 35,
-          "label": "The deal holds",
-          "support": 8.03,
-          "heat": 18,
-          "text": "Whole blocks of votes move your way. Nobody says how."
-        },
-        {
-          "id": "small",
-          "weight": 30,
-          "label": "Partly delivered",
-          "support": 3.35,
-          "heat": 18,
-          "text": "Less than promised, but something moved."
-        },
-        {
-          "id": "none",
-          "weight": 20,
-          "label": "Nothing came of it",
-          "support": 0,
-          "heat": 18,
-          "text": "The money went out and nothing came back."
-        },
-        {
-          "id": "backfire",
-          "weight": 15,
-          "label": "It got out",
-          "support": -5.35,
-          "heat": 30,
-          "text": "Word spread about the arrangement. This will follow you."
-        }
-      ],
-      "reach": {
-        "seats": 5,
-        "share": 0.55
-      },
-      "menu": "corruption",
-      "allowsAmount": true
-    },
-    {
-      "id": "influence",
-      "group": "risky",
-      "label": "Political Influence",
-      "icon": "🌀",
-      "blurb": "Quiet pressure applied through intermediaries.",
-      "cost": 26500000,
-      "heat": 12,
-      "riskLabel": "Medium risk",
-      "impactLabel": "Gain, or heat",
-      "needsConstituency": true,
-      "outcomes": [
-        {
-          "id": "gain",
-          "weight": 40,
-          "label": "Levers moved",
-          "support": 5.29,
-          "heat": 12,
-          "text": "The right people became helpful."
-        },
-        {
-          "id": "none",
-          "weight": 35,
-          "label": "No traction",
-          "support": 0,
-          "heat": 12,
-          "text": "Nothing shifted. The money is gone."
-        },
-        {
-          "id": "heat",
-          "weight": 25,
-          "label": "Questions are being asked",
-          "support": 0,
-          "heat": 26,
-          "text": "Someone noticed the pressure and started asking who applied it."
-        }
-      ],
-      "reach": {
-        "seats": 4,
-        "share": 0.55
-      },
-      "menu": "corruption",
       "allowsAmount": true
     },
     {
       "id": "negative",
       "group": "risky",
-      "label": "Negative Campaign",
-      "icon": "🗣️",
-      "blurb": "Turn the constituency against whoever is ahead of you.",
-      "cost": 20000000,
+      "label": "Negative campaign",
+      "icon": "▼",
+      "blurb": "Money spent against a rival rather than for yourself.",
+      "cost": 10000000,
       "heat": 10,
       "riskLabel": "Medium risk",
-      "impactLabel": "Hurts your rival — usually",
+      "impactLabel": "Cuts a rival",
       "needsConstituency": true,
       "outcomes": [
         {
-          "id": "works",
-          "weight": 45,
-          "label": "It lands",
+          "id": "bites",
+          "weight": 40,
+          "label": "It bit",
           "support": 0,
-          "opponentSupport": -8,
-          "heat": 10,
-          "text": "Your rival spends the week defending themselves instead of campaigning."
+          "opponentSupport": -7,
+          "heat": 8,
+          "text": "The line stuck. Your rival is losing ground here."
         },
         {
-          "id": "none",
-          "weight": 30,
-          "label": "Shrugged off",
+          "id": "lands",
+          "weight": 40,
+          "label": "It landed",
           "support": 0,
+          "opponentSupport": -3,
           "heat": 10,
-          "text": "Voters have heard it all before."
+          "text": "Some of it stuck. Your rival is a little weaker here."
         },
         {
-          "id": "backlash",
-          "weight": 25,
-          "label": "It rebounds",
-          "support": -6,
-          "heat": 20,
-          "text": "People thought it was beneath you, and said so."
+          "id": "backfires",
+          "weight": 20,
+          "label": "It backfired",
+          "support": -2,
+          "opponentSupport": 0,
+          "heat": 18,
+          "text": "It read as desperate. The attack came back on you."
         }
       ],
-      "reach": {
-        "seats": 3,
-        "share": 0.5
-      },
       "menu": "campaign",
       "allowsAmount": true
     },
     {
-      "id": "lastpush",
+      "id": "bribe",
       "group": "risky",
-      "label": "Last-Minute Push",
-      "icon": "⚡",
-      "blurb": "Throw everything at one seat in the final stretch.",
-      "cost": 46500000,
-      "heat": 15,
+      "label": "Corruption / bribe",
+      "icon": "▲",
+      "blurb": "Money that does not go through the books. It can pay for itself.",
+      "cost": 10000000,
+      "heat": 20,
       "riskLabel": "High risk",
-      "impactLabel": "Can flip a marginal",
+      "impactLabel": "High, or a scandal",
       "needsConstituency": true,
       "outcomes": [
         {
-          "id": "large",
+          "id": "success",
           "weight": 30,
-          "label": "The seat swings",
-          "support": 12.16,
-          "heat": 15,
-          "text": "A late surge. This could be the seat that decides it."
+          "label": "It worked",
+          "support": 9,
+          "heat": 16,
+          "text": "Quiet arrangements, and the ground moved. Nobody is asking questions yet."
         },
         {
-          "id": "moderate",
-          "weight": 40,
-          "label": "Some movement",
-          "support": 4.87,
-          "heat": 15,
-          "text": "It moved, but not as far as you needed."
+          "id": "paidoff",
+          "weight": 15,
+          "label": "It paid for itself",
+          "support": 5,
+          "funds": 25000000,
+          "heat": 22,
+          "text": "The ground moved and money came back with it. That money has a history."
         },
         {
-          "id": "backlash",
-          "weight": 30,
-          "label": "Too much, too late",
-          "support": -8.1,
-          "heat": 25,
-          "text": "The blitz looked desperate, and voters read it that way."
+          "id": "nothing",
+          "weight": 25,
+          "label": "No effect",
+          "support": 0,
+          "heat": 14,
+          "text": "The money went somewhere and nothing came of it."
+        },
+        {
+          "id": "scandal",
+          "weight": 20,
+          "label": "A scandal",
+          "support": -4,
+          "heat": 34,
+          "text": "It got out. The story is running and it is running against you."
+        },
+        {
+          "id": "fine",
+          "weight": 10,
+          "label": "A fine",
+          "support": -2,
+          "fine": 15000000,
+          "heat": 30,
+          "text": "The commission noticed. There is a penalty to pay."
         }
       ],
-      "reach": {
-        "seats": 6,
-        "share": 0.6
-      },
-      "menu": "campaign",
+      "menu": "bribe",
       "allowsAmount": true
     }
   ],
@@ -561,7 +349,29 @@
     "seatNoise": 3.2,
     "undecidedWeight": 14,
     "majority": 59,
-    "totalSeats": 117
+    "totalSeats": 117,
+    "won": {
+      "_comment": [
+        "When a seat stops being led and starts being won.",
+        "",
+        "Leading is where a seat stands today and can be taken back tomorrow.",
+        "Winning it is final: nobody can campaign there again, including the",
+        "winner, and it counts toward a district being permanently controlled.",
+        "",
+        "Two conditions, and both matter. share says nobody else is close;",
+        "influence says the seat has actually been campaigned in rather than being",
+        "one a party wandered into while the others were elsewhere. Without the",
+        "second, one opening investment in an empty seat would lock it forever.",
+        "",
+        "At 25 influence a seat costs about ten crore to lock if nobody contests",
+        "it — two rounds of allowance spent in one place. That is deliberate: it",
+        "leaves a rival a round to notice and come in, which is what makes the",
+        "conflict rule matter, and it keeps the permanent layer to roughly ten",
+        "seats a campaign rather than the whole board."
+      ],
+      "share": 70,
+      "influence": 25
+    }
   },
   "coalition": {
     "_comment": [
@@ -797,17 +607,17 @@
   "finance": {
     "_comment": [
       "Cash and debt are tracked separately and cash may never go negative.",
-    "",
-    "Loans are the interesting decision: money now against a bill four rounds",
-    "later, at a rate that hurts. Borrowing after round 16 is refused because",
-    "the bill would land after the campaign has closed, which would make late",
-    "borrowing free.",
-    "",
-    "The bank lends against capacity rather than appetite, and a payment that",
-    "cannot be met carries forward with a penalty rather than clearing. The",
-    "default block below is what remains of the old rule and now applies only",
-    "where a campaign is beyond recovery."
-  ],
+      "",
+      "Loans are the interesting decision: money now against a bill four rounds",
+      "later, at a rate that hurts. Borrowing after round 16 is refused because",
+      "the bill would land after the campaign has closed, which would make late",
+      "borrowing free.",
+      "",
+      "The bank lends against capacity rather than appetite, and a payment that",
+      "cannot be met carries forward with a penalty rather than clearing. The",
+      "default block below is what remains of the old rule and now applies only",
+      "where a campaign is beyond recovery."
+    ],
     "loan": {
       "interestRate": 0.2,
       "repayAfterRounds": 4,
@@ -903,55 +713,6 @@
       ],
       "menu": "grants",
       "allowsAmount": true
-    },
-    "underground": {
-      "id": "underground",
-      "label": "Secret Funding",
-      "icon": "💼",
-      "cost": 0,
-      "heat": 24,
-      "riskLabel": "Very high risk",
-      "impactLabel": "₹20-80 lakh, and a great deal of heat",
-      "blurb": "Accept an undisclosed funding offer, no questions asked.",
-      "needsConstituency": false,
-      "outcomes": [
-        {
-          "id": "big",
-          "weight": 28,
-          "label": "A large sum arrives",
-          "funds": 53500000,
-          "heat": 24,
-          "text": "The money is in the account. Nobody will say where it came from."
-        },
-        {
-          "id": "medium",
-          "weight": 32,
-          "label": "Less than promised",
-          "funds": 26500000,
-          "heat": 24,
-          "text": "Well short of what was discussed, but it is money."
-        },
-        {
-          "id": "small",
-          "weight": 22,
-          "label": "A token payment",
-          "funds": 13500000,
-          "heat": 26,
-          "text": "Barely worth the exposure."
-        },
-        {
-          "id": "nothing",
-          "weight": 18,
-          "label": "The money never arrives",
-          "funds": 0,
-          "heat": 32,
-          "support": -2,
-          "seats": 3,
-          "text": "Nothing came. The conversation, however, was noticed."
-        }
-      ],
-      "menu": "corruption",
-      "allowsAmount": false
     }
   },
   "events": {
@@ -1244,10 +1005,9 @@
   "_menuComment": [
     "Which menu each action appears under.",
     "",
-    "The four safe strategies and the last-minute push are ordinary",
-    "campaigning. The rest are the high-risk ones, and they sit together under",
-    "their own heading so a player can see at a glance that everything on that",
-    "screen carries a real chance of going wrong.",
+    "There are three actions in the game. Campaigning is money into an area",
+    "and is the only one anybody needs; the negative campaign and the",
+    "corruption/bribe are optional modifiers a player may attach to it.",
     "",
     "This lives in the config rather than the interface so adding an action",
     "puts it in the right place without anyone editing a screen."
@@ -1284,176 +1044,40 @@
       "reading the map or simply touching every seat.",
       "",
       "Measure with: node tools/balance-money.mjs"
+    ],
+    "entryMaximum": 10000000,
+    "_entryComment": [
+      "The most a campaign may put behind its first move into a seat.",
+      "",
+      "Getting in is cheap and capped. Anybody may walk into an open seat for a",
+      "crore, so nobody can buy their way in ahead of everybody else — an",
+      "opening is a foot in the door, not a purchase. Once a campaign has a",
+      "presence there the cap is gone.",
+      "",
+      "It is also what makes the opening conflict possible: five campaigns",
+      "entering one seat all commit the same crore, all match, and all bounce",
+      "off it."
     ]
   },
   "bribe": {
     "_comment": [
-      "A separate menu of the highest-risk moves in the game.",
+      "Corruption and bribery, as one optional modifier on a campaign.",
       "",
-      "Every one of these is a fictional mechanic and nothing more: a cost, a",
-      "weighted table, a lot of heat, and a real chance of an investigation. None",
-      "of them describes a method or explains how anything would be done. What a",
-      "player is choosing is a gamble inside a game, and the interesting part is",
-      "what happens when the oversight system notices.",
+      "There used to be a menu of them. There is one now, because choosing",
+      "between four ways to cheat was a decision about vocabulary rather",
+      "than about strategy: what a player is actually deciding is whether",
+      "to take the risk at all.",
       "",
-      "They are deliberately worse than campaigning on expectation. The upside is",
-      "real, the downside is worse, and the heat lands whichever way it goes."
+      "It is a fictional mechanic and nothing more: a cost, a weighted",
+      "table, a lot of heat, and a real chance of an investigation. It",
+      "describes no method and explains how nothing would be done. The",
+      "interesting part is what happens when it goes wrong, which it does",
+      "three times in ten.",
+      "",
+      "Nothing in the game requires it. A campaign funded and fought",
+      "entirely on ordinary money can win, and does in the balance runs."
     ],
-    "actions": [
-      {
-        "id": "voteinfluence",
-        "label": "Risky Vote Influence",
-        "icon": "🎲",
-        "group": "risky",
-        "menu": "bribe",
-        "cost": 13500000,
-        "allowsAmount": true,
-        "riskLabel": "Very high risk",
-        "impactLabel": "A swing, or a scandal",
-        "blurb": "An approach nobody will admit to making.",
-        "reach": {
-          "seats": 3,
-          "share": 0.5
-        },
-        "outcomes": [
-          {
-            "id": "swing",
-            "weight": 26,
-            "label": "It moves",
-            "support": 7.14,
-            "heat": 26,
-            "text": "Something shifted. Nobody is saying what."
-          },
-          {
-            "id": "slight",
-            "weight": 30,
-            "label": "A small shift",
-            "support": 2.74,
-            "heat": 24,
-            "text": "A little movement, and a lot of exposure for it."
-          },
-          {
-            "id": "nothing",
-            "weight": 26,
-            "label": "Nothing came of it",
-            "support": 0,
-            "heat": 28,
-            "text": "The money went. The votes did not follow."
-          },
-          {
-            "id": "backfire",
-            "weight": 18,
-            "label": "It got out",
-            "support": -4.95,
-            "seats": 3,
-            "heat": 36,
-            "text": "Word travelled faster than the offer did."
-          }
-        ]
-      },
-      {
-        "id": "hiddenoffer",
-        "label": "Hidden Offer",
-        "icon": "🤫",
-        "group": "risky",
-        "menu": "bribe",
-        "cost": 23500000,
-        "allowsAmount": true,
-        "riskLabel": "Very high risk",
-        "impactLabel": "A big swing, or an inquiry",
-        "blurb": "Terms agreed somewhere with no minutes taken.",
-        "reach": {
-          "seats": 4,
-          "share": 0.55
-        },
-        "outcomes": [
-          {
-            "id": "accepted",
-            "weight": 24,
-            "label": "Accepted",
-            "support": 21.28,
-            "heat": 30,
-            "text": "Whatever was agreed, it is holding."
-          },
-          {
-            "id": "partial",
-            "weight": 28,
-            "label": "Partly honoured",
-            "support": 9.32,
-            "heat": 28,
-            "text": "Half of what was promised, at full price."
-          },
-          {
-            "id": "refused",
-            "weight": 26,
-            "label": "Refused",
-            "support": -2.66,
-            "heat": 32,
-            "text": "Turned down, and remembered."
-          },
-          {
-            "id": "exposed",
-            "weight": 22,
-            "label": "Exposed",
-            "support": -15.97,
-            "seats": 4,
-            "heat": 40,
-            "text": "Somebody in the room was taking notes."
-          }
-        ]
-      },
-      {
-        "id": "lastgamble",
-        "label": "Last-Minute Gamble",
-        "icon": "🎰",
-        "group": "risky",
-        "menu": "bribe",
-        "cost": 33500000,
-        "allowsAmount": true,
-        "riskLabel": "Extreme risk",
-        "impactLabel": "Everything, or nothing at all",
-        "blurb": "One throw, on the last stretch, for everything.",
-        "reach": {
-          "seats": 5,
-          "share": 0.6
-        },
-        "outcomes": [
-          {
-            "id": "lands",
-            "weight": 22,
-            "label": "It lands",
-            "support": 11,
-            "heat": 34,
-            "text": "It worked. It should not have, but it did."
-          },
-          {
-            "id": "modest",
-            "weight": 24,
-            "label": "Modest return",
-            "support": 3,
-            "heat": 32,
-            "text": "Some of it stuck."
-          },
-          {
-            "id": "wasted",
-            "weight": 26,
-            "label": "Wasted",
-            "support": -1.5,
-            "heat": 36,
-            "text": "A great deal of money for nothing at all."
-          },
-          {
-            "id": "disaster",
-            "weight": 28,
-            "label": "A disaster",
-            "support": -8,
-            "seats": 5,
-            "heat": 45,
-            "text": "It came apart in public, and it came apart badly."
-          }
-        ]
-      }
-    ]
+    "actions": []
   },
   "profiles": {
     "_comment": [

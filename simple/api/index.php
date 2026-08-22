@@ -670,7 +670,8 @@ switch (route()) {
                     continue;
                 }
                 $want = min($share, $range['max']);
-                if ($engine->blockedReason($player, $board, $actionId, $seat, $want) !== null) {
+                if ($engine->blockedReason($player, $board, $actionId, $seat, $want,
+                        (array) ($g['wonSeats'] ?? [])) !== null) {
                     continue;
                 }
                 // A roll per seat, seeded from the game, the player, the round
@@ -866,7 +867,9 @@ switch (route()) {
             }
 
             $board = Rounds::boardOf($g);
-            $blocked = $engine->blockedReason($player, $board, $actionId, $target, $amount);
+            $blocked = $engine->blockedReason(
+                $player, $board, $actionId, $target, $amount, (array) ($g['wonSeats'] ?? [])
+            );
             if ($blocked !== null) {
                 throw new LobbyError($blocked, 'blocked');
             }
@@ -908,7 +911,8 @@ switch (route()) {
                     $game['players'][$playerId],
                     $amount,
                     (int) ($game['round'] ?? 1),
-                    Rounds::boardOf($game)
+                    Rounds::boardOf($game),
+                    (array) ($game['wonSeats'] ?? [])
                 ),
                 'game' => Lobby::publicView($game, $playerId),
             ]);
@@ -927,7 +931,8 @@ switch (route()) {
                 $g['players'][$playerId],
                 $amount,
                 (int) ($g['round'] ?? 1),
-                Rounds::boardOf($g)
+                Rounds::boardOf($g),
+                (array) ($g['wonSeats'] ?? [])
             );
             if (!$offer['ok']) {
                 throw new LobbyError($offer['error'], 'loan_refused');

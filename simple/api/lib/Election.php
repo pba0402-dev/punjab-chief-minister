@@ -60,7 +60,29 @@ final class Election
             $totals[$party] = 0;
         }
 
+        $won = (array) ($game['wonSeats'] ?? []);
+
         foreach ($seatNumbers as $number) {
+            /*
+             * A seat already won is not counted again.
+             *
+             * It was decided during the campaign and locked; putting it back
+             * into the polling-day roll would let a seat nobody could contest
+             * change hands on the night, which is the opposite of what winning
+             * it meant.
+             */
+            if (isset($won[(string) $number])) {
+                $row = (array) $won[(string) $number];
+                $party = (string) $row['party'];
+                $perSeat[(string) $number] = [
+                    'winner' => $party,
+                    'share' => (float) ($row['share'] ?? 100),
+                    'margin' => 100.0,
+                ];
+                $totals[$party] = ($totals[$party] ?? 0) + 1;
+                continue;
+            }
+
             $merged = (array) $board[(string) $number];
 
             /*
@@ -157,7 +179,9 @@ final class Election
                 // which is not the same number as holding them at the end.
                 'districts' => $leaders === []
                     ? 0
-                    : count($this->campaign->territory()->heldBy($leaders, (string) $party)),
+                    : count($this->campaign->territory()->heldBy(
+                        Territory::wonOf((array) ($game['wonSeats'] ?? [])), (string) $party
+                    )),
                 'grantIncome' => (int) ($player['grantTotalEarned'] ?? 0),
             ];
         }

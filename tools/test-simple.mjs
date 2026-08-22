@@ -121,24 +121,46 @@ const actionCard = (d, label) =>
  * redesign asks for — click, open, decide, back — and driving the test the
  * same way is what proves the way back actually exists.
  */
+/*
+ * Back to the board.
+ *
+ * Home is the map with the two strategic buttons above it, so that is what
+ * arriving there looks like — there is no menu grid to find any more.
+ */
 function goHome(d) {
-  for (let i = 0; i < 4 && !q(d, '.g-menu'); i++) {
+  for (let i = 0; i < 4 && !q(d, '.g-strategy'); i++) {
     const back = q(d, '.g-section-head .sd-back') || q(d, '.areas .sd-back') || q(d, '.sd-back');
     if (!back) break;
     clickIt(d, back);
   }
-  if (!q(d, '.g-menu')) throw new Error('could not get back to the game menu');
+  if (!q(d, '.g-strategy')) throw new Error('could not get back to the game board');
 }
 
+/*
+ * Open a screen the way a player does.
+ *
+ * My Areas and Alliances are the two buttons above the map; everything else
+ * lives under More, because none of it is opened every round.
+ */
 function openSection(d, label) {
   goHome(d);
-  if (label === 'Home') return;
-  const tab = qq(d, '.g-menu-item').find((n) => {
-    const name = n.querySelector('.g-menu-label');
+  // The map is the home screen now, so there is nowhere to go for it.
+  if (label === 'Home' || label === 'Map') return;
+
+  const strategy = qq(d, '.g-strategy-item').find((n) => {
+    const name = n.querySelector('.g-strategy-label');
     return name && name.textContent === label;
   });
-  if (!tab) throw new Error('no section called ' + label);
-  clickIt(d, tab);
+  if (strategy) {
+    clickIt(d, strategy);
+    return;
+  }
+
+  clickIt(d, q(d, '.g-more'));
+  const item = qq(d, '.sheet-item').find((n) => n.textContent === label ||
+    n.textContent.indexOf(label) === 0);
+  if (!item) throw new Error('no section called ' + label);
+  clickIt(d, item);
 }
 
 /**
@@ -180,42 +202,42 @@ const openCampaignSheet = async (d, seatIndex) => {
  * Play one move the way a player does: through a constituency's campaign
  * sheet, choosing an amount, and confirming.
  */
-const playCard = async (d, label, amount) => {
-  const action = d.window.CMP.ACTIONS.find((a) => a.label === label);
-  if (!action) throw new Error('no action called ' + label);
-
+/*
+ * Put money into a seat, the way a player does.
+ *
+ * One panel: pick what the money is for — campaigning, a negative campaign or
+ * a bribe — set the amount, confirm. There is no list of campaign types to
+ * choose from any more, so `mode` is one of those three rather than an action
+ * out of eleven.
+ */
+const playCard = async (d, mode, amount) => {
   if (!q(d, '.campaign-sheet')) await openCampaignSheet(d);
 
-  if (action.menu === 'corruption' || action.menu === 'bribe') {
-    const reveal = qq(d, 'button').find((b) => /High-risk options/.test(b.textContent));
-    if (reveal) {
-      clickIt(d, reveal);
-      await settle();
-    }
-  }
-
-  const card = actionCard(d, label);
-  if (!card) throw new Error('no action called ' + label + ' in the campaign sheet');
-  clickIt(d, card.querySelector('.act-use'));
+  const pick = qq(d, '.cs-mode').find((b) => {
+    const n = b.querySelector('.cs-mode-label');
+    return n && new RegExp(mode, 'i').test(n.textContent);
+  });
+  if (!pick) throw new Error('no campaign mode called ' + mode);
+  clickIt(d, pick);
   await settle();
 
-  if (action.allowsAmount && amount) {
-    const pick = qq(d, '.cs-amount').find((b) => b.textContent === d.window.CMP.ui.money.words(amount));
-    if (pick) {
-      clickIt(d, pick);
+  if (amount) {
+    const range = q(d, '.cs-range');
+    if (range) {
+      range.value = String(Math.min(Number(range.max), Math.max(Number(range.min), amount)));
+      range.dispatchEvent(new d.window.Event('input', { bubbles: true }));
       await settle();
     }
   }
-  // The sheet confirms in place — the amount step is the confirmation, so
-  // there is no second dialog to agree to.
-  const confirm = qq(d, 'button').find((b) => /Confirm campaign/.test(b.textContent));
-  if (!confirm) throw new Error('no confirm step appeared for ' + label);
+
+  const confirm = qq(d, '.campaign-sheet button').find((b) => /^Invest/.test(b.textContent));
+  if (!confirm) throw new Error('no invest button appeared for ' + mode);
   clickIt(d, confirm);
   await settle();
 
-  // Then the result, which the player dismisses to carry on.
-  const stay = qq(d, 'button').find((b) => /Stay here/.test(b.textContent));
-  if (stay) clickIt(d, stay);
+  // Then the result, which takes itself away.
+  const back = qq(d, 'button').find((b) => /Back to the map/.test(b.textContent));
+  if (back) clickIt(d, back);
   await settle();
 };
 
@@ -252,13 +274,22 @@ check('42. the 117 constituency records are not loaded before a game starts',
   CMP.CONSTITUENCIES ? CMP.CONSTITUENCIES.length + ' records' : 'none');
 check('42. and neither are the sitting MLAs or the map',
   !CMP.INCUMBENTS && !CMP.GEOMETRY);
-check('   campaign config loaded', !!CMP.CAMPAIGN && CMP.ACTIONS.length === 13,
+check('   campaign config loaded', !!CMP.CAMPAIGN && CMP.ACTIONS.length === 4,
   CMP.ACTIONS.length + ' actions');
-check('   eleven campaign actions plus two ways of raising money',
-  CMP.actionsByGroup('safe').length === 4 && CMP.actionsByGroup('risky').length === 7 &&
-  CMP.actionsByGroup('funding').length === 2);
-check('   corruption and bribe are separate menus',
-  CMP.actionsByMenu('corruption').length === 3 && CMP.actionsByMenu('bribe').length === 3);
+/*
+ * 2. One way to campaign, two optional risks, one way to raise money.
+ *
+ * There were eleven. Choosing between them was a decision about vocabulary
+ * rather than about strategy: a rally, a media push and a community drive were
+ * all money into a seat.
+ */
+check('2. one way to campaign', CMP.actionsByGroup('safe').length === 1,
+  CMP.actionsByGroup('safe').map((a) => a.id).join(','));
+check('2. two optional risks, and one of each',
+  CMP.actionsByGroup('risky').length === 2 &&
+  !!CMP.getAction('negative') && !!CMP.getAction('bribe'));
+check('22. one corruption action, not a menu of them',
+  CMP.actionsByMenu('bribe').length === 1);
 
 /* ---------------------------------------------------------------- setup */
 
@@ -334,11 +365,8 @@ function cashInHand(d) {
 
 /** One item in the game's menu grid, by its label. */
 function menuItem(d, label) {
-  goHome(d);
-  return qq(d, '.g-menu-item').find((n) => {
-    const name = n.querySelector('.g-menu-label');
-    return name && name.textContent === label;
-  });
+  openSection(d, label);
+  return q(d, '.g-section-head') || q(d, '.punjab-map') || q(d, '.areas');
 }
 
 function moneyLine(d, label) {
@@ -376,11 +404,20 @@ check('3. with the round out of twenty beside it',
 check('4. no large player card', !q(dom, '.g-player-name') && !q(dom, '.g-player-who'));
 check('5. money is a compact strip of figures',
   qq(dom, '.g-fig').length >= 3, qq(dom, '.g-fig').length + ' figures');
-check('5. available, new this round and spent',
-  /Available/i.test(q(dom, '.g-player').textContent) &&
-  /New/i.test(q(dom, '.g-player').textContent) &&
-  /Spent/i.test(q(dom, '.g-player').textContent),
-  q(dom, '.g-player').textContent);
+/*
+ * 1 + 20. The money lives in the header, beside the clock.
+ *
+ * It used to be a card of its own under the round bar, which cost a third of
+ * a phone screen to say three numbers — and meant a player deep in the map had
+ * to come back to Home to find out what they could afford.
+ */
+check('1. available, grant and spent sit beside the round',
+  /Available/i.test(q(dom, '.round-aside').textContent) &&
+  /Grant/i.test(q(dom, '.round-aside').textContent) &&
+  /Spent/i.test(q(dom, '.round-aside').textContent),
+  q(dom, '.round-aside').textContent);
+check('19. and the large finance card is gone',
+  !q(dom, '.g-player') || q(dom, '.g-player').children.length === 0);
 check('5. available is the figure that leads',
   /₹5 crore/.test(q(dom, '.g-fig.is-lead').textContent),
   q(dom, '.g-fig.is-lead').textContent);
@@ -391,21 +428,28 @@ check('   no large stat cards remain', qq(dom, '.stat').length === 0);
 const menuLabels = () =>
   qq(dom, '.g-menu-item .g-menu-label').map((n) => n.textContent);
 
-check('1. a compact menu grid replaces the scrolling strip',
-  qq(dom, '.g-menu').length === 1 && !q(dom, '.g-nav'),
-  menuLabels().join('/'));
-check('1. ten destinations, two columns', qq(dom, '.g-menu-item').length === 10,
-  menuLabels().length + ' items');
-check('1. every item the brief asks for is there',
-  ['Campaign', 'Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'Map',
-   'Constituencies', 'My Areas', 'Alliances']
-    .every((l) => menuLabels().indexOf(l) !== -1),
-  menuLabels().join('/'));
-check('2. "High Risk" is gone, replaced by Corruption and Bribe',
-  menuLabels().indexOf('High Risk') === -1 &&
-  menuLabels().indexOf('Corruption') !== -1 && menuLabels().indexOf('Bribe') !== -1);
-check('1. the menu opens on the game home screen',
-  !!q(dom, '.g-menu') && !!q(dom, '.lb'));
+/*
+ * 2 + 33. Home is the map.
+ *
+ * There is no dashboard of ten buttons any more. What a player does every
+ * round is decide where to put money, and the place that decision lives is the
+ * board — so the board is on the home screen, with the two strategic screens
+ * above it and everything else under More.
+ */
+check('2. the dashboard of buttons is gone', qq(dom, '.g-menu-item').length === 0,
+  qq(dom, '.g-menu-item').length + ' buttons');
+check('4. the map is on the home screen', !!q(dom, '.punjab-map'));
+check('3. with My Areas and Alliances above it',
+  qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/') ===
+  'My Areas/Alliances',
+  qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/'));
+check('5. the map offers Punjab and its three regions',
+  qq(dom, '.map-regions .term-option').length === 4,
+  qq(dom, '.map-regions .term-option').map((n) => n.textContent).join('/'));
+check('23. and says what the three appearances mean',
+  !!q(dom, '.legend-key') && /won/i.test(q(dom, '.legend-key').textContent),
+  q(dom, '.legend-key') ? q(dom, '.legend-key').textContent : 'no key');
+check('1. the leaderboard is on it too', !!q(dom, '.lb'));
 
 check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
 
@@ -484,8 +528,8 @@ check('7. a campaign opens on one round allowance, not a lump sum',
   String(CMP.campaign.remaining(game)));
 check('15. and nothing was granted up front', game.budget === 0, String(game.budget));
 
-const rallyCost = CMP.getAction('rally').cost;
-await playCard(dom, 'Public Rally');
+const rallyCost = CMP.getAction('invest').cost;
+await playCard(dom, 'Campaign');
 game = dom.window.CMP.app.getGame();
 check('5. a safe action works', game.spent === rallyCost, 'spent ' + game.spent);
 // The outcome arrives as a sheet: it matters for a moment, then the log
@@ -510,14 +554,14 @@ check('3. spent is displayed',
   moneyLine(dom, 'Spent on the campaign') === dom.window.CMP.ui.money.words(rallyCost),
   moneyLine(dom, 'Spent on the campaign'));
 check('23. and the spending shows up as a transaction',
-  qq(dom, '.g-txn').length === 1 && /Public Rally/.test(q(dom, '.g-txn').textContent),
+  qq(dom, '.g-txn').length === 1 && /Campaign/.test(q(dom, '.g-txn').textContent),
   q(dom, '.g-txn') ? q(dom, '.g-txn').textContent : 'none');
 openSection(dom, 'Home');
 
 const heatBefore = game.heat;
-await playCard(dom, 'Undisclosed Deal');
+await playCard(dom, 'Corruption');
 game = dom.window.CMP.app.getGame();
-check('6. a risky action works', game.spent === rallyCost + CMP.getAction('deal').cost);
+check('6. a risky action works', game.spent === rallyCost + CMP.getAction('bribe').cost);
 check('8. risky play raises Political Heat', game.heat > heatBefore, 'heat ' + game.heat);
 // A report sheet is over the screen after a risky move; clear it first.
 if (q(dom, '.report-sheet')) {
@@ -548,30 +592,34 @@ game.spent = game.budget - cheapest;
 dom.window.CMP.storage.save(game);
 dom.window.CMP.app.goTo('election');
 
-// Affordability is judged in the campaign sheet, where the moves live now.
+/*
+ * 26. A campaign nobody can pay for is not offered.
+ *
+ * The panel is one amount now, so affordability is the range on the slider
+ * rather than a list of moves greyed out — and what it can never offer is more
+ * than the campaign holds.
+ */
 await openCampaignSheet(dom);
-const dear = actionCard(dom, 'Last-Minute Push');
-check('4. an unaffordable action is disabled',
-  dear.querySelector('.act-use').disabled === true);
-check('4. it says what is wrong', /More than you can spend/.test(dear.textContent),
-  dear.textContent.slice(0, 80));
+const brokeRange = q(dom, '.cs-range');
+check('26. the panel never offers more than the campaign holds',
+  !brokeRange || Number(brokeRange.max) <= dom.window.CMP.campaign.remaining(
+    dom.window.CMP.app.getGame()),
+  brokeRange ? brokeRange.max + ' of ' + dom.window.CMP.campaign.remaining(
+    dom.window.CMP.app.getGame()) : 'nothing offered');
 
 // Dispatching a click straight at a disabled button would still run the
 // handler in jsdom, which tests nothing a player can do. The engine's own
 // refusal is the guarantee worth checking.
 const spentBefore = dom.window.CMP.app.getGame().spent;
 const refusedPush = dom.window.CMP.campaign.canPlay(
-  dom.window.CMP.app.getGame(), 'lastpush', 20
+  dom.window.CMP.app.getGame(), 'bribe', 20, 40 * 10000000
 );
-check('4. the engine refuses it too', refusedPush.ok === false, refusedPush.reason);
+check('26. the engine refuses an unaffordable move', refusedPush.ok === false,
+  refusedPush.reason);
 check('4. and nothing was spent', dom.window.CMP.app.getGame().spent === spentBefore);
-check('4. spending never exceeds the budget',
-  dom.window.CMP.app.getGame().spent <= dom.window.CMP.app.getGame().budget);
+check('4. spending never exceeds what came in',
+  dom.window.CMP.app.getGame().spent <= dom.window.CMP.app.getGame().incomeTotal);
 
-const cheap = actionCard(dom, 'Village Outreach');
-check('   the cheapest action is still affordable',
-  cheap.querySelector('.act-use').disabled === false,
-  'cash ₹' + dom.window.CMP.app.getGame().cash);
 clickIt(dom, qq(dom, '.campaign-sheet button').find((b) => b.textContent === 'Cancel'));
 await settle();
 
@@ -673,38 +721,42 @@ check('the legend states the majority', /majority 59/.test(q(dom, '.map-legend')
 check('the map says the shapes are not official boundaries',
   /not official constituency boundaries/i.test(q(dom, '.map-note').textContent));
 
-// Clicking a seat opens that constituency, which is what a player expects
-// from a map — the target follows from it.
+/*
+ * 36. Tapping a seat opens the campaign panel over the map.
+ *
+ * Not a page, and not a detour: pick a seat, put money in, come back to the
+ * map. That loop is the game, and every screen transition in the middle of it
+ * was a screen transition in the middle of it.
+ */
 const cell = qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 clickIt(dom, cell);
-check('clicking a seat opens that constituency',
-  q(dom, '.sd-name') && q(dom, '.sd-name').textContent === 'Amritsar Central',
-  q(dom, '.sd-name') ? q(dom, '.sd-name').textContent : 'no detail opened');
-check('11. it names the seat and district',
-  /AC 17 · Amritsar/.test(q(dom, '.sd-where').textContent), q(dom, '.sd-where').textContent);
-check('11. it shows the current leader with a share, or says there is none',
-  !!q(dom, '.sd-leader') && (
-    q(dom, '.sd-leader-share')
-      ? /%$/.test(q(dom, '.sd-leader-share').textContent)
-      : /No leader/i.test(q(dom, '.sd-leader-name').textContent)
-  ),
-  q(dom, '.sd-leader').textContent.replace(/\s+/g, ' ').slice(0, 80));
-check('13. and a bar for every party', qq(dom, '.sd-bar').length >= 4);
+await settle();
+
+check('36. tapping a seat opens the campaign panel', !!q(dom, '.campaign-sheet'));
+check('12. it names the seat',
+  q(dom, '.campaign-sheet .sheet-title').textContent === 'Amritsar Central',
+  q(dom, '.campaign-sheet .sheet-title').textContent);
+check('12. and where it is',
+  /AC 17 · Amritsar/.test(q(dom, '.cs-where').textContent),
+  q(dom, '.cs-where').textContent);
+check('20. with the standings, or that nobody has been here',
+  !!q(dom, '.cs-positions') || /Nobody has campaigned/.test(q(dom, '.cs-open').textContent));
+
+clickIt(dom, qq(dom, '.campaign-sheet button').find((b) => b.textContent === 'Cancel'));
+await settle();
+check('36. and cancelling puts the map back', !q(dom, '.campaign-sheet') && !!q(dom, '.punjab-map'));
+
 /*
  * 4. No sitting member, anywhere.
  *
  * The seat, its number and its district are real Punjab geography. Every
- * person and every party on this screen is the game's own, and there is no
- * MLA panel to keep separate from them because there is no MLA data left.
+ * person and party on this screen is the game's own.
  */
 check('4. no sitting member is shown', !q(dom, '.sd-mla'));
 check('4. and the engine no longer carries any',
   !dom.window.CMP.INCUMBENTS && !dom.window.CMP.getIncumbent);
-check('   with a way to campaign there',
-  !!qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
-
 // Colours must follow the game, not a fixed picture.
-clickIt(dom, menuItem(dom, 'Map'));
+menuItem(dom, 'Map');
 const seat17 = () => qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 const before17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 const g17 = dom.window.CMP.app.getGame();
@@ -716,7 +768,7 @@ dom.window.CMP.getParties().forEach((p2) => {
   g17.support[17][p2.id] = p2.id === g17.partyId ? 80 : 5;
 });
 dom.window.CMP.app.goTo('election');
-clickIt(dom, menuItem(dom, 'Map'));
+menuItem(dom, 'Map');
 const after17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 check('the map repaints when support moves', before17 !== after17, before17 + ' -> ' + after17);
 check('the seat now shows the player colour',
@@ -878,47 +930,55 @@ check('10. a constituency opens when clicked',
 /* --------------------------------------------- the campaign sheet */
 
 section('9-13. Campaign here');
+// The affordability block above deliberately emptied the purse. Put a round's
+// allowance back, so the panel is exercised with real choices in it.
+dom.window.CMP.app.getGame().cash = 20 * 10000000;
 clickIt(dom, qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
 await settle();
 check('9. one button opens the campaign controls', !!q(dom, '.campaign-sheet'));
 check('10. it names the seat', new RegExp(pickedName).test(q(dom, '.campaign-sheet').textContent));
-check('10. and states cash and the race',
-  /Available/.test(q(dom, '.cs-figures').textContent) &&
-  /Your support/.test(q(dom, '.cs-figures').textContent));
-check('10. ordinary moves are listed',
-  qq(dom, '.campaign-sheet .act').length ===
-    dom.window.CMP.actionsByMenu('campaign').length,
-  qq(dom, '.campaign-sheet .act').length + ' moves');
-check('10. high-risk moves are not, until asked',
-  !/Undisclosed Deal|Political Influence/.test(q(dom, '.campaign-sheet').textContent) &&
-  !!qq(dom, 'button').find((b) => /High-risk options/.test(b.textContent)));
+/*
+ * 14 + 42. The whole decision, on one panel.
+ *
+ * Where, how much, and whether to take a risk with it. There is no list of
+ * campaign types to pick from — a rally, a media push and a community drive
+ * were all money into a seat, and choosing between them was a decision about
+ * vocabulary rather than about strategy.
+ */
+check('14. it says where the money can go and how much there is',
+  /Available/.test(q(dom, '.cs-summary').textContent) &&
+  /Invest/.test(q(dom, '.cs-amount').textContent),
+  q(dom, '.cs-summary').textContent.replace(/\s+/g, ' ').slice(0, 80));
+check('20. and where everybody stands here',
+  !!q(dom, '.cs-positions') || !!q(dom, '.cs-open'));
+check('2. no list of campaign types', qq(dom, '.campaign-sheet .act').length === 0,
+  qq(dom, '.campaign-sheet .act').length + ' listed');
+check('16. the two optional risks are on the same panel',
+  qq(dom, '.cs-mode .cs-mode-label').map((n) => n.textContent).join('/') ===
+  'Campaign/Negative/Corruption',
+  qq(dom, '.cs-mode .cs-mode-label').map((n) => n.textContent).join('/'));
+check('13. with a district-or-seat target', qq(dom, '.cs-target .term-option').length === 2,
+  q(dom, '.cs-target') ? q(dom, '.cs-target').textContent : 'no toggle');
+check('14. a stepper and a slider set the amount',
+  qq(dom, '.cs-step').length === 2 && !!q(dom, '.cs-range'));
+check('24. and the risk is stated', /Risk/.test(q(dom, '.cs-summary').textContent));
 
-// Several rounds' worth of allowance, because this is testing the sheet
-// rather than what happens when a campaign is broke.
-dom.window.CMP.app.getGame().cash = 20 * 10000000;
-clickIt(dom, actionCard(dom, 'Public Rally').querySelector('.act-use'));
-await settle();
-check('11. it then asks how much to spend', !!q(dom, '.cs-question'));
-check('11. with quick amounts', qq(dom, '.cs-amount').length >= 3,
-  qq(dom, '.cs-amount').length + ' amounts');
-check('11. and a slider', !!q(dom, '.cs-range'));
-check('11. the preview states cash before, spend and cash after',
-  /Current cash/.test(q(dom, '.dialog-lines').textContent) &&
-  /Campaign spending/.test(q(dom, '.dialog-lines').textContent) &&
-  /Cash after/.test(q(dom, '.dialog-lines').textContent));
-check('11. with an estimated impact and a risk',
-  /Estimated impact/.test(q(dom, '.dialog-lines').textContent) &&
-  /Risk/.test(q(dom, '.dialog-lines').textContent));
+/*
+ * 15. Getting in is capped at a crore.
+ *
+ * Nobody can buy their way into an open seat ahead of everybody else — an
+ * opening is a foot in the door, not a purchase.
+ */
+check('15. an opening investment is capped',
+  Number(q(dom, '.cs-range').max) === dom.window.CMP.CAMPAIGN.spending.entryMaximum,
+  q(dom, '.cs-range').max + ' offered');
+check('15. and the panel says why',
+  /First campaign here/.test(q(dom, '.cs-cap').textContent),
+  q(dom, '.cs-cap').textContent.slice(0, 60));
 
-// Whichever amount the sheet offers second — the figures move with the
-// config, so pinning one by name would break every time prices are tuned.
-const offered = qq(dom, '.cs-amount');
-const pick = offered[1] || offered[0];
-const chosenAmount = Number(pick.dataset.amount);
+const chosenAmount = Number(q(dom, '.cs-range').value);
 const cashBeforeCampaign = dom.window.CMP.app.getGame().cash;
-clickIt(dom, pick);
-await settle();
-clickIt(dom, qq(dom, 'button').find((b) => /Confirm campaign/.test(b.textContent)));
+clickIt(dom, qq(dom, '.campaign-sheet button').find((b) => /^Invest/.test(b.textContent)));
 await settle();
 
 check('12. a short result follows', !!q(dom, '.result-sheet'));
@@ -929,15 +989,19 @@ check('11. the chosen amount is what was actually charged',
   cashBeforeCampaign - dom.window.CMP.app.getGame().cash === chosenAmount,
   'spent ' + (cashBeforeCampaign - dom.window.CMP.app.getGame().cash) +
     ', chose ' + chosenAmount);
-check('13. it offers the next closest seat',
-  !!qq(dom, '.rs-next button').find((b) => /Next closest seat/.test(b.textContent)));
-check('13. and a way back to my areas',
-  !!qq(dom, '.rs-next button').find((b) => /Back to my areas/.test(b.textContent)));
+/*
+ * 36. And it puts the map back.
+ *
+ * Pick a seat, put money in, come back to the map. The result used to offer a
+ * next seat and a way to a dashboard, which was two more decisions than
+ * anybody wanted at the moment the money had just gone.
+ */
+check('36. the result offers the way back',
+  !!qq(dom, '.result-sheet button').find((b) => /Back to the map/.test(b.textContent)));
 
-clickIt(dom, qq(dom, 'button').find((b) => /Stay here/.test(b.textContent)));
+clickIt(dom, qq(dom, 'button').find((b) => /Back to the map/.test(b.textContent)));
 await settle();
-check('12. and leaves the player on the constituency, not a dashboard',
-  !!q(dom, '.seat-detail'));
+check('36. and taking it leaves no panel over the board', !q(dom, '.result-sheet'));
 
 /* ------------------------------------------- 15. a rival's position */
 
@@ -1013,7 +1077,7 @@ async function endRound(d) {
 }
 
 let solo = dom.window.CMP.app.getGame();
-await playCard(dom, 'Public Rally');
+await playCard(dom, 'Campaign');
 const spentInRound1 = dom.window.CMP.app.getGame().spent;
 
 /* The clock expires: the round settles and the scoreboard goes up. */
@@ -1092,7 +1156,7 @@ async function settledAt(rounds) {
   const g = w.CMP.state.startElection({ partyId: 'aap', candidateName: 'Simran Kaur Gill' });
   for (let r = 0; r < rounds; r++) {
     for (let m = 0; m < 3; m++) {
-      w.CMP.campaign.play(g, m === 1 ? 'media' : 'rally', ((r * 11 + m * 7) % 117) + 1,
+      w.CMP.campaign.play(g, m === 1 ? 'invest' : 'invest', ((r * 11 + m * 7) % 117) + 1,
         { outcome: 0.3, consequence: 0.9, consequencePick: 0.5 });
     }
     w.CMP.campaign.endRound(g);
@@ -1189,7 +1253,8 @@ dom.window.CMP.app.goTo('election');
 await settle();
 
 goHome(dom);
-check('and the menu is back', qq(dom, '.g-menu-item').length === 10);
+check('and the board is back',
+  qq(dom, '.g-strategy-item').length === 2 && !!q(dom, '.punjab-map'));
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
@@ -1314,13 +1379,189 @@ check('54. for every party on the board',
 check('54. two figures apiece',
   qq(dom, '.cn-row .cn-fig strong').length === qq(dom, '.cn-row').length * 2,
   qq(dom, '.cn-row .cn-fig strong').length + ' figures');
-// Real numbers off the board, not a row of zeroes: twenty rounds always
-// leaves somebody holding ground.
-check('54. and they are real figures, not a row of zeroes',
-  qq(dom, '.cn-row .cn-fig strong').some((n) => !/^(0|₹0)$/.test(n.textContent.trim())),
+/*
+ * The figures come off the engine, zero or not.
+ *
+ * A district counts only when every seat in it was won outright, so a short
+ * campaign can honestly finish with none — and the block says so rather than
+ * disappearing, which would read as missing information.
+ */
+check('54. and the figures match the engine',
+  qq(dom, '.cn-row .cn-fig strong').length === qq(dom, '.cn-row').length * 2 &&
+  qq(dom, '.cn-row .cn-fig strong').every((n) => n.textContent.trim().length > 0),
   qq(dom, '.cn-row .cn-fig strong').map((n) => n.textContent).join(' / '));
 
 /* ---------------------------------------------------------------- console */
+
+section('A seat that has been won');
+
+/*
+ * Won is the only state in this game that cannot be undone, and four separate
+ * screens have to agree about it: the seat itself, the round result that
+ * declared it, the grants ledger that pays for it, and My Areas. A seat that
+ * reads "leading 74%, campaign here" on one screen and "won" on another is
+ * worse than either, so this section drives one game to a win and reads all
+ * four.
+ */
+const wonWin = dom.window;
+const wonGame = wonWin.CMP.state.startElection({
+  partyId: 'aap',
+  candidateName: 'Simran Kaur Gill',
+});
+
+// A seat with one campaign in it and enough influence behind it to be
+// commanding. Built directly rather than played, because reaching a 70% share
+// through the ₹1 crore entry cap takes more rounds than a UI test should.
+const LOCKED = 17;
+const MINE = wonGame.partyId;
+const RIVAL = wonWin.CMP.getParties().filter((x) => x.id !== MINE)[0].id;
+wonGame.support[LOCKED] = { [MINE]: 40 };
+wonGame.support[18] = { [MINE]: 40 };
+wonGame.wonSeats = wonGame.wonSeats || {};
+const declared = wonWin.CMP.campaign.settleWins(wonGame, 3);
+
+check('a commanding share in a campaigned seat is declared won',
+  declared.some((d) => d.seat === LOCKED), JSON.stringify(declared));
+check('and the engine records who won it and when',
+  wonWin.CMP.campaign.wonBy(wonGame, LOCKED).party === MINE &&
+  wonWin.CMP.campaign.wonBy(wonGame, LOCKED).round === 3,
+  JSON.stringify(wonWin.CMP.campaign.wonBy(wonGame, LOCKED)));
+
+/* ---- the seat itself ---- */
+wonWin.CMP.app.setGame(wonGame);
+wonWin.CMP.app.goTo('election');
+await settle();
+
+const seatNode = wonWin.CMP.ui.constituency.render(wonGame, LOCKED, { players: [] });
+check('the seat says it is permanently won',
+  /Permanently won/i.test(seatNode.querySelector('.sd-leader-kicker').textContent),
+  seatNode.querySelector('.sd-leader-kicker').textContent);
+check('it names the winner and the round',
+  /round 3/i.test(seatNode.querySelector('.sd-leader-party').textContent),
+  seatNode.querySelector('.sd-leader-party').textContent);
+check('it reads as locked rather than as a lead',
+  !!seatNode.querySelector('.sd-rating.is-locked'));
+check('and offers nothing to campaign with',
+  !seatNode.querySelector('.btn-campaign'));
+check('it says why, in words',
+  /rest of the election/i.test(seatNode.querySelector('.sd-locked-note').textContent),
+  seatNode.querySelector('.sd-locked-note').textContent.slice(0, 70));
+
+// An open seat still offers the button — the absence above is the won state,
+// not the renderer having no footer.
+const openNode = wonWin.CMP.ui.constituency.render(wonGame, 40, { players: [] });
+check('an open seat is not locked', !openNode.querySelector('.sd-locked-note'));
+
+/* ---- the engine refuses all three actions there ---- */
+['invest', 'negative', 'bribe'].forEach((id) => {
+  const verdict = wonWin.CMP.campaign.canPlay(wonGame, id, LOCKED, 1000000);
+  check('a won seat refuses ' + id, verdict.ok === false, verdict.reason);
+});
+
+/* ---- the round result that declared it ---- */
+const wonResult = {
+  round: 3,
+  standings: wonWin.CMP.getParties().map((party, i) => ({
+    partyId: party.id,
+    seats: 30 - i,
+    won: party.id === MINE ? 1 : 0,
+    leading: 29 - i,
+    share: 25,
+  })),
+  changes: [],
+  won: [{ seat: LOCKED, party: MINE, round: 3 }],
+  conflicts: [{
+    seat: 55,
+    district: null,
+    amount: 10000000,
+    parties: [MINE, RIVAL],
+  }],
+};
+
+const rr = wonWin.CMP.ui.scoreboard.create({
+  you: () => MINE,
+  trend: () => [],
+  onFinished: () => {},
+});
+rr.render(wonResult, 30);
+rr.stop();
+const rrText = rr.root.textContent;
+
+check('the round result announces the seat won', !!rr.root.querySelector('.rr-win'));
+check('it says the seat is locked from now on',
+  /rest of the election|Locked/i.test(rr.root.querySelector('.rr-win-note').textContent),
+  rr.root.querySelector('.rr-win-note').textContent);
+check('it announces the campaign conflict', !!rr.root.querySelector('.rr-conflict'));
+check('and says nobody gained and nobody was refunded',
+  /Nobody gained, nobody was refunded/.test(
+    rr.root.querySelector('.rr-conflict-note').textContent),
+  rr.root.querySelector('.rr-conflict-note').textContent);
+check('the conflict names what was matched',
+  /crore|lakh/.test(rr.root.querySelector('.rr-conflict-note').textContent));
+check('both sides of the conflict are named',
+  rr.root.querySelectorAll('.rr-conflict-parties .rr-badge').length === 2,
+  rr.root.querySelectorAll('.rr-conflict-parties .rr-badge').length + ' named');
+check('a round with wins is never called quiet',
+  !/No major seat changes/.test(rrText));
+
+
+/* ---- the grants ledger counts won seats, not led ones ---- */
+const district = wonWin.CMP.DISTRICTS.find((d) => d.seats.indexOf(LOCKED) !== -1);
+check('the seat sits in a real district', !!district, LOCKED);
+
+// Lead every seat in it without winning any: that must pay nothing.
+const ledGame = wonWin.CMP.state.startElection({ candidateName: 'S' });
+const LED = ledGame.partyId;
+const controlIds = () =>
+  wonWin.CMP.campaign.districtsWonBy(ledGame, LED).map((d) => d.id);
+
+district.seats.forEach((n) => {
+  ledGame.support[n] = { [LED]: 12 };
+});
+check('leading every seat in a district is not controlling it',
+  controlIds().indexOf(district.id) === -1, controlIds().join('/') || 'none');
+check('and it pays nothing',
+  wonWin.CMP.campaign.grantTotal(ledGame) === 0,
+  String(wonWin.CMP.campaign.grantTotal(ledGame)));
+
+// Win every seat in it, and it pays.
+ledGame.wonSeats = ledGame.wonSeats || {};
+district.seats.forEach((n) => {
+  ledGame.wonSeats[String(n)] = { party: LED, round: 4, share: 80 };
+});
+check('winning every seat in it is control',
+  controlIds().indexOf(district.id) !== -1, controlIds().join('/') || 'none');
+
+/* ---- my areas reports won and leading apart ---- */
+const areas = wonWin.CMP.ui.myAreas.create({
+  onAllocate: () => ({ ok: true }),
+  onChanged: () => {},
+});
+areas.render(ledGame);
+const controlFigs = [].slice.call(areas.root.querySelectorAll('.ma-control-fig'));
+check('my areas opens with what the campaign controls', controlFigs.length === 4,
+  controlFigs.length + ' figures');
+check('seats won leads it',
+  /seats won/i.test(controlFigs[0].textContent) &&
+  controlFigs[0].querySelector('.ma-control-value').textContent ===
+    String(district.seats.length),
+  controlFigs[0].textContent);
+check('won and leading are never added together',
+  controlFigs[1].querySelector('.ma-control-value').textContent === '0',
+  controlFigs[0].textContent + ' / ' + controlFigs[1].textContent);
+check('and it states the grant income',
+  /grants a round/i.test(controlFigs[3].textContent),
+  controlFigs[3].textContent);
+
+const controlled = [].slice.call(areas.root.querySelectorAll('.ma-region'))
+  .map((n) => n.textContent).join(' | ');
+check('the region says how many seats are won',
+  new RegExp(district.seats.length + ' / ').test(controlled), controlled.slice(0, 120));
+
+/* ---- and nothing anywhere still counts three moves ---- */
+const everywhere = dom.window.document.body.textContent;
+check('no "3 moves" rule survives in the UI',
+  !/3\s*\/\s*3|three moves|3 moves/i.test(everywhere));
 
 section('12. Console');
 const realErrors = consoleErrors.filter((e) => !/Could not parse CSS|Not implemented/.test(e));

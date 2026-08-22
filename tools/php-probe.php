@@ -45,7 +45,7 @@ switch ($cmd) {
 
     case 'outcomes': {
         // Which outcome each roll selects, across the unit interval.
-        $action = $engine->action($argv[2] ?? 'rally');
+        $action = $engine->action($argv[2] ?? 'invest');
         $samples = (int) ($argv[3] ?? 100);
         $out = [];
         for ($i = 0; $i < $samples; $i++) {

@@ -190,21 +190,37 @@ async function openClient(label) {
  * a player moves is what proves the way back exists on every screen.
  */
 function goHome(c) {
-  for (let i = 0; i < 4 && !c.q('.g-menu'); i++) {
+  for (let i = 0; i < 4 && !c.q('.g-strategy'); i++) {
     const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
     if (!back) break;
     c.click(back);
   }
-  return !!c.q('.g-menu');
+  return !!c.q('.g-strategy');
 }
 
 /** One item in the game's menu grid, by its label. */
+/*
+ * Open a screen the way a player does.
+ *
+ * Home is the map with two strategic buttons above it; everything else lives
+ * under More, because none of it is opened every round.
+ */
 function menuItem(c, label) {
   goHome(c);
-  return c.qq('.g-menu-item').find((n) => {
-    const name = n.querySelector('.g-menu-label');
+  const strategy = c.qq('.g-strategy-item').find((n) => {
+    const name = n.querySelector('.g-strategy-label');
     return name && name.textContent === label;
   });
+  if (strategy) {
+    c.click(strategy);
+    return c.q('.g-section-head') || c.q('.areas');
+  }
+  c.click(c.q('.g-more'));
+  const item = c.qq('.sheet-item').find((n) => n.textContent === label ||
+    n.textContent.indexOf(label) === 0);
+  if (!item) return null;
+  c.click(item);
+  return c.q('.g-section-head');
 }
 
 /* ------------------------------------------------------------ the lobby */
@@ -352,38 +368,33 @@ async function act(c, label) {
   await sleep(120);
 
   /*
-   * The named action if it is affordable, otherwise the cheapest that is.
+   * One panel: what the money is for, how much, confirm.
    *
-   * A campaign that downed tools whenever its first choice was out of reach
-   * would be measuring the price list rather than the drill-down, and it
-   * varies: nobody starts with money, and what a round leaves behind depends
-   * on what the grants paid.
+   * The mode falls back to ordinary campaigning when the named one is not
+   * offered, because a run that downed tools would be measuring the panel's
+   * vocabulary rather than the drill-down it is here to exercise.
    */
-  const affordable = c.qq('.campaign-sheet .act').filter((n) => {
-    const btn = n.querySelector('.act-use');
-    return btn && !btn.disabled;
+  const modes = c.qq('.cs-mode');
+  const wanted = modes.find((b) => {
+    const n = b.querySelector('.cs-mode-label');
+    return n && new RegExp(label, 'i').test(n.textContent);
   });
-  const named = affordable.find((n) => {
-    const t = n.querySelector('.act-name');
-    return t && t.textContent === label;
-  });
-  const card = named || affordable[affordable.length - 1];
-  const use = card && card.querySelector('.act-use');
-  if (!use) {
+  if (wanted) {
+    c.click(wanted);
+    await sleep(60);
+  }
+
+  const invest = c.qq('.campaign-sheet button').find((b) => /^Invest/.test(b.textContent));
+  if (!invest) {
     const cancel = c.qq('.campaign-sheet button').find((b) => b.textContent === 'Cancel');
     if (cancel) c.click(cancel);
     return false;
   }
-  c.click(use);
-  await sleep(80);
-
-  const confirm = c.qq('button').find((b) => /Confirm campaign/.test(b.textContent));
-  if (!confirm) return false;
-  c.click(confirm);
+  c.click(invest);
   await sleep(250);
 
-  const stay = c.qq('button').find((b) => /Stay here/.test(b.textContent));
-  if (stay) c.click(stay);
+  const back = c.qq('button').find((b) => /Back to the map/.test(b.textContent));
+  if (back) c.click(back);
   await sleep(80);
   return true;
 }
@@ -400,7 +411,7 @@ async function act(c, label) {
 async function lateMove(c) {
   const g = c.game();
   const seat = Object.keys(g.support)[0];
-  const res = await c.dom.window.CMP.net.playAction('rally', Number(seat));
+  const res = await c.dom.window.CMP.net.playAction('invest', Number(seat));
   const stage = res && res.game ? res.game.stage : null;
   return { leaked: !!(res && res.ok && stage === 'results'), stage: stage };
 }
@@ -430,7 +441,6 @@ for (let round = 1; round <= 20; round++) {
   if (round === 2 && !loanTaken) {
     const tab = menuItem(host, 'Loan');
     if (tab) {
-      host.click(tab);
       await sleep(150);
       const offer = host.qq('.loan-offer').find((b) => !b.disabled);
       if (offer) {

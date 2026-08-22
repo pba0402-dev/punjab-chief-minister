@@ -188,6 +188,16 @@ CMP.ui.constituency = (function () {
     var previous = (game.leaders || {})[String(number)];
     var showHistory = false;
 
+    /*
+     * A seat that has been won is finished, and the screen should read that
+     * way. Not "leading, 74%, campaign here" with a note underneath — the
+     * race is over, and offering a control that the server will refuse is
+     * worse than offering nothing.
+     */
+    var won = CMP.campaign.wonBy(game, number);
+    var wonParty = won ? CMP.getParty(won.party) : null;
+    var wonCandidate = won ? candidateFor(won.party, opts.players) : null;
+
     var historyNode = el('div', { class: 'seat-history' });
     function paintHistory() {
       CMP.ui.dom.mount(historyNode, [
@@ -233,7 +243,34 @@ CMP.ui.constituency = (function () {
        * Printing "0.0%" against four parties and calling one of them safe
        * would be reading numbers that do not exist yet.
        */
-      !lead
+      won
+        ? el('div', {
+            class: 'sd-leader is-locked',
+            style: { '--party': wonParty.colour, '--party-ink': wonParty.ink || '#fff' },
+          }, [
+            wonCandidate && wonCandidate.avatar
+              ? CMP.ui.portrait.render(wonCandidate.avatar, 44, wonCandidate.candidateName)
+              : el('span', { class: 'sd-leader-flag', text: wonParty.short }),
+            el('div', { class: 'sd-leader-body' }, [
+              el('span', { class: 'sd-leader-kicker', text: '✓ Permanently won' }),
+              el('strong', {
+                class: 'sd-leader-name',
+                text: wonCandidate ? wonCandidate.candidateName : wonParty.name,
+              }),
+              el('span', {
+                class: 'sd-leader-party',
+                text: wonParty.short + ' · round ' + won.round,
+              }),
+            ]),
+            el('div', { class: 'sd-leader-figures' }, [
+              el('strong', {
+                class: 'sd-leader-share',
+                text: (won.share || 0).toFixed(1) + '%',
+              }),
+              el('span', { class: 'sd-rating is-locked', text: 'Locked' }),
+            ]),
+          ])
+      : !lead
         ? el('div', { class: 'sd-leader is-open' }, [
             el('div', { class: 'sd-leader-body' }, [
               el('span', { class: 'sd-leader-kicker', text: 'Uncontested' }),
@@ -297,8 +334,16 @@ CMP.ui.constituency = (function () {
           ])
         : null,
 
+      won
+        ? el('p', { class: 'sd-locked-note' }, [
+            'This seat is decided. Nobody — including ' + wonParty.short +
+              ' — can campaign, run a negative campaign or bribe here for the ' +
+              'rest of the election.',
+          ])
+        : null,
+
       historyNode,
-      opts.footer || null,
+      won ? null : opts.footer || null,
     ]);
   }
 

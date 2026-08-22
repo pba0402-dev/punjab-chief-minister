@@ -298,7 +298,7 @@ CMP.campaign = (function () {
     if (game.grantsCredited[key]) return 0;
     game.grantsCredited[key] = true;
 
-    var held = districtsHeldBy(game.support, game.partyId);
+    var held = districtsWonBy(game, game.partyId);
     game.districtsHeld = held.length;
 
     // A grant is for a district taken, not one inherited.
@@ -354,15 +354,38 @@ CMP.campaign = (function () {
    * nothing. That is deliberate: a grant should be the reward for finishing a
    * job, not for being ahead.
    */
-  function districtsHeldBy(support, partyId) {
+  /**
+   * Districts a party controls permanently.
+   *
+   * Every seat in it won outright, not merely led. Leading a district is a
+   * position that can be taken back before the next round; controlling one
+   * cannot, which is why the grant that comes with it is safe to pay for the
+   * rest of the election.
+   *
+   * `won` is the seats already decided — pass the game's own map. Without it
+   * this answers about leads, which is what the map and the area screens want
+   * when they are describing where a campaign stands rather than what it owns.
+   */
+  function districtsHeldBy(support, partyId, won) {
     if (!partyId || !CMP.DISTRICTS) return [];
     var leaders = currentLeaders(support);
     return CMP.DISTRICTS.filter(function (d) {
       for (var i = 0; i < d.seats.length; i++) {
-        if (leaders[d.seats[i]] !== partyId) return false;
+        var seat = d.seats[i];
+        if (won) {
+          var row = won[String(seat)];
+          if (!row || row.party !== partyId) return false;
+        } else if (leaders[seat] !== partyId) {
+          return false;
+        }
       }
       return d.seats.length > 0;
     });
+  }
+
+  /** Districts controlled outright by one party in this game. */
+  function districtsWonBy(game, partyId) {
+    return districtsHeldBy(game.support, partyId, game.wonSeats || {});
   }
 
   /** How a district stands for one party: held, leading, or neither. */
@@ -458,6 +481,213 @@ CMP.campaign = (function () {
     return Math.max(0, cap - (game.roundActions || 0));
   }
 
+  /* --------------------------------------------- getting into a seat */
+
+  /** The district a seat sits in, for the ledger and the area screens. */
+  function areaOf(target) {
+    if (target === null || target === undefined || target === '') return null;
+    return (CMP.DISTRICT_OF_SEAT || {})[Number(target)] || null;
+  }
+
+  /* ---------------------------------------------- seats already won */
+
+  /**
+   * Leading a seat and having won it are different things.
+   *
+   * Leading is where the seat stands today and can be taken back tomorrow.
+   * Winning it is final: at the end of a round, a campaign holding a
+   * commanding share of a seat that has had real work done in it is declared
+   * to have won it, and from that moment nobody can campaign there again —
+   * not the winner, not anybody else, not with money, not with a negative
+   * campaign, and not with a bribe.
+   *
+   * That is what makes the board fill up rather than churn, and it is what
+   * turns a district into a permanent one for the grant system.
+   */
+  function isWon(game, seat) {
+    return !!(game.wonSeats || {})[String(seat)];
+  }
+
+  function wonBy(game, seat) {
+    return (game.wonSeats || {})[String(seat)] || null;
+  }
+
+  function wonReason(game, seat) {
+    var won = wonBy(game, seat);
+    var party = won ? CMP.getParty(won.party) : null;
+    return 'Won' + (party ? ' by ' + party.short : '') +
+      (won && won.round ? ' in round ' + won.round : '') +
+      '. Locked for the rest of the election.';
+  }
+
+  /**
+   * Declare the seats that have been won outright.
+   *
+   * Two conditions, and both matter. A commanding share says nobody else is
+   * close; a floor under the total influence says the seat has actually been
+   * campaigned in, rather than being one a party wandered into while the
+   * others were elsewhere. Without the second, a single opening investment in
+   * an empty seat would lock it forever.
+   *
+   * Called once at the end of a round and nowhere else, so a seat cannot be
+   * won mid-round and every player plays the same board for the whole of it.
+   */
+  function settleWins(game, round) {
+    var cfg = (config().election || {}).won || {};
+    var needShare = cfg.share || 0;
+    var needInfluence = cfg.influence || 0;
+    if (!needShare || !needInfluence) return [];
+
+    if (!game.wonSeats) game.wonSeats = {};
+    var declared = [];
+
+    Object.keys(game.support).forEach(function (seat) {
+      if (isWon(game, seat)) return;
+      var cell = game.support[seat];
+
+      var total = 0;
+      Object.keys(cell).forEach(function (id) {
+        total += Math.max(0, cell[id] || 0);
+      });
+      if (total < needInfluence) return;
+
+      var ranked = standings(cell);
+      if (!ranked.length || ranked[0].support < needShare) return;
+
+      game.wonSeats[String(seat)] = {
+        party: ranked[0].partyId,
+        round: round || game.round || 0,
+        share: ranked[0].support,
+      };
+      declared.push({
+        seat: Number(seat),
+        party: ranked[0].partyId,
+        round: round || game.round || 0,
+      });
+    });
+
+    return declared;
+  }
+
+  /** True once this campaign has any influence in a seat. */
+  function isEstablishedIn(game, target) {
+    return ((game.support[target] || {})[game.partyId] || 0) > 0;
+  }
+
+  /**
+   * The most a campaign may put behind its first move into a seat.
+   *
+   * Getting in is cheap and deliberately capped. Anybody may walk into an
+   * open seat for a crore, which means nobody can buy their way in ahead of
+   * everybody else — an opening is a foot in the door, not a purchase. Once a
+   * campaign has a presence there the cap is gone and it can spend what it
+   * likes.
+   *
+   * Returns 0 where there is no cap.
+   */
+  function entryCap(game, target, action) {
+    if (!target) return 0;
+    // Applying for a grant is development work, not buying into a seat.
+    if (action && action.group === 'funding') return 0;
+    if (isEstablishedIn(game, target)) return 0;
+    return (CMP.CAMPAIGN.spending || {}).entryMaximum || 0;
+  }
+
+  /**
+   * What a campaign committed to a seat, and what that bought.
+   *
+   * Kept per seat for the round so the settle can find the decisive
+   * commitment — the largest single sum anybody put into that seat — and
+   * unwind it if two campaigns matched each other. Cleared when the round
+   * opens; see beginRound.
+   */
+  function noteBid(game, seat, amount, gained) {
+    if (!seat) return;
+    if (!game.areaBids) game.areaBids = {};
+    var key = String(seat);
+    if (!game.areaBids[key]) game.areaBids[key] = [];
+    game.areaBids[key].push({ amount: amount, gained: gained || 0 });
+  }
+
+  /** The largest single sum a campaign put into one seat this round. */
+  function topBid(actor, seat) {
+    var bids = (actor.areaBids || {})[String(seat)] || [];
+    var best = null;
+    bids.forEach(function (bid) {
+      if (!best || bid.amount > best.amount) best = bid;
+    });
+    return best;
+  }
+
+  /**
+   * Campaign conflicts, settled once a round.
+   *
+   * Where two or more campaigns put exactly the same largest sum into the
+   * same seat, none of them gets what it paid for: the influence those
+   * particular investments bought is taken back out, and the money is gone.
+   * Nobody is refunded and nobody wins the exchange.
+   *
+   * It applies as much to five campaigns walking into an open seat for a
+   * crore each — all five bounce off, the seat stays open — as to two
+   * established rivals matching five crore late on.
+   *
+   * Only the decisive investment is void. Everything else those campaigns did
+   * in that seat stands, and they may try again next round: a conflict
+   * settles one exchange, not the seat.
+   */
+  function settleConflicts(game) {
+    var actors = [{ actor: game, party: game.partyId }].concat(
+      (game.opponents || []).map(function (o) {
+        return { actor: o, party: o.partyId };
+      })
+    );
+
+    var seats = {};
+    actors.forEach(function (entry) {
+      Object.keys(entry.actor.areaBids || {}).forEach(function (seat) {
+        seats[seat] = true;
+      });
+    });
+
+    var conflicts = [];
+    Object.keys(seats).forEach(function (seat) {
+      var tops = [];
+      actors.forEach(function (entry) {
+        var bid = topBid(entry.actor, seat);
+        if (bid && bid.amount > 0) tops.push({ party: entry.party, bid: bid });
+      });
+      if (tops.length < 2) return;
+
+      var highest = tops.reduce(function (best, t) {
+        return t.bid.amount > best ? t.bid.amount : best;
+      }, 0);
+      var matched = tops.filter(function (t) {
+        return t.bid.amount === highest;
+      });
+      if (matched.length < 2) return;
+
+      // Take back exactly what those investments bought. The money is not
+      // returned: it was spent.
+      var cell = game.support[seat];
+      matched.forEach(function (t) {
+        if (!cell || !t.bid.gained) return;
+        cell[t.party] = Math.max(0, round1((cell[t.party] || 0) - t.bid.gained));
+        if (!cell[t.party]) delete cell[t.party];
+      });
+
+      conflicts.push({
+        seat: Number(seat),
+        district: areaOf(seat),
+        amount: highest,
+        parties: matched.map(function (t) {
+          return t.party;
+        }),
+      });
+    });
+
+    return conflicts;
+  }
+
   function canPlay(game, actionId, target, amount) {
     var action = CMP.getAction(actionId);
     if (!action) return { ok: false, reason: 'Unknown action.' };
@@ -465,14 +695,26 @@ CMP.campaign = (function () {
       return { ok: false, reason: 'You have ended your round. Wait for the next one.' };
     }
     if (actionsLeft(game) <= 0) return { ok: false, reason: 'No moves left this round' };
-    if (resolveAmount(action, amount) > spendableOn(game, target).total) {
-      return { ok: false, reason: 'More than you can spend here' };
-    }
     if (action.needsConstituency && !target) {
       return { ok: false, reason: 'Choose a constituency first' };
     }
     if (action.needsConstituency && !game.support[target]) {
       return { ok: false, reason: 'Unknown constituency' };
+    }
+    if (action.needsConstituency && isWon(game, target)) {
+      return { ok: false, reason: wonReason(game, target) };
+    }
+
+    var cost = resolveAmount(action, amount);
+    var cap = entryCap(game, target, action);
+    if (cap && cost > cap) {
+      return {
+        ok: false,
+        reason: 'A first campaign here is capped at ' + money(cap),
+      };
+    }
+    if (cost > spendableOn(game, target).total) {
+      return { ok: false, reason: 'More than you can spend here' };
     }
     if (!roundIsLive(game)) {
       return { ok: false, reason: 'That round has closed. Wait for the next one.' };
@@ -544,6 +786,8 @@ CMP.campaign = (function () {
       o.roundActions = 0;
       o.roundSpent = 0;
       o.roundReady = false;
+      // Three moves an area, and a new round is three fresh ones everywhere.
+      o.areaBids = {};
       creditRoundIncome(o, round);
       creditDistrictGrants(withBoard(o, game), round);
     });
@@ -554,6 +798,7 @@ CMP.campaign = (function () {
     game.roundSpent = 0;
     game.roundGained = 0;
     game.roundActions = 0;
+    game.areaBids = {};
     creditRoundIncome(game, round);
     creditDistrictGrants(game, round);
 
@@ -608,7 +853,7 @@ CMP.campaign = (function () {
 
     // Grants already being paid by districts already held. Region-locked, so
     // they count toward capacity but are spent where they were earned.
-    var held = districtsHeldBy(game.support, game.partyId);
+    var held = districtsWonBy(game, game.partyId);
     var opening = game.openingDistricts || [];
     var perRound = held.reduce(function (t, d) {
       return opening.indexOf(d.id) === -1 ? t + d.grant : t;
@@ -900,6 +1145,22 @@ CMP.campaign = (function () {
       o.heat = clamp(o.heat - cool, 0, config().heat.max);
     });
 
+    /*
+     * Conflicts, before anything is counted.
+     *
+     * Two campaigns that matched each other's decisive investment in a
+     * district both lose what it bought, so the seats have to be counted
+     * after that is unwound rather than before.
+     */
+    summary.conflicts = settleConflicts(game);
+
+    /*
+     * Then the seats won outright, which is the other thing that can only
+     * happen at a settle: a seat cannot be won mid-round, so everybody plays
+     * the same board for the whole of it.
+     */
+    summary.won = settleWins(game, game.round);
+
     // The round is settled: seats are awarded now, not while it was running.
     var counts = settleSeats(game);
     (game.opponents || []).forEach(function (o) {
@@ -919,7 +1180,7 @@ CMP.campaign = (function () {
 
     // Territory, and what it will pay next round while it is held. Districts
     // the deal handed over pay nothing, so they are counted but not billed.
-    var heldNow = districtsHeldBy(game.support, game.partyId);
+    var heldNow = districtsWonBy(game, game.partyId);
     var openingHeld = game.openingDistricts || [];
     game.districtsHeld = heldNow.length;
     summary.districtsAfter = heldNow.length;
@@ -1012,6 +1273,13 @@ CMP.campaign = (function () {
     var cfg = CMP.CAMPAIGN.scoreboard;
     var majority = config().election.majority;
 
+    // Seats already won outright, per party.
+    var wonCount = {};
+    Object.keys(game.wonSeats || {}).forEach(function (seat) {
+      var id = game.wonSeats[seat].party;
+      wonCount[id] = (wonCount[id] || 0) + 1;
+    });
+
     var standingsRows = CMP.PLAYABLE_PARTIES.map(function (party) {
       var mine = party.id === game.partyId;
       var opponent = mine ? null : findOpponent(game, party.id);
@@ -1027,6 +1295,17 @@ CMP.campaign = (function () {
         avatar: mine ? game.avatar : (opponent ? opponent.avatar : null),
         isAI: !mine,
         seats: counts[party.id] || 0,
+
+        /*
+         * Won and leading are different facts and are kept apart.
+         *
+         * A won seat is finished and nobody can take it; a led seat is where
+         * that constituency stands today. `seats` is the projection — the two
+         * added together — because a led seat is still a seat if nothing
+         * changes, but a scoreboard that called them all won would be lying.
+         */
+        won: wonCount[party.id] || 0,
+        leading: Math.max(0, (counts[party.id] || 0) - (wonCount[party.id] || 0)),
         change: (counts[party.id] || 0) - before,
         heat: actor ? Math.round(actor.heat || 0) : 0,
         disqualified: !!(actor && actor.disqualified),
@@ -1282,6 +1561,7 @@ CMP.campaign = (function () {
    */
   var ACTOR_FIELDS = [
     'cash', 'spent', 'roundSpent', 'roundActions', 'roundGained',
+    'areaBids',
     'granted', 'raised', 'borrowed', 'repaid', 'interestPaid', 'finesPaid',
     'heat', 'defaults', 'borrowingBlocked', 'restrictedUntilTurn',
   ];
@@ -1379,6 +1659,7 @@ CMP.campaign = (function () {
       kind: 'campaign',
       label: action.label,
       seat: target || null,
+      district: areaOf(target),
       region: paid.region,
       fromGrant: paid.grant,
       fromCash: paid.cash,
@@ -1403,6 +1684,11 @@ CMP.campaign = (function () {
     }
 
     var applied = applySupport(game, target, outcome);
+
+    // What this particular investment bought here, so a conflict can take
+    // back exactly this and nothing else.
+    if (target) noteBid(game, target, cost, applied.player || 0);
+
 
     // Dearer actions are seen beyond the seat they are aimed at. The spill is
     // a fraction of whatever actually happened, so a costly campaign that goes
@@ -1605,6 +1891,20 @@ CMP.campaign = (function () {
         var seat = game.support[number];
 
         /*
+         * A seat already won is not counted again.
+         *
+         * It was decided during the campaign and locked; putting it back into
+         * the polling-day roll would let a seat nobody could contest change
+         * hands on the night, which is the opposite of what winning it meant.
+         */
+        var already = wonBy(game, number);
+        if (already) {
+          perSeat[String(number)] = { winner: already.party, share: already.share || 100, margin: 100 };
+          totals[already.party] = (totals[already.party] || 0) + 1;
+          return;
+        }
+
+        /*
          * Polling day works on shares, not on raw influence: what decides a
          * seat is how the campaigns stand against each other in it, and the
          * noise has to be in the same units as the thing it disturbs.
@@ -1667,7 +1967,7 @@ CMP.campaign = (function () {
           // counted off the final board; grant income is what those districts
           // actually paid out over the twenty rounds, which is not the same
           // number as holding them at the end.
-          districts: districtsHeldBy(game.support, id).length,
+          districts: districtsWonBy(game, id).length,
           grantIncome: (them && them.grantTotalEarned) || 0,
         };
       })
@@ -1829,6 +2129,7 @@ CMP.campaign = (function () {
     creditRoundIncome: creditRoundIncome,
     creditDistrictGrants: creditDistrictGrants,
     districtsHeldBy: districtsHeldBy,
+    districtsWonBy: districtsWonBy,
     openingDistrictsFor: openingDistrictsFor,
     districtStanding: districtStanding,
     amountRange: amountRange,
@@ -1867,6 +2168,14 @@ CMP.campaign = (function () {
     seatView: seatView,
     seatsLed: seatsLed,
     standings: standings,
+    settleConflicts: settleConflicts,
+    areaOf: areaOf,
+    entryCap: entryCap,
+    isEstablishedIn: isEstablishedIn,
+    isWon: isWon,
+    wonBy: wonBy,
+    wonReason: wonReason,
+    settleWins: settleWins,
     isContested: isContested,
     shareOf: shareOf,
     reviewField: reviewField,

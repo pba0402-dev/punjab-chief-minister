@@ -2,10 +2,14 @@
 
 Found a party — name it, badge it, pick its symbol and its colour — and fight a
 twenty-round campaign across all 117 Punjab assembly constituencies. Every seat
-starts empty: no leader, no percentage, nobody's. What a seat is worth is what
-has been spent in it, and the seats are awarded when a round is settled. Spend
-your allowance, borrow against it if you dare, and try to hold 59 when the polls
-close.
+starts empty: no leader, no percentage, nobody's.
+
+The game is the map. Tap a seat, decide how much to put into it, and come back
+to the board. Getting into an open seat costs a crore at most, so nobody buys
+their way in ahead of anybody else; after that you can spend what you like.
+Match a rival's decisive investment exactly and you both lose it. Take a seat
+convincingly enough and it is *won* — locked for the rest of the election, and
+a step toward controlling the district it sits in.
 
 Solo or with up to three friends — every empty chair is filled by an opponent
 that founds a party of its own, so the scoreboard always has four campaigns on
@@ -57,99 +61,100 @@ page served by PHP, since the lobby talks to `api/index.php`.
 
 ## The game screen
 
-Every screen answers one question, and campaigning is a drill-down rather than
-a wall of controls:
+The map is the game.
+
+Everything a player does in a round is decide where money goes, and the place
+that decision belongs is the board — so the board is the home screen, and
+campaigning is a tap on it rather than a page you navigate to. There is no
+dashboard of buttons any more.
 
 | | |
 | --- | --- |
-| **Home** | Who is winning? |
-| **Candidate** | Where am I winning, close, or losing? |
-| **Constituency** | What is happening here? |
-| **Campaign** | How much do I want to spend here? |
-
-Nothing is a long scrolling page. Every destination is **click → open → decide
-→ back**, and every screen but the one you start on carries its own way back.
+| **Home** | Where is the money going? |
+| **Campaign panel** | How much, into this seat, and at what risk? |
+| **My Areas** | What do I actually hold? |
+| **Constituency** | What is happening in this one seat? |
 
 Designed for a phone — 320 to 430px — and allowed to breathe on a larger
 screen rather than rebuilt for one.
 
 ### Home
 
-A sticky round strip (round, a dot per move remaining, the clock), one compact
-player row, then the menu, then the only thing home is for: **WHO'S LEADING?**
-— four candidates ranked by projected seats, each with their face and their
-place. One line for the majority. Then **LEADING FROM**, naming the tightest
-seats under each party.
+A compact round strip: a circular timer that drains as the round runs, `ROUND 4
+OF 20` beside it, and — in the same strip rather than in a card of its own —
+available, grant and spent. That last part matters more than it sounds. Money
+used to be a block under the header that cost a third of a phone screen to say
+three numbers, and a player deep in the map had to come back to Home to find
+out what they could afford. Now it is in the header, so it is on every screen.
 
-A compact circular timer sits in the corner and drains as the round runs —
-full circle at the start, empty at zero — with `ROUND 4 OF 20` beside it and,
-in a game with other people in it, how many of them have finished.
+Under the strip, two strategic buttons and nothing else: **MY AREAS** and
+**ALLIANCES**, side by side, because deciding what to defend and deciding who
+to defend it with are the same kind of thinking.
 
-Under that, the four figures that make the economy readable at a glance:
-available, new this round, spent, and how far through the ₹100 crore the
-campaign is. Region grant purses get their own line, because money that can
-only be spent in Majha is not the same money as cash.
-
-Then the menu — a two-column grid of ten, not a strip that scrolls sideways:
+Then the map, full width. A selector across the top — **All Punjab**, **Malwa**,
+**Majha**, **Doaba** — zooms to a region by computing the bounding box of its
+seats, so it frames whatever the geography actually is rather than a hard-coded
+rectangle. Pinch, drag, wheel and double-tap all work. The key under it reads:
 
 | | |
 | --- | --- |
-| **Campaign** | **Money** |
-| **Grants** | **Loan** |
-| **Corruption** | **Bribe** |
-| **Map** | **Constituencies** |
-| **My Areas** | **Alliances** |
+| ○ | **Open** — nobody has campaigned here |
+| ● | **Leading** — somebody is ahead today |
+| ⚔ | **Contested** — two campaigns are close |
+| ✓ | **Won** — taken, locked, finished |
 
-And at the foot of the screen, under everything a player might still want to
-do, **END ROUND** — reached by finishing rather than by accident.
+Below the map, **WHO'S LEADING?** — parties ranked by seats, each with their
+face, their won total and how many more they lead; then one line for the
+majority. At the foot, under everything a player might still want to do, **END
+ROUND**.
 
-It lives here rather than above every screen, which is what makes each
-destination a place you go and come back from instead of a tab you switch to.
+Money, grants, loans, the transaction history, all 117 constituencies and the
+election archive are in **More**. They are all screens a player visits
+occasionally and deliberately, which is exactly what a menu is for — and none
+of them is a move.
 
-No campaign actions live on home at all. Tapping a candidate is how you
-campaign, and so is the Campaign item — they open the same page.
+### The campaign panel
 
-### Candidate — the strategy centre
+Tapping a seat raises a sheet from the bottom of the screen with the map still
+behind it. The whole decision is on it:
 
-Tapping your own row opens a summary of where the campaign stands, not 117
-rows:
+- **where** — the seat's name and number, and a toggle between this **seat**
+  and its whole **district**, which spends across every seat in it at once
+- **who is there** — every party's share of this seat, or a line saying nobody
+  has campaigned here yet
+- **how much** — a slider and a stepper, bounded by what the campaign holds and
+  by the ₹1 crore entry cap when this would be a first investment, with the cap
+  explaining itself rather than silently refusing
+- **what kind** — Campaign, Negative, or Corruption
 
-- a ring showing **leading / close / behind** across all 117
-- **statewide support** — each party's average share across every seat, which
-  is a figure the game computes from its own board and not an opinion poll
-- the **five strongest seats** and the **five closest races**, each row
-  tappable straight through to the constituency
+Then confirm, read a short result, and the map comes back. That loop is the
+game, and every screen transition in the middle of it was a screen transition
+in the middle of it.
 
-**View all 117** opens the full list underneath: every constituency from your
-party's point of view, split by how the race stands — **Leading**, **Close**,
-**Losing**, **Uncontested** — with a search box and a sort that defaults to
-**closest race first**, because that is where a move changes a seat rather
-than padding a lead.
+A won seat opens the same panel, which says who won it and in which round, and
+offers nothing to spend.
 
-Tapping a rival's row opens the same page for them, but only what an election
-makes public: their seats and where they lead. Their cash reads *private*, and
-there are no campaign controls. Anyone watching an election can count seats;
-nobody can read a rival's bank statement.
+### My Areas
+
+Where the campaign stands, not 117 rows: a ring showing **won / leading / close
+/ behind**, statewide support computed from the game's own board, the strongest
+seats and the closest races — each tappable straight through to the seat. Then
+region by region: districts held, seats won, and the grant each one pays.
+
+**View all 117** opens the full list underneath, split by how the race stands,
+with a search box and a sort that defaults to **closest race first**, because
+that is where a move changes a seat rather than padding a lead.
+
+Tapping a rival opens the same page for them, but only what an election makes
+public: their seats and where they lead. Their cash reads *private*, and there
+are no campaign controls. Anyone watching an election can count seats; nobody
+can read a rival's bank statement.
 
 ### Constituency
 
-Who is leading with their face and share, a bar for every party, whether it
-changed hands, and — kept separate at the bottom — the real sitting MLA,
-labelled as reference that takes no part in the game. One primary button:
-**CAMPAIGN HERE**.
-
-### Campaign
-
-Two steps in a sheet over the top. Pick a move, then decide how much to put
-behind it. High-risk options sit behind a deliberate second tap, so nobody
-stumbles into one looking for a rally.
-
-Afterwards, a short result — the support moving, what it cost — and then
-**next closest seat** or **back to my areas**. The player is never sent out to
-a dashboard and made to navigate back.
-
-The map is the same journey by another route: tap a seat, and CAMPAIGN HERE
-works identically.
+Who is leading with their face and share, a bar for every party, and whether it
+changed hands. A won seat says so instead: **✓ PERMANENTLY WON**, by whom, in
+which round, and no controls at all.
 
 ### Money
 
@@ -159,22 +164,18 @@ and every movement of money this campaign as a transaction list — read back of
 the action log and the loan book rather than stored a second time, so the
 summary and the list can never disagree.
 
-### Corruption and Bribe
+### The two risks
 
-Two separate menus, because they are two different gambles. Corruption holds
-Secret Funding, Undisclosed Deal and Political Influence; Bribe holds Risky
-Vote Influence, Hidden Offer and Last-Minute Gamble. Each states its cost, its
-risk, what it might win and what it might cost in investigations and fines.
+Negative campaigning and corruption are options on the campaign panel rather
+than menus of their own. There were six named gambles across two screens; there
+are two now, because what a player is actually deciding is whether to take a
+risk with this money, not which flavour of it to take.
 
-Every one of them is a fictional mechanic and nothing else: a cost, a weighted
-table, a lot of heat, and a real chance of an investigation. None describes a
-method or explains how anything would be done. They are deliberately worse
-than campaigning on expectation — the upside is real, the downside is worse,
-and the heat lands whichever way the roll goes.
-
-Inside a constituency's campaign sheet the two are offered together behind one
-deliberate second tap, because there what matters is simply that the move can
-go wrong.
+Both are fictional mechanics and nothing else: a cost, a weighted table, a lot
+of heat, and a real chance of an investigation. Neither describes a method or
+explains how anything would be done. They are deliberately worse than
+campaigning on expectation — the upside is real, the downside is worse, and the
+heat lands whichever way the roll goes.
 
 ---
 
@@ -298,6 +299,75 @@ mattering. The undecided part splits at random on the day, which is what makes
 breadth a gamble and depth a decision, and why a seat left uncontested is a
 lottery rather than a free saving.
 
+### Where, how much, and whether to risk it
+
+There is one campaign action, and it is money into a seat.
+
+There used to be eleven — a rally, a media push, a community drive, a
+development programme. Choosing between them was a decision about vocabulary
+rather than about strategy: they were all money into a seat, and the only thing
+that ever varied was how much. So the choice is the amount now, and the two
+things that are genuinely different decisions sit beside it as optional
+modifiers on the same investment:
+
+- **Negative campaign** — the same money spent against a rival rather than for
+  yourself. Medium risk, and it can come back on you.
+- **Corruption / bribe** — the same money spent somewhere it should not go.
+  High risk, high return, and it goes wrong three times in ten. There is one of
+  these, not a menu: what a player is deciding is whether to take the risk at
+  all, not which flavour of it.
+
+Neither is ever necessary. An election can be fought and won on ordinary money,
+and is, in every balance run.
+
+### Getting into a seat costs a crore
+
+The first investment a campaign makes in a seat is capped at **₹1 crore**.
+
+That is what stops the board being bought. Without it the right play would be
+to find an empty seat and drop five crore on it before anybody noticed, and the
+first campaign to have money would take Punjab. With it, everybody walks in
+through the same door — and once a campaign has a presence there the cap is
+gone and it can spend whatever it holds.
+
+It is also what makes the conflict rule bite.
+
+### Matching a rival costs both of you
+
+Where two or more campaigns put **exactly the same largest sum** into the same
+seat in the same round, none of them gets what it paid for. The influence those
+particular investments bought is taken back out, and the money is gone. Nobody
+is refunded and nobody wins the exchange.
+
+Five campaigns walking into an open seat for a crore each all bounce off it and
+the seat stays open. Two established rivals matching five crore late on both
+lose the five crore. Only the decisive investment is void — everything else
+those campaigns did there stands, and they can try again next round.
+
+Conflicts are settled once, at the end of a round, on the server. A conflict is
+never a win.
+
+### Leading a seat and winning it
+
+**Leading** is where a seat stands today and can be taken back tomorrow.
+**Winning** it is final.
+
+At the end of a round, a campaign holding a commanding share of a seat that has
+had real work done in it is declared to have won it — and from that moment
+nobody campaigns there again. Not the winner, not anybody else, not with money,
+not with a negative campaign, not with a bribe. The server refuses it, so a
+direct request gets `SEAT_LOCKED` and nothing is deducted.
+
+Two conditions, and both matter: a commanding share says nobody else is close,
+and a floor under the total influence says the seat has actually been
+campaigned in rather than being one a party wandered into. Without the second,
+a single opening investment in an empty seat would lock it forever.
+
+A won seat is drawn in the winner's colour with a tick on it, counts under
+**WON** rather than **LEADING** on the scoreboard, and is not re-rolled on
+polling day. A district is **controlled** — and its grant becomes safe to pay
+for the rest of the election — only when every seat in it has been won.
+
 ### The allowance is income, not a limit
 
 Nobody starts with money. **₹5 crore arrives at the start of every round**, and
@@ -338,22 +408,31 @@ Punjab has three regions and the game uses the real ones, split by the rivers:
 | **Doaba** | the Bist Doab | 4 districts, 23 seats |
 | **Malwa** | south of the Sutlej | 15 districts, 69 seats |
 
-Hold **every** seat in a district and it pays its grant every round for as long
-as the hold lasts. Leading eight of nine pays nothing, which is what makes the
-last seat in a district worth more than the first seat in the next one. Grants
+**Win** every seat in a district — won, not led — and it pays its grant every
+round for the rest of the election. Leading eight of nine pays nothing, which
+is what makes the last seat in a district worth more than the first seat in the
+next one. Because control is built out of permanent wins it cannot be taken
+back, so a district is a position a campaign builds toward over many rounds
+rather than a lead it might hold this minute. Grants
 scale with district size, from ₹2 crore for a two-seat district to ₹30 crore
 for Ludhiana's fourteen.
 
 **The money is locked to its own region.** A Malwa grant fights Malwa seats and
 nothing else, so the map is worth reading rather than merely winning.
 
-### A grant is for a district taken, not one inherited
+### A grant is for a district taken
 
-The opening board is dealt from the sitting MLAs, and it hands one party six
-districts on average — eighteen on some seeds, worth ₹136 crore a round.
-Paying for those would settle the election before anybody campaigned. So the
-districts a party opens holding are its starting position and pay nothing,
-until it loses one and takes it back, which is a thing it did.
+Nobody opens holding anything, so there is nothing to inherit and no rule
+needed to stop it paying. Every grant in the game was earned by winning every
+seat in a district outright.
+
+There used to be. The board was dealt from the sitting members and handed one
+party six districts on average — eighteen on some seeds, worth ₹136 crore a
+round — so a district a player opened holding paid nothing until they lost it
+and took it back. That rule is still in the engine and still tested, because a
+guard against being paid for something you did not earn is worth keeping; it
+simply never fires now, because the list of districts anybody opens holding is
+empty.
 
 ## Alliances, and the checkpoint
 
@@ -398,13 +477,15 @@ spend outside the range by asking nicely.
 
 ## The campaign: twenty rounds
 
-A campaign is **15 rounds**, each **60 seconds**, and each round gives every
-player **3 moves**. Forty-five moves a campaign, for everybody.
+A campaign is **20 rounds**, each **two minutes** by default, and a round takes
+as many moves as a player can pay for.
 
-That cap is the most important balance decision in the game. Without it, a
-round rewards whoever clicks fastest, and a large purse converts straight into
-support at the speed of the mouse. With it, the question stops being *how much
-can I spend* and becomes *which three seats are worth it this minute*.
+There is no cap on moves, and there was: three a round, forty-five a campaign.
+It went because money became the constraint instead, and two constraints doing
+the same job means neither is legible. What bounds a round now is the purse,
+the ₹1 crore price of walking into a seat nobody holds, and the two minutes on
+the clock — so the question is *which seats are worth it*, answered with money
+rather than with a counter.
 
 ### The clock belongs to the server
 
@@ -598,9 +679,10 @@ The portraits are **drawn, never photographed** — small vector illustrations
 built from a seed: a face shape, a skin tone, a turban or hair, a beard,
 sometimes glasses, sometimes the lines of an older face. That is a deliberate
 choice rather than a shortcut. A photographic portrait of a fictional candidate
-would sooner or later resemble somebody real, and this game already puts real
-sitting MLAs on screen as reference; a drawn face can never be mistaken for one
-of them, and nothing here is derived from any real person's likeness.
+would sooner or later resemble somebody real; a drawn face cannot, and nothing
+here is derived from any real person's likeness. There are no real politicians
+anywhere in this game to be confused with — not in the data, not on the board,
+not on this screen.
 
 The seed is assigned once, when a player sits down, and stored with the game.
 The same seed always draws the same face — in round one, in round fifteen, and
@@ -683,30 +765,39 @@ All of it is worked out on the server. The browser asks; the server decides.
 Two routes, with opposite characters. Both are fictional game mechanics and
 neither describes any real-world method.
 
-- **Apply for a Grant** — ₹20 lakh of visible development work and a funding
-  application. No heat. Usually returns less than it cost on its own; worth
-  doing because the development also moves support.
-- **Underground Funding** — free to accept, can pay several times over, and is
-  the fastest way to raise heat in the game. It can also simply never arrive.
+- **Apply for a Grant** — visible development work and a funding application.
+  No heat. Usually returns less than it cost on its own; worth doing because
+  the development also moves support.
+- **A bribe that pays off** — one of the outcomes on the corruption roll
+  returns money rather than support, several times what went in. It is the
+  fastest way to raise heat in the game and it is a roll, not a plan.
 
-## Where the money goes, and why the dear ones reach further
+There is no separate underground-funding action any more. Free money you could
+simply take was a decision only in the sense that saying yes is a decision;
+folding it into the corruption table made it what it always should have been —
+one of the things that can happen when a campaign takes a risk.
 
-| Safe campaign | Cost | Reach | | Risky strategies | Cost | Reach |
-| --- | --- | --- | --- | --- | --- | --- |
-| Village Outreach | ₹10 lakh | 1 seat | | Negative Campaign | ₹30 lakh | 3 seats |
-| Public Rally | ₹15 lakh | 1 seat | | Secret Influence | ₹40 lakh | 4 seats |
-| Community Development | ₹20 lakh | 3 seats | | Underground Deal | ₹60 lakh | 5 seats |
-| Media Campaign | ₹25 lakh | 4 seats | | Last-Minute Push | ₹70 lakh | 6 seats |
+## Where the money goes
 
-The dearer actions **reach further** rather than hitting harder. A doorstep
-campaign moves one constituency; media coverage is seen in several. The extra
-seats take a fraction of the effect, and bad outcomes spread the same way — a
-media campaign that goes wrong goes wrong in public.
+Every action costs **₹1 crore** as its base, and the amount is the lever. What
+a sum is worth is `scale = (amount / ₹1 crore) ^ 0.72`, so five crore into a
+seat is worth about 3.2 times one crore rather than five — spending more in one
+place works, with diminishing returns, and spreading wide is a real alternative
+rather than a strictly better one.
 
-`node tools/calibrate-actions.mjs` measures what a crore of each action is
-actually worth, in seats expected on polling day, and reports the scaling that
-would flatten them. They currently sit between 0.49 and 0.70 seats a crore — a
-1.4× spread across eleven actions, with the cheap wide ones at the top.
+That exponent is the single most important number in the game. At 0.5 — a
+square root — splitting a sum across N seats is worth √N times aiming it at
+one, which makes touching every seat strictly correct and reading the map
+pointless. At 1.0 breadth is worth nothing and only depth pays. 0.72 was
+measured rather than picked: `node tools/balance-money.mjs` plays the exponent
+against strategies that aim and strategies that spread, and it is where neither
+dominates.
+
+`node tools/calibrate-actions.mjs` measures what a crore is actually worth in
+seats expected on polling day, at each amount a player can choose, and reports
+whether the curve pays for spending up. It exists because the dear end of the
+range was once a trap — a large amount bought less per rupee than several small
+ones, which is a tax on the player who commits.
 
 ### Does money decide the game?
 
@@ -988,8 +1079,8 @@ mechanics). Awarded by the server from the result, never claimed by the client.
 
 ## What the home screen does not download
 
-The 117 constituency records, the sitting MLAs and the map geometry are
-together the largest thing this game fetches, and the opening screen uses none
+The 117 constituency records and the map geometry are together the largest
+thing this game fetches, and the opening screen uses none
 of them — it shows a title, two buttons and some counters.
 
 So they are not in the page. `js/data/loader.js` pulls them in the moment
@@ -1084,8 +1175,8 @@ in `index.php` that constructs the store.
   every move, and needs no server; multiplayer state lives on the server, saved
   under lock on every change
 
-Everything in the brief is built. The obvious next things would be more than
-four players, and refreshing the MLA data before the next state election.
+Everything in the brief is built. The obvious next thing would be more than
+four players.
 
 ## Files
 
@@ -1098,11 +1189,11 @@ simple/
                            alliances, bulk), map, and finally mobile —
                            portrait phones, loaded last so it wins
   js/
-    data/parties.js          the four parties — the only place a party is defined
+    data/parties.js          the party registry — parties belong to a game now
+    data/avatars.js          the drawn character roster, and who gets which
     data/actions.js          GENERATED: costs, outcomes, heat, consequences
     data/loader.js           fetches the board when a game starts, not before
     data/constituencies.js   GENERATED: the 117 seats           ] fetched on
-    data/incumbents.js       GENERATED: the 117 sitting MLAs    ] demand,
     data/regions.js          GENERATED: regions, districts, grants ] not in
     data/geometry.js         GENERATED: map shapes and hex tiles   ] the page
     engine/rng.js            seeded randomness
@@ -1123,14 +1214,14 @@ simple/
     ui/scoreboard.js         the leaderboard, seat changes and round results
     ui/seats.js              leading-from, on the home screen
     ui/areas.js              a candidate's areas: leading, close, losing
-    ui/campaign-sheet.js     pick a move, pick an amount, see the result
+    ui/campaign-sheet.js     the bottom sheet: where, how much, what risk
     ui/allocate.js           one sum across many seats, in one decision
     ui/territory.js          priority districts, and alliances
     ui/map.js                the 117-seat map and tile view
-    ui/constituency.js       one seat: real MLA above, game race below
+    ui/constituency.js       one seat: the race, or who won it and when
     ui/oversight.js          rivals, reporting and your own record
     ui/result.js             result, hung assembly and coalition talks
-    ui/election.js           campaign panel
+    ui/election.js           the game screen — round strip, map, leaderboard
     app.js                   screen routing, autosave, boot
   api/
     index.php                front controller and routes

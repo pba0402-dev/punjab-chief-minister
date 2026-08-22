@@ -337,10 +337,6 @@ CMP.ai = (function () {
         return;
       }
       if (action.group === 'funding') {
-        // Undisclosed money is free and costs 24 heat, which is most of the
-        // way through the floor on its own. Same rule.
-        if (action.id === 'underground'
-          && (runningHot || heat + (action.heat || 0) >= consequencesFrom)) return;
         funding.push(action);
         return;
       }
@@ -359,8 +355,6 @@ CMP.ai = (function () {
     if (!safe.length) {
       var grant = find(funding, 'grant');
       if (grant) return grant;
-      var shady = find(funding, 'underground');
-      if (shady && rand() < profile.riskAppetite) return shady;
       return null;
     }
 

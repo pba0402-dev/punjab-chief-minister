@@ -49,6 +49,26 @@ CMP.ui.election = (function () {
    * opened Money twice already does not need to be told it is where the cash
    * is. One word is enough to disambiguate, which is all a label owes anybody.
    */
+  /*
+   * The menu: eight destinations, two columns.
+   *
+   * My Areas and Alliances used to be here and are not any more. They are not
+   * gone — My Areas is reached from the map and the constituency list, which
+   * is where somebody thinking about territory already is, and Alliances is
+   * under More with the other things that are about the election rather than
+   * about this round. Eight buttons fit a phone without scrolling; ten did not.
+   */
+  /*
+   * Every screen in the game, and where it is reached from.
+   *
+   * There is no dashboard of buttons any more. Home is the map, because what
+   * a player does every round is decide where to put money and the place that
+   * decision lives is the board. My Areas and Alliances sit above the map as
+   * the two strategic screens; the rest are under More, because none of them
+   * is a thing anybody opens every round.
+   *
+   * The list survives because a screen still needs a title and a way back.
+   */
   var SECTIONS = [
     { id: 'areas', label: 'Campaign', hint: 'Seats', icon: '◆' },
     { id: 'money', label: 'Money', hint: 'Cash', icon: '₹' },
@@ -57,14 +77,15 @@ CMP.ui.election = (function () {
     { id: 'corruption', label: 'Corruption', hint: 'Risk', icon: '▲', risky: true },
     { id: 'bribe', label: 'Bribe', hint: 'Risk', icon: '▲', risky: true },
     { id: 'map', label: 'Map', hint: 'Punjab', icon: '◉' },
-    { id: 'priorities', label: 'My Areas', hint: 'Targets', icon: '★' },
     { id: 'seats', label: 'Constituencies', hint: '117', icon: '☰' },
+    { id: 'priorities', label: 'My Areas', hint: 'Targets', icon: '★' },
     { id: 'allies', label: 'Alliances', hint: 'Partners', icon: '⚭' },
   ];
 
   function sectionById(id) {
-    for (var i = 0; i < SECTIONS.length; i++) {
-      if (SECTIONS[i].id === id) return SECTIONS[i];
+    var all = SECTIONS;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].id === id) return all[i];
     }
     return null;
   }
@@ -104,12 +125,25 @@ CMP.ui.election = (function () {
         return null;
       },
     });
+    var resultsShown = false;   // the sequence has run for this round
+
     var resultsView = CMP.ui.scoreboard.create({
       you: function () {
         return game ? game.partyId : null;
       },
       trend: function () {
         return (game && game.seatTrend) || [];
+      },
+      /*
+       * The sequence has finished, so give the board back.
+       *
+       * The round is still being counted underneath — the server owns that
+       * clock — but the player has seen what happened and should not be held
+       * on a screen they have finished reading.
+       */
+      onFinished: function () {
+        resultsShown = true;
+        if (game) render(game);
       },
     });
     mount(resultsNode, [resultsView.root]);
@@ -407,6 +441,34 @@ CMP.ui.election = (function () {
         el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
           el('h2', { class: 'sheet-title', text: 'Menu' }),
 
+          /*
+           * Everything that came off the dashboard.
+           *
+           * The map is the game now, and none of these is a thing anybody
+           * opens every round: money is a ledger you check, grants and loans
+           * are occasional decisions, and the risky screens are where you go
+           * to read about heat rather than to campaign — campaigning with a
+           * bribe happens on the map with everything else.
+           */
+          el('div', { class: 'sheet-group' }, [
+            { id: 'money', label: 'Money' },
+            { id: 'grants', label: 'Grants' },
+            { id: 'loan', label: 'Loan' },
+            { id: 'corruption', label: 'Corruption' },
+            { id: 'bribe', label: 'Bribe' },
+            { id: 'seats', label: 'All 117 constituencies' },
+          ].map(function (item) {
+            return el('button', {
+              class: 'sheet-item',
+              type: 'button',
+              text: item.label,
+              onclick: function () {
+                close();
+                setSection(item.id);
+              },
+            });
+          })),
+
           el('button', {
             class: 'sheet-item',
             type: 'button',
@@ -574,54 +636,41 @@ CMP.ui.election = (function () {
     /* ----------------------------------------------------- player strip */
 
     /*
-     * The money, in one line.
+     * The money, beside the clock.
      *
-     * This replaced two things: a card with a portrait, a name, a party and a
-     * seat count, and a separate panel of figures underneath. Between them
-     * they took a third of the screen to say what fits in a strip — and the
-     * portrait and name were the two facts the player is least likely to have
-     * forgotten.
+     * Three figures, in the header, on every screen. It used to be a card of
+     * its own under the round bar, which cost a third of a phone screen to say
+     * what fits in a corner — and meant a player deep in the map had to come
+     * back to Home to find out what they could afford.
      *
-     * What is left is what changes: what you can spend, what arrived this
-     * round, and what has gone. Available is the one that matters, so it is
-     * the one that is larger.
+     * What is here is what changes: what you can spend, what the districts are
+     * paying, and what has gone this round. Available is the one that decides
+     * anything, so it is the one that is larger.
      */
     function paintPlayer() {
       var cash = CMP.campaign.remaining(game);
       var grants = CMP.campaign.grantTotal(game);
       var debt = CMP.campaign.debtOf(game);
-      var income = (CMP.CAMPAIGN.income || {}).perRound || 0;
 
-      function figure(label, value, cls) {
-        return el('div', { class: 'g-fig' + (cls ? ' ' + cls : '') }, [
+      function figure(label, value, cls, onclick) {
+        return el(onclick ? 'button' : 'div', {
+          class: 'g-fig' + (cls ? ' ' + cls : ''),
+          type: onclick ? 'button' : null,
+          onclick: onclick || null,
+        }, [
           el('span', { class: 'g-fig-label', text: label }),
           el('strong', { class: 'g-fig-value', text: value }),
         ]);
       }
 
-      mount(playerNode, [
+      mount(roundView.aside, [
         figure('Available', money.words(cash) || '₹0', 'is-lead'),
-        figure('New', '+' + money.words(income)),
+        figure('Grant', money.words(grants) || '₹0', grants ? 'is-grant' : null,
+          grants ? function () { setSection('grants'); } : null),
         figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
-        grants
-          ? el('button', {
-              class: 'g-fig is-grant',
-              type: 'button',
-              onclick: function () {
-                setSection('grants');
-              },
-            }, [
-              el('span', { class: 'g-fig-label', text: 'Grants' }),
-              el('strong', { class: 'g-fig-value', text: money.words(grants) }),
-            ])
-          : null,
-        debt
-          ? el('div', { class: 'g-fig is-debt' }, [
-              el('span', { class: 'g-fig-label', text: 'Owed' }),
-              el('strong', { class: 'g-fig-value', text: money.words(debt) }),
-            ])
-          : null,
+        debt ? figure('Owed', money.words(debt), 'is-debt') : null,
       ]);
+      mount(playerNode, []);
     }
 
     /* -------------------------------------------------------------- nav */
@@ -813,21 +862,10 @@ CMP.ui.election = (function () {
       window.setTimeout(close, 4000);
     }
 
-    /** The two-column menu. Lives on the home screen, not above every screen. */
-    function menuGrid() {
-      return el('nav', { class: 'g-menu', 'aria-label': 'Menu' }, SECTIONS.map(function (s) {
-        return el('button', {
-          class: 'g-menu-item' + (s.risky ? ' is-risky' : ''),
-          type: 'button',
-          onclick: function () {
-            setSection(s.id);
-          },
-        }, [
-          el('span', { class: 'g-menu-icon', 'aria-hidden': 'true', text: s.icon }),
-          el('span', { class: 'g-menu-label', text: s.label }),
-          el('span', { class: 'g-menu-hint', text: s.hint }),
-        ]);
-      }));
+    function paintNotice() {
+      mount(noticeNode, notice
+        ? [el('p', { class: 'notice notice-' + notice.tone, text: notice.text })]
+        : []);
     }
 
     /** Every screen but home opens with a way back to it. */
@@ -849,12 +887,14 @@ CMP.ui.election = (function () {
       ]);
     }
 
-    function paintNotice() {
-      mount(noticeNode, notice
-        ? [el('p', { class: 'notice notice-' + notice.tone, text: notice.text })]
-        : []);
-    }
-
+    /*
+     * The four places worth one tap from anywhere.
+     *
+     * Home, because a player deep in the map should never have to guess their
+     * way out; and the three screens a round is actually played from. It sits
+     * under the header on every screen but Home, where the menu grid is the
+     * same thing said larger.
+     */
     /* --------------------------------------------------------- the body */
 
     function paintBody() {
@@ -872,8 +912,8 @@ CMP.ui.election = (function () {
         return;
       }
 
-      // Every other screen is a destination reached from the menu, so each
-      // one carries its own way back.
+      // Every other screen is reached from More or from the map, so each one
+      // carries its own way back.
       var body;
       if (section === 'candidate') body = [candidateSection()];
       else if (section === 'areas') body = [areasSection()];
@@ -882,19 +922,44 @@ CMP.ui.election = (function () {
       else if (section === 'loan') body = loanSection();
       else if (section === 'corruption') body = riskSection('corruption');
       else if (section === 'bribe') body = riskSection('bribe');
-      else if (section === 'map') body = [mapSection()];
+      else if (section === 'map') body = [toMyAreas(), mapSection()];
       else if (section === 'seats') body = [seatsSection()];
       else if (section === 'priorities') body = prioritiesSection();
       else if (section === 'allies') body = alliesSection();
       else body = [];
 
       // The candidate's own screen carries its own portrait, name and back
-      // arrow, so it does not want a second header on top. Everything else
-      // does — including the map, which is otherwise a screen with no way
-      // off it.
+      // arrow, so it does not want a second header on top.
       var meta = sectionById(section);
       var wantsHead = section !== 'areas' && section !== 'candidate';
       mount(bodyNode, (wantsHead && meta ? [sectionHead(meta.label)] : []).concat(body));
+    }
+
+    /**
+     * The way through to My Areas.
+     *
+     * It came off the main grid — eight buttons fit a phone and ten did not —
+     * and lives here instead, on the two screens somebody thinking about
+     * territory is already looking at.
+     */
+    function toMyAreas() {
+      return el('button', {
+        class: 'g-jump',
+        type: 'button',
+        onclick: function () {
+          setSection('priorities');
+        },
+      }, [
+        el('span', { class: 'g-jump-icon', 'aria-hidden': 'true', text: '★' }),
+        el('span', { class: 'g-jump-body' }, [
+          el('strong', { class: 'g-jump-label', text: 'My Areas' }),
+          el('span', {
+            class: 'g-jump-note',
+            text: 'Districts, grants and where to attack',
+          }),
+        ]),
+        el('span', { class: 'g-jump-chev', 'aria-hidden': 'true', text: '›' }),
+      ]);
     }
 
     /* ---------------------------------------------------- campaign home */
@@ -904,15 +969,46 @@ CMP.ui.election = (function () {
      * here — tapping a candidate opens their areas, and that is where the
      * spending decisions are made.
      */
+    /*
+     * Home, which is now mostly the map.
+     *
+     * It used to be ten buttons and a scoreboard, and the map was one of the
+     * ten. That had the game backwards: what a player is doing every round is
+     * deciding where to put money, and the place that decision lives is the
+     * board. So the board is here, and the rest is two buttons and a menu.
+     *
+     * Money, grants, loans and the risky screens are all still reachable —
+     * under More — but none of them is a thing anybody opens every round.
+     */
     function homeSection() {
       var counts = CMP.campaign.heldSeats(game);
       var people = roster();
 
       return [
-        menuGrid(),
+        el('div', { class: 'g-strategy' }, [
+          strategyButton('priorities', '★', 'My Areas', 'Districts and grants'),
+          strategyButton('allies', '⚭', 'Alliances', 'Partners'),
+        ]),
+        mapSection(),
         leaderboardBlock(counts, people),
         majorityLine(counts),
       ];
+    }
+
+    function strategyButton(id, icon, label, note) {
+      return el('button', {
+        class: 'g-strategy-item',
+        type: 'button',
+        onclick: function () {
+          setSection(id);
+        },
+      }, [
+        el('span', { class: 'g-strategy-icon', 'aria-hidden': 'true', text: icon }),
+        el('span', { class: 'g-strategy-body' }, [
+          el('strong', { class: 'g-strategy-label', text: label }),
+          el('span', { class: 'g-strategy-note', text: note }),
+        ]),
+      ]);
     }
 
     /*
@@ -924,19 +1020,38 @@ CMP.ui.election = (function () {
      * they lose one.
      */
     function grantsSection() {
+      /*
+       * A grant is paid for seats won, not seats led.
+       *
+       * The distinction is the whole screen. Leading nine of nine districts
+       * pays nothing and can evaporate in a round; winning nine of nine pays
+       * every round to the end of the election and cannot be taken back. So
+       * the count under each district is won-of-total, and what is only led
+       * is shown as progress toward it rather than as a holding.
+       */
       var leaders = CMP.campaign.currentLeaders(game.support);
       var opening = game.openingDistricts || [];
+      var wonSeats = game.wonSeats || {};
+
+      function wonIn(d) {
+        return d.seats.filter(function (n) {
+          return (wonSeats[String(n)] || {}).party === game.partyId;
+        }).length;
+      }
 
       var blocks = CMP.REGIONS.map(function (region) {
         var held = [];
         var close = [];
 
         CMP.districtsInRegion(region.id).forEach(function (d) {
-          var mine = d.seats.filter(function (n) {
+          var mine = wonIn(d);
+          var leading = d.seats.filter(function (n) {
             return leaders[n] === game.partyId;
           }).length;
-          if (mine === d.seats.length) held.push({ d: d, mine: mine });
-          else if (mine >= d.seats.length - 2) close.push({ d: d, mine: mine });
+          if (mine === d.seats.length) held.push({ d: d, mine: mine, leading: leading });
+          else if (mine || leading >= d.seats.length - 2) {
+            close.push({ d: d, mine: mine, leading: leading });
+          }
         });
 
         var paying = held.filter(function (row) {
@@ -958,7 +1073,7 @@ CMP.ui.election = (function () {
             class: 'g-block-note',
             text: perRound
               ? money.words(perRound) + ' a round from ' + paying.length +
-                ' district' + (paying.length === 1 ? '' : 's') + ' you took.'
+                ' district' + (paying.length === 1 ? '' : 's') + ' you control.'
               : 'No districts here are paying yet.',
           }),
 
@@ -966,14 +1081,19 @@ CMP.ui.election = (function () {
             ? el('div', { class: 'g-districts' }, held.map(function (row) {
                 var inherited = opening.indexOf(row.d.id) !== -1;
                 return el('div', { class: 'g-district is-held' }, [
-                  el('span', { class: 'g-district-name', text: row.d.name }),
+                  el('span', { class: 'g-district-name' }, [
+                    row.d.name,
+                    el('span', { class: 'g-district-state', text: 'District controlled ✓' }),
+                  ]),
                   el('span', {
                     class: 'g-district-seats',
-                    text: row.mine + ' / ' + row.d.seats.length,
+                    text: row.mine + ' / ' + row.d.seats.length + ' won',
                   }),
                   el('span', {
                     class: 'g-district-grant' + (inherited ? ' is-quiet' : ''),
-                    text: inherited ? 'inherited' : money.words(row.d.grant) + ' a round',
+                    text: inherited
+                      ? 'inherited'
+                      : money.words(row.d.grant) + ' a round · grant active',
                   }),
                 ]);
               }))
@@ -981,16 +1101,24 @@ CMP.ui.election = (function () {
 
           close.length
             ? el('div', { class: 'g-districts' }, close.map(function (row) {
+                var short = row.d.seats.length - row.mine;
                 return el('div', { class: 'g-district' }, [
-                  el('span', { class: 'g-district-name', text: row.d.name }),
+                  el('span', { class: 'g-district-name' }, [
+                    row.d.name,
+                    row.leading > row.mine
+                      ? el('span', {
+                          class: 'g-district-state is-quiet',
+                          text: 'leading ' + row.leading + ' · not yet won',
+                        })
+                      : null,
+                  ]),
                   el('span', {
                     class: 'g-district-seats',
-                    text: row.mine + ' / ' + row.d.seats.length,
+                    text: row.mine + ' / ' + row.d.seats.length + ' won',
                   }),
                   el('span', {
                     class: 'g-district-grant is-quiet',
-                    text: (row.d.seats.length - row.mine) + ' more for ' +
-                      money.words(row.d.grant),
+                    text: 'win ' + short + ' more for ' + money.words(row.d.grant),
                   }),
                 ]);
               }))
@@ -1001,9 +1129,9 @@ CMP.ui.election = (function () {
       return [
         el('p', {
           class: 'g-block-note',
-          text: 'Hold every seat in a district and it pays you every round. ' +
-            'The money is locked to its own region — Malwa money fights Malwa ' +
-            'seats and nothing else.',
+          text: 'Win every seat in a district — won, not led — and it pays you ' +
+            'every round for the rest of the election. The money is locked to ' +
+            'its own region: Malwa money fights Malwa seats and nothing else.',
         }),
       ].concat(blocks);
     }
@@ -1291,7 +1419,7 @@ CMP.ui.election = (function () {
 
       return el('div', { class: 'act-list' }, actions.map(function (action) {
         var check = CMP.campaign.canPlay(game, action.id, selected);
-        var risky = action.group === 'risky' || action.id === 'underground';
+        var risky = action.group === 'risky';
 
         return el('div', {
           class: 'act' + (risky ? ' is-risky' : '') + (check.ok ? '' : ' is-blocked')
@@ -1754,11 +1882,19 @@ CMP.ui.election = (function () {
      * The map is the second route to a constituency. Tapping a seat opens it,
      * and CAMPAIGN HERE works exactly as it does from the areas list.
      */
+    /*
+     * The map, which is where a round is played.
+     *
+     * Tapping a seat opens the campaign panel over the top of it rather than
+     * navigating anywhere: pick a seat, put money in, come back to the map.
+     * That loop is the game, and every screen transition in the middle of it
+     * was a screen transition in the middle of it.
+     */
     function mapSection() {
       if (!mapView) {
         mapView = CMP.ui.map.create({
           onSelect: function (num) {
-            openSeatDetail(num);
+            campaignHere(num);
           },
         });
       }
@@ -1807,13 +1943,21 @@ CMP.ui.election = (function () {
      * next seat. The player never gets sent back out to a dashboard to do it
      * again — that round trip was the whole problem with the old flow.
      */
-    function campaignHere(seat) {
+    function campaignHere(seat, districtId) {
       selected = Number(seat);
 
       CMP.ui.campaignSheet
         .open(game, seat, {
+          district: districtId || CMP.campaign.areaOf(seat),
           play: function (actionId, target, amount) {
             return Promise.resolve(opts.play(actionId, target, amount));
+          },
+          playBulk: function (actionId, seats, total) {
+            return Promise.resolve(allocate(actionId, seats, total)).then(function (res) {
+              return res && res.ok
+                ? { ok: true, report: res.reports && res.reports[0], game: game }
+                : { ok: false, reason: (res && res.reason) || 'That could not be played.' };
+            });
           },
           onNotice: setNotice,
         })
@@ -1881,7 +2025,7 @@ CMP.ui.election = (function () {
 
       var cash = CMP.campaign.remaining(game);
       var def = action.needsConstituency ? seatDef(selected) : null;
-      var risky = action.group === 'risky' || action.id === 'underground';
+      var risky = action.group === 'risky';
 
       CMP.ui.dialog
         .confirm({
@@ -1995,6 +2139,8 @@ CMP.ui.election = (function () {
       if (game.round !== lastRound) {
         lastRound = game.round;
         seatHistory = {};
+        // A new round is a new set of results to sit through.
+        resultsShown = false;
       }
 
       paintHead();
@@ -2004,7 +2150,7 @@ CMP.ui.election = (function () {
 
       // While the round is being counted the menu is not offered at all —
       // paintBody clears the body, and the results panel has the screen.
-      var counting = isCounting();
+      var counting = isCounting() && !resultsShown;
       resultsNode.style.display = counting ? '' : 'none';
 
       if (counting) {

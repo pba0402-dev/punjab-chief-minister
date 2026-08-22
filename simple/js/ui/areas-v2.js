@@ -33,12 +33,24 @@ CMP.ui.myAreas = (function () {
 
     /* ------------------------------------------------------- reading */
 
-    /** How a district stands: who leads it, seat by seat, and what it pays. */
-    function readDistrict(d, leaders) {
+    /*
+     * How a district stands.
+     *
+     * Two counts, and the difference between them is the screen. `leading` is
+     * where the seats stand today and can be taken back tomorrow; `won` is
+     * permanent. A district only pays its grant when every seat in it has been
+     * won, so `need` counts what is still to be won — including the seats this
+     * campaign is already leading, which are the cheapest ones left but are
+     * not banked.
+     */
+    function readDistrict(d, leaders, won) {
       var byParty = {};
+      var wonBy = {};
       d.seats.forEach(function (n) {
         var who = leaders[n];
         if (who) byParty[who] = (byParty[who] || 0) + 1;
+        var w = won[String(n)];
+        if (w) wonBy[w.party] = (wonBy[w.party] || 0) + 1;
       });
 
       var ranked = Object.keys(byParty).map(function (id) {
@@ -47,26 +59,38 @@ CMP.ui.myAreas = (function () {
         return b.seats - a.seats;
       });
 
-      var mine = byParty[game.partyId] || 0;
+      var mine = wonBy[game.partyId] || 0;
+      var leading = byParty[game.partyId] || 0;
       var inherited = (game.openingDistricts || []).indexOf(d.id) !== -1;
+
+      // Who controls it outright, if anybody does.
+      var owner = null;
+      Object.keys(wonBy).forEach(function (id) {
+        if (wonBy[id] === d.seats.length) owner = id;
+      });
 
       return {
         district: d,
         byParty: byParty,
+        wonBy: wonBy,
         ranked: ranked,
         leader: ranked.length ? ranked[0].party : null,
+        owner: owner,
         mine: mine,
+        leading: leading,
         total: d.seats.length,
         need: d.seats.length - mine,
         held: mine === d.seats.length,
+        lost: !!owner && owner !== game.partyId,
         inherited: inherited,
       };
     }
 
     function allDistricts() {
       var leaders = CMP.campaign.currentLeaders(game.support);
+      var won = game.wonSeats || {};
       return CMP.DISTRICTS.map(function (d) {
-        return readDistrict(d, leaders);
+        return readDistrict(d, leaders, won);
       });
     }
 
@@ -80,7 +104,9 @@ CMP.ui.myAreas = (function () {
      */
     function bestTarget(rows) {
       var candidates = rows.filter(function (r) {
-        return !r.held && r.need > 0 && r.need <= 4;
+        // A district a rival has already won every seat in is not a target;
+        // it is a finished piece of the map.
+        return !r.held && !r.lost && r.need > 0 && r.need <= 4;
       });
       if (!candidates.length) return null;
 
@@ -105,6 +131,59 @@ CMP.ui.myAreas = (function () {
       if (at === -1) selected.push(id);
       else selected.splice(at, 1);
       paint();
+    }
+
+    /**
+     * What the campaign actually holds.
+     *
+     * Everything else on this screen is about what to do next; this is the
+     * one block that says where things stand. Won and leading are side by
+     * side and never added together — a campaign leading forty seats and
+     * holding two is in a completely different position from one holding
+     * forty, and a single total would hide exactly that.
+     */
+    function control(rows) {
+      var won = Object.keys(game.wonSeats || {}).filter(function (seat) {
+        return game.wonSeats[seat].party === game.partyId;
+      }).length;
+      var leaders = CMP.campaign.currentLeaders(game.support);
+      var leading = Object.keys(leaders).filter(function (seat) {
+        return leaders[seat] === game.partyId && !(game.wonSeats || {})[seat];
+      }).length;
+      var controlled = rows.filter(function (r) {
+        return r.held;
+      });
+      var income = controlled.reduce(function (t, r) {
+        return t + (r.inherited ? 0 : r.district.grant);
+      }, 0);
+
+      return el('section', { class: 'ma-control' }, [
+        el('h3', { class: 'ma-control-title', text: 'Your control' }),
+        el('div', { class: 'ma-control-figs' }, [
+          el('div', { class: 'ma-control-fig is-won' }, [
+            el('strong', { class: 'ma-control-value', text: String(won) }),
+            el('span', { class: 'ma-control-label', text: 'seats won' }),
+          ]),
+          el('div', { class: 'ma-control-fig' }, [
+            el('strong', { class: 'ma-control-value', text: String(leading) }),
+            el('span', { class: 'ma-control-label', text: 'leading' }),
+          ]),
+          el('div', { class: 'ma-control-fig' }, [
+            el('strong', { class: 'ma-control-value', text: String(controlled.length) }),
+            el('span', { class: 'ma-control-label', text: 'districts' }),
+          ]),
+          el('div', { class: 'ma-control-fig is-money' }, [
+            el('strong', { class: 'ma-control-value', text: money.words(income) || '₹0' }),
+            el('span', { class: 'ma-control-label', text: 'grants a round' }),
+          ]),
+        ]),
+        el('p', {
+          class: 'ma-control-note',
+          text: won
+            ? 'Won seats are yours for the rest of the election. Leading seats are not.'
+            : 'Nothing is won yet. A seat is won by taking a commanding share of it.',
+        }),
+      ]);
     }
 
     /** The bar across the top: what is selected, and what there is to spend. */
@@ -157,21 +236,37 @@ CMP.ui.myAreas = (function () {
       var on = selected.indexOf(d.id) !== -1;
       var leaderParty = row.leader ? CMP.getParty(row.leader) : null;
 
-      return el('div', { class: 'ma-district' + (on ? ' is-on' : '') + (row.held ? ' is-held' : '') }, [
+      var ownerParty = row.owner ? CMP.getParty(row.owner) : null;
+      var finished = row.held || row.lost;
+
+      return el('div', {
+        class: 'ma-district' + (on ? ' is-on' : '') + (row.held ? ' is-held' : '') +
+          (row.lost ? ' is-lost' : ''),
+      }, [
         el('div', { class: 'ma-d-top' }, [
           el('div', { class: 'ma-d-name-wrap' }, [
             el('strong', { class: 'ma-d-name', text: d.name }),
-            el('span', { class: 'ma-d-seats', text: d.seats.length + ' seats' }),
+            el('span', {
+              class: 'ma-d-seats',
+              text: row.mine + ' / ' + d.seats.length + ' won',
+            }),
           ]),
-          el('button', {
-            class: 'ma-d-select' + (on ? ' is-on' : ''),
-            type: 'button',
-            'aria-pressed': on ? 'true' : 'false',
-            text: on ? 'Selected' : 'Select',
-            onclick: function () {
-              toggle(d.id);
-            },
-          }),
+          // A district where every seat is decided has nothing left to spend
+          // on, so it offers nothing to select.
+          finished
+            ? el('span', {
+                class: 'ma-d-locked',
+                text: row.held ? 'Controlled ✓' : ownerParty.short + ' ✓',
+              })
+            : el('button', {
+                class: 'ma-d-select' + (on ? ' is-on' : ''),
+                type: 'button',
+                'aria-pressed': on ? 'true' : 'false',
+                text: on ? 'Selected' : 'Select',
+                onclick: function () {
+                  toggle(d.id);
+                },
+              }),
         ]),
 
         // Who holds what, as a stacked bar. Four numbers in a row is a table;
@@ -203,14 +298,22 @@ CMP.ui.myAreas = (function () {
          * count seats to work out that one more here starts a grant.
          */
         el('p', {
-          class: 'ma-d-goal' + (row.held ? ' is-held' : row.need <= 2 ? ' is-close' : ''),
+          class: 'ma-d-goal' + (row.held ? ' is-held' : row.lost ? ' is-lost' :
+            row.need <= 2 ? ' is-close' : ''),
           text: row.held
             ? (row.inherited
                 ? 'Held from the start — pays nothing until you lose it and win it back'
-                : 'Controlled · ' + money.words(d.grant) + ' every round')
-            : row.need === 1
-              ? 'One more seat unlocks ' + money.words(d.grant) + ' a round'
-              : row.need + ' more seats for ' + money.words(d.grant) + ' a round',
+                : 'Controlled ✓ · ' + money.words(d.grant) +
+                  ' every round for the rest of the election')
+            : row.lost
+              ? ownerParty.short + ' has won every seat here. Nothing left to fight for.'
+              : (row.need === 1
+                  ? 'Win one more seat to unlock ' + money.words(d.grant) + ' a round'
+                  : 'Win ' + row.need + ' more seats for ' + money.words(d.grant) +
+                    ' a round') +
+                (row.leading > row.mine
+                  ? ' · leading ' + row.leading + ' of them already'
+                  : ''),
         }),
       ]);
     }
@@ -219,7 +322,7 @@ CMP.ui.myAreas = (function () {
       if (!game) return;
 
       var rows = allDistricts();
-      var body = [header(rows)];
+      var body = [control(rows), header(rows)];
 
       var rec = recommendation(rows);
       if (rec) body.push(rec);
@@ -232,6 +335,12 @@ CMP.ui.myAreas = (function () {
         var held = inRegion.filter(function (r) {
           return r.held;
         }).length;
+        var seatsWon = inRegion.reduce(function (t, r) {
+          return t + r.mine;
+        }, 0);
+        var seatsAll = inRegion.reduce(function (t, r) {
+          return t + r.total;
+        }, 0);
         var purse = CMP.campaign.grantIn(game, region.id);
 
         return el('button', {
@@ -245,7 +354,8 @@ CMP.ui.myAreas = (function () {
           el('strong', { class: 'ma-region-name', text: region.name }),
           el('span', {
             class: 'ma-region-note',
-            text: inRegion.length + ' districts · ' + held + ' held',
+            text: seatsWon + ' / ' + seatsAll + ' seats · ' + held + ' of ' +
+              inRegion.length + ' districts',
           }),
           purse
             ? el('span', { class: 'ma-region-purse', text: money.words(purse) })
@@ -272,10 +382,21 @@ CMP.ui.myAreas = (function () {
       }
 
       /* ---- opposition ---- */
+      /*
+       * Where a rival is about to lock a district away.
+       *
+       * Sorted by how close they are rather than by what it pays, because
+       * once every seat is won the district is gone for good — a cheap
+       * district about to close is more urgent than a dear one nobody is
+       * near finishing.
+       */
       var opposition = rows.filter(function (r) {
-        return r.leader && r.leader !== game.partyId && r.need <= 3 && !r.held;
+        if (r.held || r.lost) return false;
+        if (!r.leader || r.leader === game.partyId) return false;
+        var theirs = r.wonBy[r.leader] || 0;
+        return r.total - theirs <= 3 || r.need <= 3;
       }).sort(function (a, b) {
-        return a.need - b.need;
+        return (a.total - (a.wonBy[a.leader] || 0)) - (b.total - (b.wonBy[b.leader] || 0));
       }).slice(0, 4);
 
       if (opposition.length && !openRegion) {
@@ -283,7 +404,7 @@ CMP.ui.myAreas = (function () {
           el('h3', { class: 'g-block-title', text: 'Opposition areas' }),
           el('p', {
             class: 'g-block-note',
-            text: 'Districts a rival is holding together, and close enough to break.',
+            text: 'Districts a rival is close to locking away for good.',
           }),
           el('div', { class: 'ma-districts' }, opposition.map(districtCard)),
         ]));

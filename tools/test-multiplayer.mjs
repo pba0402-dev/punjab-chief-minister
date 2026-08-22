@@ -154,22 +154,46 @@ async function openClient(label, seedSession) {
  * reaching any section means going back first. Driving the suites the same way
  * a player moves is what proves the way back exists on every screen.
  */
+/*
+ * Back to the board.
+ *
+ * Home is the map with the two strategic buttons above it: there is no menu
+ * grid to find any more, so arriving there looks like the map being there.
+ */
 function goHome(c) {
-  for (let i = 0; i < 4 && !c.q('.g-menu'); i++) {
+  for (let i = 0; i < 4 && !c.q('.g-strategy'); i++) {
     const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
     if (!back) break;
     c.click(back);
   }
-  return !!c.q('.g-menu');
+  return !!c.q('.g-strategy');
 }
 
-/** One item in the game's menu grid, by its label. */
+/**
+ * Open a screen the way a player does.
+ *
+ * My Areas and Alliances are the two buttons above the map; everything else
+ * is under More, because none of it is opened every round.
+ */
 function menuItem(c, label) {
   goHome(c);
-  return c.qq('.g-menu-item').find((n) => {
-    const name = n.querySelector('.g-menu-label');
+  if (label === 'Map') return c.q('.punjab-map');
+
+  const strategy = c.qq('.g-strategy-item').find((n) => {
+    const name = n.querySelector('.g-strategy-label');
     return name && name.textContent === label;
   });
+  if (strategy) {
+    c.click(strategy);
+    return c.q('.g-section-head') || c.q('.areas');
+  }
+
+  c.click(c.q('.g-more'));
+  const item = c.qq('.sheet-item').find((n) => n.textContent === label ||
+    n.textContent.indexOf(label) === 0);
+  if (!item) return null;
+  c.click(item);
+  return c.q('.g-section-head');
 }
 
 /* ---------------------------------------------------------------- host */
@@ -384,20 +408,31 @@ const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').tex
 // 28. The party they founded, not a code from a list nobody chose.
 check("28. the host's own party is shown", /PDP/.test(host.q('.g-who-party').textContent),
   host.q('.g-who-party').textContent);
-check('4. the host sees their money, not a card about themselves',
-  /Available/.test(host.q('.g-player').textContent) &&
-  !/Simran Kaur Gill/.test(host.q('.g-player').textContent),
-  host.q('.g-player').textContent);
+/*
+ * 1 + 20. The money lives in the header, beside the clock, on every screen.
+ */
+check('1. the host sees their money beside the round, not in a card',
+  /Available/.test(host.q('.round-aside').textContent) &&
+  !/Simran Kaur Gill/.test(host.q('.round-aside').textContent),
+  host.q('.round-aside').textContent);
 check('the home screen carries no campaign actions', host.qq('.act').length === 0,
   host.qq('.act').length + ' actions');
 goHome(host);
-check('1. the menu is a compact grid, not a scrolling strip',
-  host.qq('.g-menu').length === 1 && !host.q('.g-nav'));
-check('1. with every destination',
-  host.qq('.g-menu-item').length === 10,
-  host.qq('.g-menu-item .g-menu-label').map((n) => n.textContent).join('/'));
-check('2. corruption and bribe are separate items',
+
+/*
+ * 2 + 33. Home is the map.
+ *
+ * There is no dashboard of ten buttons. What a player does every round is
+ * decide where to put money, and the board is where that decision lives.
+ */
+check('2. the dashboard of buttons is gone', host.qq('.g-menu-item').length === 0,
+  host.qq('.g-menu-item').length + ' buttons');
+check('4. the map is the home screen', !!host.q('.punjab-map'));
+check('3. with My Areas and Alliances above it',
+  host.qq('.g-strategy-item').length === 2);
+check('2. corruption and bribe are still reachable, under More',
   !!menuItem(host, 'Corruption') && !!menuItem(host, 'Bribe'));
+goHome(host);
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
@@ -414,10 +449,10 @@ check('28. player 2 sees their own party',
   /UPF/.test(players[1].q('.g-who-party').textContent),
   players[1].q('.g-who-party').textContent);
 check('player 2 sees their own money',
-  /Available/.test(players[1].q('.g-player').textContent));
+  /Available/.test(players[1].q('.round-aside').textContent));
 check(
   'player 2 does not see the host as their own candidate',
-  !/Simran Kaur Gill/.test(players[1].q('.g-player').textContent)
+  !/Simran Kaur Gill/.test(players[1].q('.round-aside').textContent)
 );
 
 const p4Started = await players[3].until('election', () => !!players[3].q('.screen-election'));
@@ -437,9 +472,9 @@ const cashOf = (client) => {
 };
 
 /** Open a menu section on one client. */
+// menuItem does the navigating; this reads as the flow it stands in for.
 function openSection(client, label) {
-  const tab = menuItem(client, label);
-  if (tab) client.click(tab);
+  menuItem(client, label);
 }
 
 /** A labelled figure inside the money section. */
@@ -475,21 +510,22 @@ for (const c of players) {
   check(c.label + ' starts on ₹5 crore', cashOf(c) === '₹5 crore', cashOf(c));
   check(c.label + ' starts with no debt', !c.q('.g-fig.is-debt'));
 }
-check('2. corruption stands on its own', (function () {
+/*
+ * 22. Corruption and bribe are still their own screens, but neither is a menu
+ * of moves any more: there is one combined action and it is a modifier on a
+ * campaign, reached from the map with everything else.
+ */
+check('22. corruption is a screen about risk, not a list of moves', (function () {
   openSection(host, 'Corruption');
-  const n = host.qq('.act').length;
+  const listed = host.qq('.act').length;
   goHome(host);
-  return n === 3;
+  return listed <= 1;
 })());
-check('2. and bribe is a separate section again', (function () {
+check('22. and so is bribe', (function () {
   openSection(host, 'Bribe');
-  const n = host.qq('.act').length;
-  const names = host.qq('.act-name').map((x) => x.textContent);
+  const listed = host.qq('.act').length;
   goHome(host);
-  return n === 3 &&
-    names.indexOf('Risky Vote Influence') !== -1 &&
-    names.indexOf('Hidden Offer') !== -1 &&
-    names.indexOf('Last-Minute Gamble') !== -1;
+  return listed <= 1;
 })());
 check('political heat starts at zero', heatOf(host) === 0, String(heatOf(host)));
 
@@ -513,28 +549,33 @@ async function openCampaignSheet(client) {
   await sleep(120);
 }
 
-const dealCost = host.dom.window.CMP.getAction('deal').cost;
+const dealCost = host.dom.window.CMP.getAction('bribe').cost;
 await openCampaignSheet(host);
 check('the campaign sheet opens from a constituency', !!host.q('.campaign-sheet'));
 
-// High-risk moves sit behind a second tap inside the sheet.
-host.click(host.qq('button').find((b) => /High-risk options/.test(b.textContent)));
-await sleep(80);
-const hostCard = host.qq('.campaign-sheet .act').find((c) => {
-  const n = c.querySelector('.act-name');
-  return n && n.textContent === 'Undisclosed Deal';
+/*
+ * 16. The optional risks are on the same panel as the money.
+ *
+ * There is no second tap through to a list of high-risk moves: one combined
+ * corruption action, selected beside the ordinary campaign, on the panel where
+ * the amount is already being set.
+ */
+const bribeMode = host.qq('.cs-mode').find((b) => {
+  const n = b.querySelector('.cs-mode-label');
+  return n && /Corruption/i.test(n.textContent);
 });
-host.click(hostCard.querySelector('.act-use'));
+check('16. corruption is a mode on the same panel', !!bribeMode);
+host.click(bribeMode);
 await sleep(80);
-check('it then asks how much to spend', !!host.q('.cs-question'));
+check('14. and the amount is set right there', !!host.q('.cs-range'));
 
-host.click(host.qq('button').find((b) => /Confirm campaign/.test(b.textContent)));
+host.click(host.qq('.campaign-sheet button').find((b) => /^Invest/.test(b.textContent)));
 const hostSpent = await host.until('spent', () => cashOf(host) !== '₹5 crore', 12000);
 check('the host can spend', hostSpent, cashOf(host));
 
 check('the result belongs to the seat', !!host.q('.result-sheet'));
 if (host.q('.result-sheet')) {
-  host.click(host.qq('button').find((b) => /Stay here/.test(b.textContent)));
+  host.click(host.qq('button').find((b) => /Back to the map/.test(b.textContent)));
 }
 await sleep(80);
 
@@ -563,19 +604,32 @@ for (const c of [players[1], players[2], players[3]]) {
   check(c.label + ' heat is untouched', heatOf(c) === 0, String(heatOf(c)));
 }
 
-// A second player spends independently.
+// A second player spends independently, on ordinary campaigning.
 await openCampaignSheet(players[1]);
-const p2Card = players[1].qq('.campaign-sheet .act').find((c) => {
-  const n = c.querySelector('.act-name');
-  return n && n.textContent === 'Public Rally';
-});
-players[1].click(p2Card.querySelector('.act-use'));
-await sleep(80);
-players[1].click(players[1].qq('button').find((b) => /Confirm campaign/.test(b.textContent)));
+players[1].click(players[1].qq('.campaign-sheet button')
+  .find((b) => /^Invest/.test(b.textContent)));
 const p2Spent = await players[1].until('spent', () => cashOf(players[1]) !== '₹5 crore', 12000);
 check('player 2 can spend their own money', p2Spent);
 if (players[1].q('.result-sheet')) {
-  players[1].click(players[1].qq('button').find((b) => /Stay here/.test(b.textContent)));
+  players[1].click(players[1].qq('button').find((b) => /Back to the map/.test(b.textContent)));
+}
+/*
+ * Both got in for the same crore, because getting in is capped. What proves
+ * the purses are separate is a second investment: player two is established
+ * now, so the cap is gone and they can spend what the host has not.
+ */
+await openCampaignSheet(players[1]);
+const secondRange = players[1].q('.cs-range');
+if (secondRange) {
+  secondRange.value = secondRange.max;
+  secondRange.dispatchEvent(new players[1].dom.window.Event('input', { bubbles: true }));
+  await sleep(60);
+}
+players[1].click(players[1].qq('.campaign-sheet button')
+  .find((b) => /^Invest/.test(b.textContent)));
+await players[1].until('second spend', () => cashOf(players[1]) !== '₹4 crore', 12000);
+if (players[1].q('.result-sheet')) {
+  players[1].click(players[1].qq('button').find((b) => /Back to the map/.test(b.textContent)));
 }
 check(
   'the two players have different amounts left',
@@ -585,14 +639,26 @@ check(
 
 /* --------------------------------------------- constituency + oversight */
 
-section('Constituency detail shows real MLA and fictional race');
+section('Constituency detail: the game own race, and nobody real');
 
-const tabButton = (client, label) =>
-  menuItem(client, label);
+/**
+ * Open a screen and hand back something to assert on.
+ *
+ * menuItem does the navigating, so this exists only to read as the flow it is
+ * standing in for.
+ */
+const tabButton = (client, label) => menuItem(client, label);
 
-// A constituency is opened through the candidate's own screen, as a player
-// does. CAMPAIGN is where that lives now.
-host.click(tabButton(host, 'Campaign'));
+/*
+ * A constituency is opened through the candidate's own screen, as a player
+ * does — home, tap yourself, all my seats. The dashboard button that used to
+ * lead here is gone with the rest of the dashboard.
+ */
+goHome(host);
+host.click(host.q('.lb-row.is-you'));
+await sleep(80);
+const toAllSeats = host.qq('button').find((b) => /All my seats/i.test(b.textContent));
+if (toAllSeats) host.click(toAllSeats);
 await host.until('areas', () => !!host.q('.area-row'));
 const seeEvery = host.qq('button').find((b) => /View all 117/.test(b.textContent));
 if (seeEvery) host.click(seeEvery);
@@ -629,7 +695,7 @@ check('one bar is marked as leading, unless nobody leads',
 
 section('Reporting a rival');
 // Rivals sit with the high-risk play they exist to police.
-host.click(tabButton(host, 'Corruption'));
+tabButton(host, 'Corruption');
 await host.until('rivals', () => !!host.q('.rival-list'));
 check('the rivals tab opens', !!host.q('.rival-list'));
 check('it lists the other three players', host.qq('.rival-row').length === 3,
@@ -653,7 +719,7 @@ check('you cannot report the same player twice',
 
 // A second, different player reporting the same rival opens an inquiry.
 const targetName = host.qq('.rival-row')[0].querySelector('.rival-name').textContent;
-players[1].click(tabButton(players[1], 'Corruption'));
+tabButton(players[1], 'Corruption');
 await players[1].until('rivals', () => !!players[1].q('.rival-list'));
 const sameTarget = players[1].qq('.rival-row').find((r) =>
   r.querySelector('.rival-name').textContent.indexOf(targetName.replace(/^[A-Z]+/, '').trim()) !== -1

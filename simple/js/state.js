@@ -79,6 +79,15 @@ CMP.state = (function () {
       // The parties in this game, invented by whoever is playing. There is no
       // fixed list any more.
       parties: [],
+
+      /*
+       * Seats already won outright, keyed by seat number.
+       *
+       * A won seat is finished: nobody can campaign there again, it counts
+       * toward permanent district control, and it survives a reload because
+       * it is saved with everything else. Leading a seat is not this.
+       */
+      wonSeats: {},
       // Every action taken, newest last.
       actions: [],
 
@@ -200,6 +209,7 @@ CMP.state = (function () {
     CMP.setParties(game.parties);
 
     emptyBoard(game);
+    game.wonSeats = {};
 
     /*
      * Nobody holds anything, and no district is anybody's.

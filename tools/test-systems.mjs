@@ -297,11 +297,27 @@ const poor = gf.creds[3];
 // exceeds what is in hand is covered deterministically in test-campaign.mjs,
 // which can put a player on any balance it likes; what matters here is that
 // the whole path through the real API keeps cash out of the negative.
-const capPerRound = 3;
+/*
+ * Spend until the money stops it.
+ *
+ * A round is bounded by money, not by a move counter, and one corruption
+ * costs a crore against an allowance of five — so the loop has to be able to
+ * run past five before it sees the refusal it is here to check.
+ */
 let spendGuard = 0;
 let refusal = null;
-while (spendGuard++ < capPerRound + 2) {
-  const res = await J('campaign', { ...poor, actionId: 'lastpush', constituency: 20 });
+while (spendGuard++ < 12) {
+  /*
+   * The first attempt gets into the seat at the entry cap; every one after it
+   * is unrestricted and asks for three crore, so what stops the run is the
+   * purse rather than the entry rule.
+   */
+  const res = await J('campaign', {
+    ...poor,
+    actionId: 'bribe',
+    constituency: 20,
+    amount: spendGuard === 1 ? 10000000 : 3 * 10000000,
+  });
   if (!res.ok) {
     refusal = res.error;
     break;
@@ -311,7 +327,7 @@ const before = (await G('state', poor)).game.players.find((p) => p.isYou);
 // A round is bounded by money now, not by a move counter: what stops a
 // player is running out, and the refusal says so.
 check('a round ends when the money does',
-  /More than you can spend/.test(refusal || ''), refusal);
+  /More than you can spend|capped at/.test(refusal || ''), JSON.stringify(refusal));
 check('spending it moved real money', before.spent > 0, '₹' + before.spent);
 
 await J('report', { ...gf.creds[0], accusedId: poorId, reason: 'spending' });
@@ -338,7 +354,7 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
   const tc = g.creds[3];
   // Three risky moves is a full round's allowance, and enough heat to make a
   // restriction one of the likelier findings.
-  for (let k = 0; k < 3; k++) await J('campaign', { ...tc, actionId: 'deal', constituency: 30 + k });
+  for (let k = 0; k < 3; k++) await J('campaign', { ...tc, actionId: 'bribe', constituency: 30 + k });
   await J('report', { ...g.creds[0], accusedId: tid, reason: 'influence' });
   const res = await J('report', { ...g.creds[1], accusedId: tid, reason: 'influence' });
   const acc = res.game.players.find((p) => p.id === tid);
@@ -346,7 +362,7 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
   if (last) seenOutcomes[last.outcomeId] = (seenOutcomes[last.outcomeId] || 0) + 1;
   if (last && (last.restrictTurns > 0 || last.outcomeId === 'restriction')) {
     restrictedSeen = true;
-    const blocked = await J('campaign', { ...tc, actionId: 'deal', constituency: 50 });
+    const blocked = await J('campaign', { ...tc, actionId: 'bribe', constituency: 50 });
     check('a restricted player cannot use risky strategies', blocked.ok === false, blocked.error);
     check('the reason explains the restriction', /restriction/i.test(blocked.error || ''), blocked.error);
     // The risky moves above used this round's allowance, so wait for the next
@@ -355,9 +371,9 @@ for (let i = 0; i < 60 && !restrictedSeen; i++) {
     // A round now settles into a short results break before the next one
     // opens, so wait out both.
     await sleep((ROUND_SECONDS + BREAK_SECONDS + 2) * 1000);
-    const safe = await J('campaign', { ...tc, actionId: 'outreach', constituency: 50 });
+    const safe = await J('campaign', { ...tc, actionId: 'invest', constituency: 50 });
     check('but safe campaigning still works', safe.ok === true, safe.error);
-    const stillBlocked = await J('campaign', { ...tc, actionId: 'deal', constituency: 51 });
+    const stillBlocked = await J('campaign', { ...tc, actionId: 'bribe', constituency: 51 });
     check('and the restriction outlives the round it started in',
       stillBlocked.ok === false && /restriction/i.test(stillBlocked.error || ''),
       stillBlocked.error);
@@ -433,7 +449,7 @@ const pushed = await startGame(2);
 const pushCreds = pushed.creds[0];
 let contested = 0;
 for (let seat = 1; seat <= 8; seat++) {
-  const res = await J('campaign', { ...pushCreds, actionId: 'rally', constituency: seat });
+  const res = await J('campaign', { ...pushCreds, actionId: 'invest', constituency: seat });
   if (res.ok) contested++;
 }
 const pushView = (await G('state', pushCreds)).game;

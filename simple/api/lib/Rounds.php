@@ -80,12 +80,16 @@ final class Rounds
             // the engine, so calling this twice cannot pay anybody twice.
             $p = $engine->creditRoundIncome($p, $round);
             if ($partyId !== '') {
-                $p = $engine->creditDistrictGrants($p, $board, $round);
+                $p = $engine->creditDistrictGrants(
+                    $p, $board, $round, (array) ($game['wonSeats'] ?? [])
+                );
             }
 
             $p['roundActions'] = 0;
             $p['roundSpent'] = 0;
             $p['roundGained'] = 0;
+            // A new round is a clean slate for the conflict settle.
+            $p['areaBids'] = [];
             $p['roundReady'] = false;
             $p['readyRound'] = 0;
             $p['round'] = $round;
@@ -317,7 +321,9 @@ final class Rounds
             if (empty($player['isAI']) || empty($player['partyId'])) {
                 continue;
             }
-            [$player, $board, $moves] = AI::takeRound($player, $board, $engine, $game['id'], $round);
+            [$player, $board, $moves] = AI::takeRound(
+                $player, $board, $engine, $game['id'], $round, (array) ($game['wonSeats'] ?? [])
+            );
             $game['players'][$pid] = $player;
             $aiMoves[$pid] = $moves;
         }
@@ -357,6 +363,24 @@ final class Rounds
             $summaries[$pid]['heatAfter'] = (float) $player['heat'];
         }
 
+        /*
+         * 4b. Conflicts, then the seats won outright.
+         *
+         * Both can only happen at a settle. Two campaigns that matched each
+         * other's decisive investment in a seat both lose what it bought, so
+         * that has to be unwound before anything is counted; and a seat cannot
+         * be won mid-round, so everybody plays the same board for the whole of
+         * it.
+         */
+        [$board, $conflicts] = Campaign::settleConflicts($game['players'], $board);
+        foreach ($game['players'] as $pid => $p) {
+            $game['players'][$pid]['areaBids'] = [];
+        }
+
+        $won = (array) ($game['wonSeats'] ?? []);
+        $declared = $engine->settleWins($won, $board, $round);
+        $game['wonSeats'] = $won;
+
         // 5 + 6. Leaders and projected seats, recounted once from the settled
         // board so every client is reading the same arithmetic.
         // The round is settled: seats are awarded now, not while it ran.
@@ -387,7 +411,7 @@ final class Rounds
             $before = (int) ($player['districtsHeld'] ?? 0);
             $heldNow = $partyId === ''
                 ? []
-                : $engine->territory()->heldBy(Territory::leadersOf($board), $partyId);
+                : $engine->territory()->heldBy(Territory::wonOf((array) ($game['wonSeats'] ?? [])), $partyId);
             $opening = $player['openingDistricts'] ?? [];
             $grantIncome = 0;
             foreach ($heldNow as $d) {
@@ -435,6 +459,11 @@ final class Rounds
         // the player sitting next to it, which would make the whole screen
         // untrustworthy.
         $game['lastResult'] = self::buildResult($game, $engine, $round, $seats, $changes, $summaries, $aiMoves);
+
+        // What the settle did beyond moving seats: exchanges nobody won, and
+        // seats that are now finished.
+        $game['lastResult']['conflicts'] = $conflicts;
+        $game['lastResult']['won'] = $declared;
 
         $game['leadParty'] = $game['lastResult']['leadParty'];
 
@@ -554,6 +583,13 @@ final class Rounds
             }
         }
 
+        // Seats already won outright, per party.
+        $wonCount = [];
+        foreach ((array) ($game['wonSeats'] ?? []) as $row) {
+            $party = (string) ((array) $row)['party'];
+            $wonCount[$party] = ($wonCount[$party] ?? 0) + 1;
+        }
+
         // Every party in this game, in slot order — invented by the people
         // playing rather than picked from a list.
         $standings = [];
@@ -569,6 +605,16 @@ final class Rounds
                 'avatar' => $player['avatar'] ?? null,
                 'isAI' => !empty($player['isAI']),
                 'seats' => (int) ($seats[$partyId] ?? 0),
+
+                /*
+                 * Won and leading are different facts and are kept apart. A
+                 * won seat is finished and nobody can take it; a led seat is
+                 * where that constituency stands today. `seats` is the two
+                 * added together, because a led seat is still a seat if
+                 * nothing changes — but calling them all won would be a lie.
+                 */
+                'won' => (int) ($wonCount[$partyId] ?? 0),
+                'leading' => max(0, (int) ($seats[$partyId] ?? 0) - (int) ($wonCount[$partyId] ?? 0)),
                 'change' => $summary !== null ? (int) $summary['seatsChange'] : 0,
                 'heat' => $player !== null ? round((float) $player['heat'], 0) : 0,
                 'disqualified' => !empty($player['record']['disqualified']),

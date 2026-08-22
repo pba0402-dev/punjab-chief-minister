@@ -241,3 +241,83 @@
   .ma-head { grid-template-columns: auto auto; }
   .ma-head-fig.is-money { grid-column: 1 / -1; text-align: left; }
 }
+
+/* ---------------------------------------------------------- your control */
+
+/*
+ * The one block on this screen that reports rather than proposes. Won leads,
+ * because it is the only figure here that cannot be taken back.
+ */
+.ma-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.ma-control-title {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.ma-control-figs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.ma-control-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ma-control-value {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ma-control-fig.is-won .ma-control-value { color: var(--good); }
+.ma-control-fig.is-money .ma-control-value {
+  font-size: 0.95rem;
+  color: var(--wheat);
+}
+.ma-control-label {
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.ma-control-note {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+
+/* A district nobody can campaign in any more: stated, not offered. */
+.ma-district.is-lost { border-left: 3px solid var(--line-2, var(--line)); opacity: 0.72; }
+.ma-d-locked {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--river);
+}
+.ma-district.is-lost .ma-d-locked { color: var(--muted-2); }
+.ma-d-goal.is-lost { color: var(--muted-2); }
+
+@media (max-width: 430px) {
+  /*
+   * Two rows of two rather than four squeezed columns — a grant figure like
+   * "₹136 crore" needs the width, and at 320px four columns give it 70px.
+   */
+  .ma-control-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

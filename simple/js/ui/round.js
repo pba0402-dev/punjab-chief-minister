@@ -154,10 +154,20 @@ CMP.ui.round = (function () {
       el('div', { class: 'rt-face' }, [clockNode]),
     ]);
 
+    /*
+     * A slot on the right of the bar for whatever the screen wants beside the
+     * clock. The election screen puts the money there: what a player has, what
+     * came in and what has gone are the figures they need at every moment, and
+     * a separate card underneath was a third of a phone screen spent saying
+     * three numbers.
+     */
+    var asideNode = el('div', { class: 'round-aside' });
+
     var root = el('div', { class: 'round-bar' }, [
       el('div', { class: 'round-bar-main' }, [
         ringNode,
         el('div', { class: 'round-bar-text' }, [labelNode, movesNode, readyNode]),
+        asideNode,
       ]),
       stepsNode,
     ]);
@@ -302,7 +312,7 @@ CMP.ui.round = (function () {
       }
     }
 
-    return { root: root, render: render, stop: stop, secondsLeft: secondsLeft };
+    return { root: root, aside: asideNode, render: render, stop: stop, secondsLeft: secondsLeft };
   }
 
   /* ------------------------------------------------------- projection */

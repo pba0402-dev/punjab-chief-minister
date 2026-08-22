@@ -68,31 +68,35 @@ const cheapest = (ids, game, limit) =>
   affordable(ids, game, limit).sort((a, b) => a.cost - b.cost)[0];
 
 /*
- * How much to put behind each move. `base` pays the sticker price; `heavy`
- * puts the maximum the action allows behind every move; `spread` divides
- * whatever is left by the moves still to come.
+ * How much to put behind each move.
  *
- * Under a square-root curve, spreading should beat dumping — that is the
- * whole reason for the curve, and these two strategies exist to prove it
- * rather than assume it.
+ * There is one campaign action now, so the money axis is entirely the amount:
+ * "a cheap move" and "a dear move" used to mean different actions and now mean
+ * different sums. base is a crore, which is also the entry cap, so it is the
+ * plan that gets in everywhere and builds nowhere. heavy puts the maximum
+ * behind every move; spread divides whatever is left across the rounds to
+ * come, which is what the spending curve is supposed to reward.
  */
+const CRORE = 10000000;
+
 const SPEND = {
-  base: () => null,
+  base: () => CRORE,
+  big: (g) => Math.min(5 * CRORE, Math.max(CRORE, g.cash)),
   heavy: (g, action) => CMP.campaign.amountRange(action).max,
   spread: (g, action, round) => {
     // Hold enough back to keep campaigning for the rest of the election.
     const roundsLeft = Math.max(1, CMP.ROUNDS.total - round + 1);
-    return Math.floor(g.cash / (roundsLeft * 2));
+    return Math.max(CRORE, Math.floor(g.cash / (roundsLeft * 2)));
   },
 };
 
 const STRATEGIES = {
-  careful: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'base' },
-  bigspender: { borrow: true, pick: (g, l) => dearest(SAFE, g, l), aim: 'marginal', spend: 'base' },
-  gambler: { borrow: true, pick: (g, l) => dearest(RISKY, g, l), aim: 'marginal', spend: 'base' },
-  scattergun: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'spread', spend: 'base' },
+  careful: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'spread' },
+  bigspender: { borrow: true, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'big' },
+  gambler: { borrow: true, pick: (g, l) => cheapest(RISKY, g, l), aim: 'marginal', spend: 'big' },
+  scattergun: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'spread', spend: 'spread' },
   heavyhitter: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'heavy' },
-  spreader: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'spread' },
+  thin: { borrow: false, pick: (g, l) => cheapest(SAFE, g, l), aim: 'marginal', spend: 'base' },
 };
 
 function playCampaign(name, seed) {
@@ -168,7 +172,14 @@ function playCampaign(name, seed) {
         plan.aim === 'marginal'
           ? pool[0]
           : pool[Math.floor(rand() * pool.length)] || pool[0];
-      const amount = SPEND[plan.spend](game, action, round);
+      /*
+       * Getting in is capped, so the first move into a seat is the cap and
+       * everything after it is the plan. A bot that ignored this would be
+       * refused on its opening move and would then measure nothing.
+       */
+      const cap = CMP.campaign.entryCap(game, seat.number, action);
+      const wanted = SPEND[plan.spend](game, action, round);
+      const amount = cap ? Math.min(cap, wanted || cap) : wanted;
       CMP.campaign.play(game, action.id, action.needsConstituency ? seat.number : null, {
         outcome: rand(),
         consequence: rand(),
@@ -259,8 +270,8 @@ console.log(
   'aim edge   (careful - scattergun): ' + (seatsOf('careful') - seatsOf('scattergun')).toFixed(1) + ' seats'
 );
 console.log(
-  'spread vs dump (spreader - heavyhitter): ' +
-  (seatsOf('spreader') - seatsOf('heavyhitter')).toFixed(1) + ' seats'
+  'spread vs dump (careful - heavyhitter): ' +
+  (seatsOf('careful') - seatsOf('heavyhitter')).toFixed(1) + ' seats'
 );
 console.log('');
 console.log('want: the money edge small and the aim edge larger — spending more should help,');

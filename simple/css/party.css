@@ -261,3 +261,357 @@
   background: none;
   border: 1px dashed var(--line);
 }
+
+/* ------------------------------------------------------------------
+   Map-first: the compact header, the two strategic buttons, the region
+   selector and the campaign panel that opens over the board.
+   ------------------------------------------------------------------ */
+
+/* --------------------------------------------- money beside the clock */
+
+.round-bar-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.round-aside {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 4px 12px;
+  justify-items: end;
+  align-items: baseline;
+}
+.round-aside .g-fig {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: right;
+}
+.round-aside .g-fig-label {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+.round-aside .g-fig-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.round-aside .g-fig.is-lead .g-fig-value {
+  font-size: 0.95rem;
+  color: var(--wheat);
+}
+.round-aside .g-fig.is-grant { cursor: pointer; }
+.round-aside .g-fig.is-grant .g-fig-value { color: var(--river); }
+.round-aside .g-fig.is-debt .g-fig-value { color: var(--danger); }
+
+/* ------------------------------------------ the two strategic buttons */
+
+.g-strategy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.g-strategy-item {
+  appearance: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  font-family: var(--font);
+  color: var(--cream);
+  text-align: left;
+  cursor: pointer;
+}
+.g-strategy-item:hover { border-color: var(--wheat-deep); }
+.g-strategy-icon { font-size: 0.95rem; color: var(--wheat); }
+.g-strategy-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.g-strategy-label { font-size: 0.82rem; font-weight: 700; }
+.g-strategy-note {
+  font-size: 0.6rem;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------- the region selector */
+
+.map-regions {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.map-regions::-webkit-scrollbar { display: none; }
+.map-regions .term-option { flex: 0 0 auto; }
+
+/* Won seats carry a tick, drawn as a stroke rather than a glyph so it
+   scales with the cell. */
+.map-cell.is-won {
+  stroke: var(--cream);
+  stroke-width: 0.9;
+  stroke-opacity: 0.85;
+}
+
+.legend-key {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.58rem;
+  color: var(--muted-2);
+}
+.legend-key-item { white-space: nowrap; }
+
+/* --------------------------------------------------- the campaign panel */
+
+.sheet.is-bottom {
+  align-items: flex-end;
+}
+.sheet.is-bottom .sheet-panel {
+  width: 100%;
+  max-width: 520px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.cs-head { display: flex; flex-direction: column; gap: 2px; }
+.cs-where { font-size: 0.68rem; color: var(--muted-2); }
+
+.cs-positions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cs-position {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 9px;
+  padding: 6px 0 6px 8px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 2px solid var(--party, transparent);
+}
+.cs-position:first-child { border-top: 0; }
+.cs-position.is-you .cs-position-party { color: var(--wheat); }
+.cs-position-rank { font-size: 0.6rem; color: var(--muted-2); }
+.cs-position-party { font-size: 0.74rem; font-weight: 700; }
+.cs-position-share {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cs-open, .cs-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted-2);
+}
+
+.cs-target {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.cs-target-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.cs-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.cs-mode {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 46px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  font-family: var(--font);
+  color: var(--cream);
+  text-align: left;
+  cursor: pointer;
+}
+.cs-mode.is-on { border-color: var(--wheat); background: var(--ink-3, var(--ink-2)); }
+.cs-mode.is-risky.is-on { border-color: var(--danger); }
+.cs-mode-label { font-size: 0.74rem; font-weight: 700; }
+.cs-mode-note {
+  font-size: 0.55rem;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-amount { display: flex; flex-direction: column; gap: 7px; }
+.cs-amount-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cs-amount-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.cs-amount-value {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 9px;
+}
+.cs-step {
+  appearance: none;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  color: var(--cream);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.cs-step[disabled] { opacity: 0.35; cursor: default; }
+.cs-range { width: 100%; }
+
+.cs-cap {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--wheat-deep, var(--muted));
+}
+
+.cs-summary {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cs-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--good);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.cs-locked-title { font-size: 1rem; font-weight: 700; }
+.cs-locked-note { font-size: 0.74rem; line-height: 1.45; color: var(--muted-2); }
+
+.cs-cannot {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--danger);
+}
+
+.rs-move.is-absent { opacity: 0.4; }
+
+/* ---------------------------------- won and leading on the scoreboard */
+
+.board-leading-count {
+  font-size: 0.56rem;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.lb-none + .lb.is-flat { margin-top: 8px; }
+
+/* ------------------------------------------------------------- narrow */
+
+@media (max-width: 560px) {
+  .round-aside { grid-template-columns: repeat(3, auto); gap: 3px 9px; }
+  .round-aside .g-fig-value { font-size: 0.72rem; }
+  .round-aside .g-fig.is-lead .g-fig-value { font-size: 0.88rem; }
+  .g-strategy-note { display: none; }
+  .cs-modes { gap: 5px; }
+  .cs-mode-note { display: none; }
+  .cs-mode { min-height: 40px; }
+}
+
+@media (max-width: 379px) {
+  .round-bar-main { grid-template-columns: auto minmax(0, 1fr); }
+  .round-aside {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, 1fr);
+    justify-items: start;
+  }
+  .round-aside .g-fig { align-items: flex-start; text-align: left; }
+}
+
+/* ------------------------------------------------ a seat that is finished */
+
+/*
+ * A won seat is not a race with a large lead — it is over. So the card is
+ * filled rather than outlined, the tick is in the kicker, and the whole
+ * campaign control below it is gone rather than disabled.
+ */
+.sd-leader.is-locked {
+  border-width: 2px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--party) 20%, transparent), transparent 70%),
+    var(--ink-2);
+}
+.sd-leader.is-locked .sd-leader-kicker { color: var(--party); }
+.sd-rating.is-locked {
+  color: var(--muted-2);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sd-locked-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--line);
+  background: var(--ink-2);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--muted-2);
+}

@@ -326,11 +326,10 @@ CMP.ui.result = (function () {
      * held ground, and the seat count alone hides that entirely.
      */
     function campaignNumbers() {
-      var rows = (view.result.standings || []).filter(function (s) {
-        return s.districts || s.grantIncome;
-      });
-      if (!rows.length) return null;
-
+      // Shown even when every figure is zero: a campaign that controlled no
+      // district outright is a fact about how it was fought, and hiding the
+      // block would make that look like missing information rather than a
+      // result.
       return el('section', { class: 'result-block' }, [
         el('h3', { class: 'result-subheading', text: 'The campaign in numbers' }),
         el('div', { class: 'cn-rows' }, view.result.standings.map(function (s) {
@@ -345,15 +344,16 @@ CMP.ui.result = (function () {
               el('span', { class: 'cn-label', text: 'districts' }),
             ]),
             el('span', { class: 'cn-fig' }, [
-              el('strong', { text: CMP.ui.money.words(s.grantIncome || 0) }),
+              el('strong', { text: CMP.ui.money.words(s.grantIncome || 0) || '₹0' }),
               el('span', { class: 'cn-label', text: 'in grants' }),
             ]),
           ]);
         })),
         el('p', {
           class: 'ar-block-note',
-          text: 'Districts held when the polls closed, and what those ' +
-            'districts paid out across the campaign.',
+          text: 'Districts won outright when the polls closed, and what those ' +
+            'districts paid out across the campaign. A district counts only ' +
+            'when every seat in it was won.',
         }),
       ]);
     }

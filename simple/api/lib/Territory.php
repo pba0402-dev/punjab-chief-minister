@@ -95,6 +95,15 @@ final class Territory
      * @param array<string, string> $leaders seat number => party id
      * @return array<int, array{id:string,name:string,region:string,seats:int[],grant:int}>
      */
+    /**
+     * Districts a party controls.
+     *
+     * Pass `wonOf()` rather than `leadersOf()` to ask about permanent
+     * control: every seat won outright, not merely led. Leading a district is
+     * a position that can be taken back before the next round; controlling
+     * one cannot, which is why the grant that comes with it is safe to pay
+     * for the rest of the election.
+     */
     public function heldBy(array $leaders, string $partyId): array
     {
         if ($partyId === '') {
@@ -147,6 +156,19 @@ final class Territory
     }
 
     /** Who leads each seat right now. @return array<string, string> */
+    /**
+     * Who has won each seat, in the same shape as a leader map, so the same
+     * district arithmetic answers both questions.
+     */
+    public static function wonOf(array $won): array
+    {
+        $out = [];
+        foreach ($won as $seat => $row) {
+            $out[(string) $seat] = (string) ($row['party'] ?? ($row->party ?? ''));
+        }
+        return $out;
+    }
+
     public static function leadersOf(array $board): array
     {
         $out = [];

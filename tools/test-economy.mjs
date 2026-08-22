@@ -134,12 +134,12 @@ let g = newGame('walkthrough');
 check('E. round 1 opens on exactly ₹5 crore', engine.remaining(g) === 5 * CR, cr(engine.remaining(g)));
 
 // F/G. Spend one crore, four should remain.
-const rally = CMP.getAction('rally');
+const rally = CMP.getAction('invest');
 let seat = CMP.DISTRICTS.find((d) => d.region === 'malwa').seats[0];
 // One rally is still one rally: a single move is capped at a multiple of its
 // own cost, so a crore goes on a district rather than into one meeting hall.
 const oneCroreAcross = engine.campaignBulk(
-  g, 'rally', CMP.DISTRICTS.find((d) => d.region === 'malwa').seats, 1 * CR, () => ROLLS
+  g, 'invest', CMP.DISTRICTS.find((d) => d.region === 'malwa').seats, 1 * CR, () => ROLLS
 );
 check('F. a ₹1 crore allocation is allowed', oneCroreAcross.ok, oneCroreAcross.reason);
 check('G. ₹4 crore remains', engine.remaining(g) === 4 * CR, cr(engine.remaining(g)));
@@ -155,7 +155,7 @@ check('N+O+P. the balance is ₹9 crore', engine.remaining(g) === 9 * CR, cr(eng
 const malwa = CMP.DISTRICTS.filter((d) => d.region === 'malwa');
 const bigDistrict = malwa.slice().sort((a, b) => b.seats.length - a.seats.length)[0];
 const before6 = engine.remaining(g) + engine.grantTotal(g);
-const bulk = engine.campaignBulk(g, 'rally', bigDistrict.seats, 6 * CR, () => ROLLS);
+const bulk = engine.campaignBulk(g, 'invest', bigDistrict.seats, 6 * CR, () => ROLLS);
 check('30. one allocation can cover a whole district', bulk.ok, bulk.reason);
 check('Q. spending ₹6 crore in one round is allowed',
   bulk.ok && bulk.spent === 6 * CR, cr(bulk.ok ? bulk.spent : 0));
@@ -204,7 +204,7 @@ check('income total agrees with the balance', g.incomeTotal === 30 * CR, cr(g.in
 // W. Spend a large accumulated balance in one round, across many seats.
 const before = engine.remaining(g);
 const wideSeats = CMP.DISTRICTS.filter((d) => d.region === 'malwa').flatMap((d) => d.seats);
-const wide = engine.campaignBulk(g, 'rally', wideSeats, 24 * CR, () => ROLLS);
+const wide = engine.campaignBulk(g, 'invest', wideSeats, 24 * CR, () => ROLLS);
 check('W. a banked ₹24 crore goes out in one round', wide.ok && wide.spent === 24 * CR,
   cr(wide.ok ? wide.spent : 0) + (wide.unspent ? ', ' + cr(wide.unspent) + ' would not fit' : ''));
 check('   which takes breadth — it will not fit on a handful of seats',
@@ -215,9 +215,9 @@ check('   and the balance fell by exactly what was spent',
 
 // The ceiling on a single move is what stops money being dumped rather than
 // campaigned. It is a real limit and the plan says so rather than hiding it.
-const rallyCeiling = engine.amountRange(CMP.getAction('rally')).max;
+const rallyCeiling = engine.amountRange(CMP.getAction('invest')).max;
 const narrow = wideSeats.slice(0, 3);
-const tooNarrow = engine.planBulk(g, 'rally', narrow, rallyCeiling * narrow.length + 10 * CR);
+const tooNarrow = engine.planBulk(g, 'invest', narrow, rallyCeiling * narrow.length + 10 * CR);
 check('11. money that will not fit is reported, not silently kept',
   tooNarrow.unspent > 0,
   cr(tooNarrow.unspent) + ' left over on ' + narrow.length + ' seats');
@@ -230,18 +230,25 @@ g = newGame('limit');
 g.cash = 60 * CR;                     // a campaign that has been saving
 const held = engine.remaining(g);
 const everySeat = CMP.DISTRICTS.flatMap((d) => d.seats);
-const overreach = engine.campaignBulk(g, 'rally', everySeat, held * 4, () => ROLLS);
+const overreach = engine.campaignBulk(g, 'invest', everySeat, held * 4, () => ROLLS);
 check('X. asking for four times the balance spends only the balance',
   overreach.ok && overreach.spent <= held, cr(overreach.spent) + ' of ' + cr(held));
 check('   and never takes the campaign below zero', engine.remaining(g) >= 0,
   cr(engine.remaining(g)));
 
-// A single move is separately capped at a multiple of its own cost, so a
-// rally is still a rally however rich the campaign.
-const rallyRange = engine.amountRange(CMP.getAction('rally'));
+/*
+ * A single move is separately capped at a multiple of its own cost, so one
+ * cheque cannot buy a seat outright however rich the campaign.
+ *
+ * The campaign gets into the seat first: an opening move is capped at a crore,
+ * so testing the ceiling from outside would only ever test the entry rule.
+ */
+const rallyRange = engine.amountRange(CMP.getAction('invest'));
 const rich = newGame('cap');
 rich.cash = 100 * CR;
-const oneMove = engine.play(rich, 'rally', everySeat[0], ROLLS, 100 * CR);
+engine.play(rich, 'invest', everySeat[0], ROLLS, CMP.CAMPAIGN.spending.entryMaximum);
+const spentGettingIn = rich.spent;
+const oneMove = engine.play(rich, 'invest', everySeat[0], ROLLS, 100 * CR);
 check('   one move cannot absorb a whole campaign',
   oneMove.ok && oneMove.report.cost === rallyRange.max,
   cr(oneMove.ok ? oneMove.report.cost : 0) + ', ceiling ' + cr(rallyRange.max));
@@ -287,17 +294,33 @@ malerkotla.seats.forEach((n) => {
 });
 
 const region = malerkotla.region;
-const heldNow = engine.districtsHeldBy(g.support, ME);
-check('AM. leading every seat is holding the district',
-  heldNow.some((d) => d.id === malerkotla.id), heldNow.map((d) => d.id).join('/'));
 
-// Lose one seat and the hold goes with it.
-const dropped = JSON.parse(JSON.stringify(g.support));
-const rival = CMP.PARTIES.find((x) => x.id !== ME).id;
-dropped[malerkotla.seats[0]][ME] = 5;
-dropped[malerkotla.seats[0]][rival] = 60;
-check('   leading all but one is not holding it',
-  !engine.districtsHeldBy(dropped, ME).some((d) => d.id === malerkotla.id));
+/*
+ * Leading every seat is not controlling the district.
+ *
+ * A grant is paid for a district that cannot be lost, so control means every
+ * seat *won* — finished, locked, nobody's to take. Leading them all is a
+ * position, and a position can change on Thursday.
+ */
+const ledOnly = engine.districtsHeldBy(g.support, ME);
+check('AM. leading every seat is not controlling the district',
+  !engine.districtsWonBy(g, ME).some((d) => d.id === malerkotla.id) &&
+  ledOnly.some((d) => d.id === malerkotla.id),
+  ledOnly.map((d) => d.id).join('/'));
+
+// Win them, and it is controlled.
+g.wonSeats = g.wonSeats || {};
+malerkotla.seats.forEach((n) => {
+  g.wonSeats[String(n)] = { party: ME, round: 8, share: 100 };
+});
+check('AM. winning every seat is controlling it',
+  engine.districtsWonBy(g, ME).some((d) => d.id === malerkotla.id));
+
+// Lose one, and the control goes with it.
+const dropped = JSON.parse(JSON.stringify(g));
+delete dropped.wonSeats[String(malerkotla.seats[0])];
+check('   winning all but one is not controlling it',
+  !engine.districtsWonBy(dropped, ME).some((d) => d.id === malerkotla.id));
 
 const cashBefore = engine.remaining(g);
 const grantBefore = engine.grantIn(g, region);
@@ -344,20 +367,23 @@ const inMalwa = engine.spendableOn(g, malwaSeat);
 check('AP. a Majha grant is spendable in Majha', inMajha.total === 15 * CR, cr(inMajha.total));
 check('AQ+AR. and blocked in Malwa', inMalwa.total === 0, cr(inMalwa.total));
 
-const blocked = engine.canPlay(g, 'rally', malwaSeat, 1 * CR);
+const blocked = engine.canPlay(g, 'invest', malwaSeat, 1 * CR);
 check('AR. so a Malwa move on Majha money is refused', !blocked.ok, blocked.reason);
 
-const allowed = engine.play(g, 'rally', majhaSeat, ROLLS, 2 * CR);
+// Getting in is capped, so the move that proves the money is spendable here
+// is the opening one.
+const entry = CMP.CAMPAIGN.spending.entryMaximum;
+const allowed = engine.play(g, 'invest', majhaSeat, ROLLS, entry);
 check('   the same move in Majha goes through', allowed.ok, allowed.reason);
 check('   and comes out of the Majha purse',
-  engine.grantIn(g, 'majha') === 15 * CR - allowed.report.cost,
+  engine.grantIn(g, 'majha') === 15 * CR - entry,
   cr(engine.grantIn(g, 'majha')));
 check('   leaving general cash alone', engine.remaining(g) === 0, cr(engine.remaining(g)));
 
 // With both purses, the region money goes first.
 g.cash = 5 * CR;
 const purseBefore = engine.grantIn(g, 'majha');
-const second = engine.play(g, 'rally', majhaSeat, ROLLS, 1 * CR);
+const second = engine.play(g, 'invest', majhaSeat, ROLLS, 1 * CR);
 check('   region money is spent before general cash',
   engine.grantIn(g, 'majha') === purseBefore - second.report.cost
     && engine.remaining(g) === 5 * CR,
@@ -368,7 +394,7 @@ check('   region money is spent before general cash',
 section('65. Every movement of money is written down');
 
 g = newGame('ledger');
-const ledgerMove = engine.play(g, 'rally', malwaSeat, ROLLS, 5000000);
+const ledgerMove = engine.play(g, 'invest', malwaSeat, ROLLS, 5000000);
 const kinds = g.ledger.map((e) => e.kind);
 check('the round allowance is a ledger row', kinds.indexOf('income') !== -1, kinds.join('/'));
 check('so is the spending', kinds.indexOf('campaign') !== -1, kinds.join('/'));
