@@ -17,11 +17,14 @@ it.
 
 > A fictional strategy game.
 >
-> Constituency names, numbers and districts are real public information, and
-> that is the whole of what is real. Every party in it is one a player or the
-> game invented. Every candidate is a drawn character, never a photograph and
-> never a real person. Every percentage and every seat comes from what players
-> actually did in that game.
+> Constituency names, numbers and districts are real public information.
+> Every party in it is one a player or the game invented, and every percentage
+> and every seat comes from what players actually did in that game — there is
+> no polling and no real election result anywhere in it.
+>
+> Portraits and party symbols are image files supplied with the build. What
+> they depict is whatever was installed; the game treats them as artwork keyed
+> to an id and makes no claim about who or what they are.
 >
 > There is no sitting-member data in it, no polling, and no real election result
 > anywhere. It is not a prediction of anything.
@@ -91,10 +94,32 @@ Under the strip, two strategic buttons and nothing else: **MY AREAS** and
 **ALLIANCES**, side by side, because deciding what to defend and deciding who
 to defend it with are the same kind of thinking.
 
-Then the map, full width. A selector across the top — **All Punjab**, **Malwa**,
-**Majha**, **Doaba** — zooms to a region by computing the bounding box of its
-seats, so it frames whatever the geography actually is rather than a hard-coded
-rectangle. Pinch, drag, wheel and double-tap all work. The key under it reads:
+Then the map, full width, and a line above it saying how the part you are
+looking at stands: each party's seats, won counted apart from leading, from
+the board rather than from anything stored.
+
+A selector across the top — **All Punjab**, **Malwa**, **Majha**, **Doaba** —
+does not crop Punjab to a region. It *replaces* it. Everything outside the
+chosen region stops being drawn, and the frame becomes the region's own bounds,
+computed from where its seats actually are and grown to the shape of the map
+area so it fills rather than letterboxes. Zooming out stops at the region
+instead of at Punjab, and panning stops at its edges, so the board cannot be
+pushed off the screen. Switching eases over 280ms.
+
+That distinction is the whole of it. The camera used to be a transform on a
+group inside a fixed viewBox, which made a region a view of Punjab: the other
+two were still there, just outside the frame, and a pinch found them again.
+The camera is the viewBox now.
+
+Gestures are measured in screen pixels rather than map units, which is all
+"follows the finger" means: forty pixels of thumb is forty pixels of map at any
+zoom. One finger drags, two pinch — zooming and panning together, because a
+midpoint that drifts is the fingers moving across the map and ignoring it feels
+pinned. A double tap eases in on what was tapped. The wheel is proportional to
+the wheel rather than a fixed step. A drag that happens to finish over a seat
+is a drag, not a tap.
+
+The key under it reads:
 
 | | |
 | --- | --- |
@@ -102,6 +127,13 @@ rectangle. Pinch, drag, wheel and double-tap all work. The key under it reads:
 | ● | **Leading** — somebody is ahead today |
 | ⚔ | **Contested** — two campaigns are close |
 | ✓ | **Won** — taken, locked, finished |
+
+Seats carry their leader's colour, faded by how close the race is; district
+borders carry theirs, because colouring a district in one colour would hide
+the seats, which are the truth of the board. A district every seat of which is
+won gets a solid border rather than a tinted one. The legend names the parties
+in full, since they are invented at the start of every game and a colour on its
+own means nothing.
 
 Below the map, **WHO'S LEADING?** — parties ranked by seats, each with their
 face, their won total and how many more they lead; then one line for the
@@ -122,10 +154,20 @@ behind it. The whole decision is on it:
   and its whole **district**, which spends across every seat in it at once
 - **who is there** — every party's share of this seat, or a line saying nobody
   has campaigned here yet
+- **which seat**, when the target is one seat — the district's constituencies
+  as a row, coloured by who leads each and ticked where the race is over,
+  because hitting one of fourteen on a map at district zoom is a thumb-sized
+  problem
 - **how much** — a slider and a stepper, bounded by what the campaign holds and
   by the ₹1 crore entry cap when this would be a first investment, with the cap
-  explaining itself rather than silently refusing
+  saying so on the control rather than silently refusing
 - **what kind** — Campaign, Negative, or Corruption
+
+The map follows the panel: switching the target to a district frames the
+district, picking a seat frames the seat. The slider is a drag rather than a
+row of stops — it used to repaint the whole panel on every input event, which
+threw away the very input the finger was holding, so each movement needed a
+fresh press.
 
 Then confirm, read a short result, and the map comes back. That loop is the
 game, and every screen transition in the middle of it was a screen transition
@@ -675,19 +717,32 @@ should read the risk actions as free.
 Every candidate has a face on the scoreboard, so four players are told apart at
 a glance rather than by reading four party codes.
 
-The portraits are **drawn, never photographed** — small vector illustrations
-built from a seed: a face shape, a skin tone, a turban or hair, a beard,
-sometimes glasses, sometimes the lines of an older face. That is a deliberate
-choice rather than a shortcut. A photographic portrait of a fictional candidate
-would sooner or later resemble somebody real; a drawn face cannot, and nothing
-here is derived from any real person's likeness. There are no real politicians
-anywhere in this game to be confused with — not in the data, not on the board,
-not on this screen.
+A portrait is an **image file**, loaded from `assets/portraits/` and keyed by
+an id — `a1` to `a24`. The ids are the durable part: a save, a profile and the
+server's own dealing of faces to opponents have all stored them since the first
+game anybody played, so they never move however the pictures are named or
+replaced.
 
-The seed is assigned once, when a player sits down, and stored with the game.
-The same seed always draws the same face — in round one, in round fifteen, and
-after a disconnection and a rejoin. `npm run shots:portraits` renders a grid of
-them to look at.
+The join between an id and a file is data, not code. `js/data/assets.js` holds
+it, and three things are tried in order: an override written by hand, the
+mapping `tools/sync-assets.mjs` generated from whatever package was installed,
+and finally the id's own name. That last one is the whole configuration for the
+simple case — drop `a7.png` into the folder and it is a7's face.
+
+    node tools/sync-assets.mjs <folder>     # folder holds portraits/ and
+                                            # party-symbols/
+
+The tool copies the images in, renames nothing, and writes
+`js/data/asset-map.js` with what it decided. It also reports which ids ended up
+without a picture, because that failure is otherwise silent: an id with no file
+falls back to a labelled circle carrying its initials, or its id where there is
+no name to take initials from. Nothing crashes and nothing shows the browser's
+broken-image glyph — the image is laid over the fallback only once the browser
+confirms it loaded.
+
+Paths are relative to the page, which is what lets the same build run from a
+checkout, from a dev server on a port, and from a subdirectory on the live
+host.
 
 ## One board, four players
 
@@ -843,7 +898,7 @@ found one.
 | --- | --- |
 | Name | up to 40 characters, anything you like |
 | Short name | up to four letters, suggested from the name and editable |
-| Symbol | one of sixteen — a tree, a lamp, a river, a shield |
+| Symbol | one of sixteen ids — `tree`, `lamp`, `river`, `shield` — each an image from `assets/party-symbols/` |
 | Colour | one of twelve, chosen to be told apart at the size of a dot |
 | Slogan | optional, and it appears on your card |
 
@@ -874,16 +929,8 @@ Twenty-four of them, drawn one at a time rather than generated from a seed — a
 generator gives you unlimited faces and no good ones, because nobody ever looks
 at any single result and decides it is right.
 
-They are invented people: a range of ages, of dress and of bearing, turbaned and
-bare-headed, in a dupatta and in a jacket, thirty and seventy. Every one is
-drawn on the same construction, so a grid of them reads as one cast rather than
-as twenty-four separate drawings.
-
-> Not one is drawn from a photograph, a real candidate or a real officeholder,
-> and the set exists precisely so the game never needs a photograph of anybody.
-
 You pick yours from a grid; opponents are dealt faces nobody else is using. The
-roster exists in three places — the drawings, the data file the engine reads,
+roster exists in three places — the renderer, the data file the engine reads,
 and the server's copy for dealing to opponents — so `npm run test:ai` fails the
 build if they ever stop matching.
 

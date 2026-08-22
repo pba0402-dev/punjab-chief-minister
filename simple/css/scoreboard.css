@@ -3,12 +3,49 @@
    Loaded after rounds.css.
    ------------------------------------------------------------------ */
 
+/*
+ * A portrait is an image file now, so this is a frame with a picture in it
+ * rather than the picture itself. The size is set inline by the renderer
+ * because every screen asks for a different one.
+ */
 .portrait {
-  border-radius: 50%;
+  position: relative;
   display: block;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
   background: var(--ink-3);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
+.portrait-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.portrait.has-image .portrait-img { opacity: 1; }
+
+/*
+ * What shows while a picture is loading, and instead of it when the file is
+ * not there. Initials rather than an empty circle: a face that is missing
+ * should still say whose it was meant to be.
+ */
+.portrait-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted-2);
+  user-select: none;
+}
+.portrait.has-image .portrait-fallback { opacity: 0; }
 
 /* ---------------------------------------------------- results screen */
 

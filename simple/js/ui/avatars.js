@@ -46,7 +46,10 @@ CMP.ui.avatars = (function () {
             if (opts.onPick) opts.onPick(id);
             paint();
           },
-        }, [CMP.ui.portrait.render(id, opts.size || 46, 'candidate ' + (i + 1))]);
+          // The button already carries the label; naming the portrait again
+          // inside it makes a screen reader say it twice, and it is what put
+          // "C1" under both candidate 11 and candidate 21.
+        }, [CMP.ui.portrait.render(id, opts.size || 46)]);
       }));
     }
 

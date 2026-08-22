@@ -390,9 +390,9 @@ const roster = host.dom.window.CMP.AVATARS;
 
 check('12. there are enough faces to choose between', roster.length >= 20,
   roster.length + ' faces');
-check('12. the cast list and the drawings agree',
+check('12. the cast list and the renderer agree',
   JSON.stringify(roster) === JSON.stringify(portrait.ids()),
-  roster.length + ' listed, ' + portrait.ids().length + ' drawn');
+  roster.length + ' listed, ' + portrait.ids().length + ' known');
 check('12. and the server deals from the same list',
   JSON.stringify(roster) === JSON.stringify(serverAvatars),
   serverAvatars.length + ' on the server');
@@ -405,19 +405,26 @@ check('13. and no two of them are the same person',
   new Set(roster.map((id) => JSON.stringify(portrait.describe(id)))).size === roster.length,
   new Set(roster.map((id) => JSON.stringify(portrait.describe(id)))).size + ' distinct');
 
-// 13. The cast has to span the people who would actually be standing.
+/*
+ * 13. Every face resolves to a picture, and to its own.
+ *
+ * Portraits are image files now rather than drawings the page builds, so what
+ * there is to guarantee has moved: that every id in the roster asks for a
+ * file, that no two ids ask for the same one, and that the path is relative —
+ * an absolute path would work on exactly one machine.
+ */
 const cast = roster.map((id) => portrait.describe(id));
-check('13. it spans turbaned and bare-headed',
-  cast.some((f) => f.hair === 'turban') && cast.some((f) => f.hair !== 'turban'),
-  cast.filter((f) => f.hair === 'turban').length + ' turbaned');
-check('13. bearded and clean-shaven',
-  cast.some((f) => f.beard !== 'none') && cast.some((f) => f.beard === 'none'));
-check('13. young, middle-aged and older',
-  new Set(cast.map((f) => f.age)).size === 3,
-  JSON.stringify([0, 1, 2].map((a) => cast.filter((f) => f.age === a).length)));
-check('13. and a range of skin tones',
-  new Set(cast.map((f) => f.skin)).size >= 4,
-  new Set(cast.map((f) => f.skin)).size + ' tones');
+check('13. every id resolves to a picture',
+  cast.every((f) => typeof f.src === 'string' && f.src.length > 0),
+  cast.filter((f) => !f.src).length + ' without one');
+check('13. all of them under the portrait folder',
+  cast.every((f) => f.src.indexOf('assets/portraits/') === 0),
+  cast[0].src);
+check('13. by a relative path, so the game runs from anywhere it is served',
+  cast.every((f) => !/^([a-zA-Z]:|\/|https?:)/.test(f.src)), cast[0].src);
+check('13. and no two faces are the same picture',
+  new Set(cast.map((f) => f.src)).size === roster.length,
+  new Set(cast.map((f) => f.src)).size + ' distinct');
 
 // Round results now open on what changed; the standings, with faces, are one
 // tap further in. Walk there the way a player does.
@@ -426,11 +433,18 @@ if (toStandings) host.click(toStandings);
 await sleep(120);
 
 const faces = host.qq('.board-row .portrait');
-check('every candidate on screen has a drawn portrait', faces.length === 4, faces.length + ' drawn');
-check('portraits are vector drawings, not images',
-  faces.every((n) => n.tagName.toLowerCase() === 'svg'));
+check('every candidate on screen has a portrait', faces.length === 4, faces.length + ' shown');
+check('each is an image from the asset folder',
+  faces.every((n) => {
+    const img = n.querySelector('img');
+    return img && /^assets\/portraits\//.test(img.getAttribute('src') || '');
+  }),
+  (faces[0] && faces[0].innerHTML || '').slice(0, 90));
 check('each portrait is labelled for a screen reader',
-  faces.every((n) => /Illustration of/.test(n.getAttribute('aria-label') || '')));
+  faces.every((n) => /Portrait of/.test(n.getAttribute('aria-label') || '')));
+// A picture that has not arrived leaves something legible rather than a hole.
+check('and carries a fallback for a picture that never loads',
+  faces.every((n) => !!n.querySelector('.portrait-fallback')));
 
 /* ------------------------------------------------------------ territory */
 

@@ -338,7 +338,7 @@ check('25. with a face apiece', host.qq('.roster-row .portrait').length >= 1,
 // 11. The preview card shows what the player is about to become.
 check('11. the party preview shows the name and badge',
   /PUNJAB DEVELOPMENT PARTY/.test(host.q('.pv-party').textContent) &&
-  !!host.q('.pv-badge svg'),
+  !!host.q('.pv-badge .sym'),
   host.q('.pv-party').textContent);
 
 /* ---------------------------------------------------------------- details */

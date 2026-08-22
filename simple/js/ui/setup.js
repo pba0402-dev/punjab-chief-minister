@@ -209,7 +209,7 @@ CMP.ui.setup = (function () {
               }),
               el('p', {
                 class: 'granted-note',
-                text: 'Drawn characters, not photographs. Nobody here is real.',
+                text: 'Pick the character you want to run as.',
               }),
             ]),
           ]),

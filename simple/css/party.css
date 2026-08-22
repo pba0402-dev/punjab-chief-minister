@@ -629,3 +629,197 @@
   line-height: 1.5;
   color: var(--muted-2);
 }
+
+/* ---------------------------------------------- the amount, as a gesture */
+
+/*
+ * A range input is a drag, so it needs a thumb a thumb can find. The native
+ * one is about 12px on a phone, which is a target you aim at rather than
+ * grab — and the track has to be tall enough that a finger travelling across
+ * it does not slide off and abandon the drag.
+ */
+.cs-range {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 34px;
+  margin: 0;
+  background: none;
+  touch-action: pan-y;
+  cursor: pointer;
+}
+.cs-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  /* --fill is written by the panel as the amount changes; WebKit will not
+     paint a range's filled portion on its own. */
+  background: linear-gradient(
+    90deg,
+    var(--wheat) var(--fill, 0%),
+    var(--line) var(--fill, 0%)
+  );
+}
+.cs-range::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.cs-range::-moz-range-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--wheat);
+}
+.cs-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -9px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--wheat);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.cs-range::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--wheat);
+}
+.cs-range:focus-visible { outline: 2px solid var(--wheat); outline-offset: 3px; }
+
+/* What the ₹1 crore rule looks like while you are up against it. */
+.cs-entry-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--wheat);
+  white-space: nowrap;
+}
+.cs-entry-tag-label {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+.cs-entry-tag-max {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 379px) {
+  /* The badge keeps the figure and drops the word; the note under the
+     slider says the rest. */
+  .cs-entry-tag-label { display: none; }
+}
+
+/* ------------------------------------------- which seat, inside a district */
+
+/*
+ * A district is up to fourteen constituencies, and hitting one of them on a
+ * map at district zoom is a thumb-sized problem. They are a scrolling row
+ * here too, coloured by who leads each so the row is a picture of the
+ * district as well as a way through it.
+ */
+.cs-seats {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.cs-seats::-webkit-scrollbar { display: none; }
+
+.cs-seat {
+  appearance: none;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--party, var(--line));
+  border-radius: 8px;
+  background: var(--ink-2);
+  font-family: var(--font);
+  color: var(--muted);
+  cursor: pointer;
+}
+.cs-seat.is-active {
+  border-color: var(--wheat);
+  border-left-color: var(--party, var(--wheat));
+  color: var(--cream);
+  background: var(--ink-3, var(--ink-2));
+}
+.cs-seat.is-won { opacity: 0.75; }
+
+.cs-seat-num {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.cs-seat-name {
+  font-size: 0.74rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-seat-tick {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--good);
+}
+
+
+/* ------------------------------------------------------- party symbols */
+
+/*
+ * A symbol is an image file now. `contain` rather than `cover`, because a
+ * symbol cropped is a different symbol.
+ */
+.sym {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.sym-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sym.has-image .sym-img { opacity: 1; }
+
+/* The symbol's own name, until its picture arrives or in place of it. */
+.sym-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: var(--muted-2);
+  overflow: hidden;
+  user-select: none;
+}
+.sym.has-image .sym-fallback { opacity: 0; }
