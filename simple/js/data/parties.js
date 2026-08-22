@@ -68,16 +68,6 @@ window.CMP = window.CMP || {};
     { id: 'sunrise', name: 'Rising Sun' },
     { id: 'mountain', name: 'Mountain' },
     { id: 'wheel', name: 'Wheel' },
-    { id: 'book', name: 'Book' },
-    { id: 'flower', name: 'Flower' },
-    { id: 'handshake', name: 'Handshake' },
-    { id: 'torch', name: 'Torch' },
-    { id: 'crown', name: 'Crown' },
-    { id: 'river', name: 'River' },
-    { id: 'shield', name: 'Shield' },
-    { id: 'wheat', name: 'Wheat' },
-    { id: 'lamp', name: 'Lamp' },
-    { id: 'bridge', name: 'Bridge' },
   ];
 
   CMP.getPartySymbol = function (id) {

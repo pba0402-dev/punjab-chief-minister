@@ -95,7 +95,7 @@ const G = async (a, p) => (await fetch(BASE + '?action=' + a + '&' + new URLSear
 
 // Parties are invented now, so a test that wants a game has to found some.
 const NAMES = ['Party One', 'Party Two', 'Party Three', 'Party Four'];
-const SYMBOLS = ['star', 'tree', 'lion', 'river'];
+const SYMBOLS = ['star', 'tree', 'lion', 'sunrise'];
 const COLOURS = ['saffron', 'indigo', 'emerald', 'crimson'];
 
 /**

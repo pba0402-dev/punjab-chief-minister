@@ -75,9 +75,7 @@ final class Lobby
     ];
 
     public const SYMBOLS = [
-        'star', 'tree', 'lion', 'sunrise', 'mountain', 'wheel', 'book',
-        'flower', 'handshake', 'torch', 'crown', 'river', 'shield', 'wheat',
-        'lamp', 'bridge',
+        'star', 'tree', 'lion', 'sunrise', 'mountain', 'wheel',
     ];
 
     /** An abbreviation, from a name nobody supplied one for. */

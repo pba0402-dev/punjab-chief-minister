@@ -30,6 +30,18 @@ async function freePort() {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', 'simple');
+
+/*
+ * The symbols the server will actually accept, read from the server.
+ *
+ * Listing them here by hand meant the list went stale the moment the game's
+ * did, and a test that agrees with a copy of the truth rather than the truth
+ * is not checking anything.
+ */
+const SYMBOLS = (fs.readFileSync(path.join(ROOT, 'api/lib/Lobby.php'), 'utf8')
+  .match(/public const SYMBOLS = \[([\s\S]*?)\];/) || [, ''])[1]
+  .match(/'([^']+)'/g)
+  ?.map((m) => m.slice(1, -1)) || [];
 const PORT = await freePort();
 const BASE = 'http://127.0.0.1:' + PORT + '/api/index.php';
 const DATA = path.join(os.tmpdir(), 'cmp-api-test-' + Date.now());
@@ -230,15 +242,13 @@ check('an empty name is refused rather than stored blank',
   mine4.party.name === 'Unnamed Party', mine4.party.name);
 check('an over-long badge is cut to four', mine4.party.short.length <= 4, mine4.party.short);
 check('an unknown symbol falls back to a real one',
-  ['star', 'tree', 'lion', 'sunrise', 'mountain', 'wheel', 'book', 'flower',
-   'handshake', 'torch', 'crown', 'river', 'shield', 'wheat', 'lamp', 'bridge']
-    .includes(mine4.party.symbol),
-  mine4.party.symbol);
+  SYMBOLS.includes(mine4.party.symbol),
+  mine4.party.symbol + ' of ' + SYMBOLS.join('/'));
 check('and an unknown colour becomes a real one',
   /^#[0-9A-Fa-f]{6}$/.test(mine4.party.colour), mine4.party.colour);
 
 // Put player four's party right before the rest of the run needs it.
-await p4.party({ name: 'Sanjha Workers Alliance', short: 'SWA', symbol: 'wheat',
+await p4.party({ name: 'Sanjha Workers Alliance', short: 'SWA', symbol: 'mountain',
   colourId: 'gold' });
 
 const afterParties = await p1.state();

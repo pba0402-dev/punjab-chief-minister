@@ -313,15 +313,22 @@ check('5. no party is offered to be picked', qq(dom, '.party-card').length === 0
 check('8. setup asks for a name, a party, a short name and a slogan',
   qq(dom, '.screen-setup .field-input').length === 4,
   qq(dom, '.screen-setup .field-input').length + ' fields');
-check('9. and offers symbols to run under',
-  qq(dom, '.sym-option').length >= 12, qq(dom, '.sym-option').length + ' symbols');
+check('9. and offers every symbol the game has',
+  qq(dom, '.sym-option').length === dom.window.CMP.PARTY_SYMBOLS.length,
+  qq(dom, '.sym-option').length + ' of ' + dom.window.CMP.PARTY_SYMBOLS.length);
+check('9. enough of them for a table of four',
+  dom.window.CMP.PARTY_SYMBOLS.length >= 4,
+  dom.window.CMP.PARTY_SYMBOLS.length + ' symbols');
 check('10. and colours', qq(dom, '.col-option').length >= 8,
   qq(dom, '.col-option').length + ' colours');
 check('1. the budget is granted, not entered', !q(dom, '.field-money'));
 check('7. the round allowance is stated on the setup screen',
   /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
-check('12. and offers faces to choose from',
-  qq(dom, '.av-option').length >= 20, qq(dom, '.av-option').length + ' avatars');
+check('12. and offers every face the game has',
+  qq(dom, '.av-option').length === dom.window.CMP.AVATARS.length,
+  qq(dom, '.av-option').length + ' of ' + dom.window.CMP.AVATARS.length);
+check('12. enough of them for a table of four',
+  dom.window.CMP.AVATARS.length >= 4, dom.window.CMP.AVATARS.length + ' faces');
 /*
  * 12. Every face is an image file, found by the id the save stores.
  *

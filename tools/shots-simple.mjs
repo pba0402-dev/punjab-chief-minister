@@ -145,7 +145,7 @@ const SCENES = {
     "  leaderboard:[" +
     "    {name:'Simran Kaur Gill',avatar:'a3',score:9600,won:5,played:7,level:4}," +
     "    {name:'Harpreet Singh Dhillon',avatar:'a7',score:8800,won:4,played:6,level:3}," +
-    "    {name:'Gurpreet Kaur Sandhu',avatar:'a12',score:7100,won:3,played:5,level:3}]" +
+    "    {name:'Gurpreet Kaur Sandhu',avatar:'a9',score:7100,won:3,played:5,level:3}]" +
     "});};" +
     "CMP.app.goTo('setup');setTimeout(function(){CMP.app.goTo('home');},40);",
 

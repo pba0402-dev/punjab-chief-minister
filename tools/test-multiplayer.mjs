@@ -280,7 +280,7 @@ const PARTY_NAMES = [
   'Pind Vikas Manch',
   'Sanjha Workers Alliance',
 ];
-const PARTY_SYMBOLS = ['tree', 'lamp', 'river', 'wheat'];
+const PARTY_SYMBOLS = ['tree', 'lion', 'sunrise', 'mountain'];
 const PARTY_COLOURS = ['emerald', 'indigo', 'crimson', 'gold'];
 
 for (let i = 0; i < players.length; i++) {

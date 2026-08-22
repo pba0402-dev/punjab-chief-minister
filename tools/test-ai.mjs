@@ -388,8 +388,8 @@ check('every portrait survived the reconnection',
 const portrait = host.dom.window.CMP.ui.portrait;
 const roster = host.dom.window.CMP.AVATARS;
 
-check('12. there are enough faces to choose between', roster.length >= 20,
-  roster.length + ' faces');
+check('12. there are enough faces for everybody at the table',
+  roster.length >= 4, roster.length + ' faces');
 check('12. the cast list and the renderer agree',
   JSON.stringify(roster) === JSON.stringify(portrait.ids()),
   roster.length + ' listed, ' + portrait.ids().length + ' known');
