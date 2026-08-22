@@ -1157,22 +1157,6 @@ CMP.ui.election = (function () {
       ];
     }
 
-    function strategyButton(id, icon, label, note) {
-      return el('button', {
-        class: 'g-strategy-item',
-        type: 'button',
-        onclick: function () {
-          setSection(id);
-        },
-      }, [
-        el('span', { class: 'g-strategy-icon', 'aria-hidden': 'true', text: icon }),
-        el('span', { class: 'g-strategy-body' }, [
-          el('strong', { class: 'g-strategy-label', text: label }),
-          el('span', { class: 'g-strategy-note', text: note }),
-        ]),
-      ]);
-    }
-
     /*
      * Where grant money lives, and where it can go.
      *
