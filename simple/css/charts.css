@@ -372,98 +372,11 @@
   color: var(--muted-2);
 }
 
-/* ---------------------------------------------- round results, screen 1 */
-
-.rr-changes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.rr-change {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'tag flip'
-    'name flip'
-    'note note';
-  align-items: center;
-  gap: 2px 10px;
-  padding: 9px 11px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--to, var(--line));
-  border-radius: var(--radius-sm);
-  background: var(--ink-2);
-  animation: rr-in 0.32s ease both;
-}
-@keyframes rr-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: none; }
-}
-
-.rr-change-tag {
-  grid-area: tag;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted-2);
-}
-.rr-change.is-won .rr-change-tag { color: var(--good); }
-.rr-change.is-lost .rr-change-tag { color: var(--danger); }
-
-.rr-change-name {
-  grid-area: name;
-  font-size: 0.9rem;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rr-change-note {
-  grid-area: note;
-  margin-top: 3px;
-  font-size: 0.66rem;
-  color: var(--muted-2);
-}
-
-.rr-change-flip {
-  grid-area: flip;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.rr-badge {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 7px;
-  border-radius: 4px;
-  border: 1px solid currentColor;
-}
-.rr-badge.is-from { color: var(--from, var(--muted-2)); }
-.rr-badge.is-to { color: var(--to, var(--cream)); }
-.rr-badge.is-none { color: var(--muted-2); border-style: dashed; }
-.rr-arrow {
-  font-size: 0.7rem;
-  color: var(--muted-2);
-}
-
-.rr-quiet {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 16px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--ink-2);
-  text-align: center;
-}
-.rr-quiet-title { font-size: 0.95rem; font-weight: 700; }
-.rr-quiet-note { font-size: 0.74rem; color: var(--muted-2); }
+/*
+ * The seats-changed list, the wins block and the conflicts block used to be
+ * styled here. Their screens are gone — the results run region by region now
+ * — and a stylesheet is a poor place to keep the memory of a layout.
+ */
 
 .round-results {
   display: flex;
@@ -532,145 +445,244 @@
   .cn-fig strong { font-size: 0.82rem; }
 }
 
-/* ------------------------------------ round results: wins and conflicts */
+/* ============================================== election night, by region */
 
 /*
- * Both sit above the list of leader changes, and both need to look unlike
- * it — a permanent win and a burned crore are different news from a seat
- * that changed hands and may change back.
+ * Malwa, then Majha, then Doaba, then who is leading. Each region is its own
+ * short screen, and the whole presentation answers three questions and no
+ * others: who is leading, where, and how many seats they have.
  */
 
-.rr-block {
+.rr-bar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
-.rr-block .results-title { margin: 0; }
-.rr-block-more {
-  margin: 0;
-  font-size: 0.66rem;
+.rr-bar-kicker {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted-2);
 }
+.rr-bar-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--cream);
+}
 
-.rr-wins,
-.rr-conflicts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Always there, always the same size, always the way to the answer. */
+.rr-skip {
+  appearance: none;
+  flex: none;
+  min-height: 40px;
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--ink-2);
+  font-family: var(--font);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+}
+.rr-skip:hover { color: var(--cream); border-color: var(--muted-2); }
+.rr-skip:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+
+.rr-districts {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.rr-win {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'tick name badge'
-    'note note note';
-  align-items: center;
-  gap: 2px 9px;
-  padding: 9px 11px;
-  border: 1px solid var(--to, var(--line));
-  border-radius: var(--radius-sm);
-  /* The winner's colour behind it, faintly — this seat belongs to somebody
-     now, and saying so in words alone under-sells it. */
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--to) 16%, transparent), transparent 62%),
-    var(--ink-2);
-  animation: rr-in 0.32s ease both;
-}
-.rr-win.is-mine { border-width: 2px; padding: 8px 10px; }
-
-.rr-win-tick {
-  grid-area: tick;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--to, var(--good));
-}
-.rr-win-name {
-  grid-area: name;
-  font-size: 0.9rem;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rr-win .rr-badge { grid-area: badge; }
-.rr-win-note {
-  grid-area: note;
-  margin-top: 3px;
-  font-size: 0.66rem;
-  color: var(--muted-2);
-}
-
-.rr-conflict {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'mark name parties'
-    'note note note';
-  align-items: center;
-  gap: 2px 9px;
-  padding: 9px 11px;
-  border: 1px dashed var(--line-2, var(--line));
+.rr-district {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--ink-2);
   animation: rr-in 0.32s ease both;
 }
-.rr-conflict.is-mine { border-color: var(--danger); }
+@keyframes rr-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 
-.rr-conflict-mark {
-  grid-area: mark;
-  font-size: 0.85rem;
+.rr-district-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rr-district-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.rr-district-seats {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--muted-2);
 }
-.rr-conflict.is-mine .rr-conflict-mark { color: var(--danger); }
-.rr-conflict-name {
-  grid-area: name;
-  font-size: 0.9rem;
+
+.rr-runners { display: flex; flex-direction: column; gap: 5px; }
+
+.rr-runner {
+  display: grid;
+  grid-template-columns: 30px 42px minmax(0, 1fr) 48px auto;
+  align-items: center;
+  gap: 8px;
+}
+.rr-runner .portrait { border: 1px solid var(--party); }
+.rr-runner-name {
+  font-size: 0.7rem;
   font-weight: 700;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rr-conflict-parties {
-  grid-area: parties;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.rr-runner.is-first .rr-runner-name { color: var(--party); }
+.rr-runner.is-you .rr-runner-name { text-decoration: underline; text-underline-offset: 3px; }
+
+.rr-runner-track {
+  height: 9px;
+  border-radius: 5px;
+  background: var(--line-soft);
+  overflow: hidden;
 }
-.rr-conflict-note {
-  grid-area: note;
-  margin-top: 3px;
-  font-size: 0.66rem;
+/*
+ * The width is the calculated share and is in the DOM from the first frame;
+ * the animation only scales what is already there, so nothing depends on a
+ * frame being painted for the number to be right.
+ */
+.rr-runner-fill {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--party);
+  transform-origin: left center;
+  animation: rr-grow 0.65s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+@keyframes rr-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.rr-runner:not(.is-first) .rr-runner-fill { opacity: 0.62; }
+
+.rr-runner-share {
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.rr-runner.is-first .rr-runner-share { color: var(--cream); }
+.rr-runner-won {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--good);
+  font-variant-numeric: tabular-nums;
+}
+
+.rr-district-lead {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--party);
+}
+
+/* ------------------------------------------------------ overall leader */
+
+.rr-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 16px 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  text-align: center;
+  animation: rr-in 0.32s ease both;
+}
+.rr-card .portrait { border: 2px solid var(--party); margin-bottom: 4px; }
+.rr-card-party {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--party);
+}
+.rr-card-seats {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+.rr-card-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--muted-2);
 }
 
-/*
- * On the narrowest phones the badges drop to their own row rather than
- * disappearing. Who won the seat, and who burned money against whom, is the
- * whole point of both rows — it is the last thing to cut, not the first.
- */
-@media (max-width: 379px) {
-  .rr-win {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'tick name'
-      'badge badge'
-      'note note';
-  }
-  .rr-win .rr-badge { justify-self: start; margin-top: 4px; }
+.rr-card.is-leading {
+  border-color: var(--party);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--party) 14%, transparent), transparent 60%),
+    var(--ink-2);
+}
+.rr-card-badge {
+  margin-top: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--party);
+  color: #12100b;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
 
-  .rr-conflict {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'mark name'
-      'parties parties'
-      'note note';
-  }
-  .rr-conflict-parties { justify-content: flex-start; margin-top: 4px; }
+@media (max-width: 379px) {
+  .rr-bar-title { font-size: 1.7rem; }
+  .rr-runner { grid-template-columns: 26px 38px minmax(0, 1fr) 44px auto; gap: 6px; }
+  .rr-card-seats { font-size: 1.8rem; }
+}
+
+@media (min-width: 720px) {
+  /* Room to show all four across, which is how a results grid should read. */
+  .rr-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rr-districts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rr-district,
+  .rr-card,
+  .rr-runner-fill { animation: none; }
 }

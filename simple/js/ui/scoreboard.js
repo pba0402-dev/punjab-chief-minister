@@ -448,26 +448,29 @@ CMP.ui.scoreboard = (function () {
     var result = null;
 
     /*
-     * Two screens, in this order, every round.
+     * Election night, in the order a results programme would run it.
      *
-     * What changed comes first, because that is the news: which seats moved
-     * and who took them from whom. Only then the standings. Showing the table
-     * first buries the story under a scoreboard that has barely moved — four
-     * numbers a round or two different is not what anybody is waiting to see.
+     * Malwa, then Majha, then Doaba, then who is leading overall. Each region
+     * is its own short screen: the districts in it, who is ahead in each, and
+     * by how much. That is the whole of what anybody wants after a round —
+     * who is leading, where, and how many seats they have.
+     *
+     * It used to be one screen of everything that changed, with the wins and
+     * the conflicts and the counts stacked on top of each other. Correct, and
+     * more than anybody reads in the eight seconds between rounds.
      */
-    var stage = 'changes';  // then 'leading', then home
-    var showAllChanges = false;
+    var REGION_ORDER = ['malwa', 'majha', 'doaba'];
+
+    var stage = REGION_ORDER[0];   // a region id, then 'overall'
 
     /*
      * The results run themselves.
      *
-     * What changed, then who is leading, then back to the board. A player who
-     * has just spent two minutes deciding things should be told what came of
-     * it without having to ask twice, and the sequence moves on by itself so
-     * nobody is left looking at a screen wondering whether it is finished.
-     *
-     * Every automatic step can be skipped, and any tap cancels the timer: the
-     * moment somebody is reading rather than watching, the clock stops.
+     * A player who has just spent two minutes deciding things should be told
+     * what came of it without having to ask, and the sequence moves on by
+     * itself so nobody is left looking at a screen wondering whether it has
+     * finished. Every step can be skipped, and any tap stops the clock: the
+     * moment somebody is reading rather than watching, it waits for them.
      */
     var advance = null;
 
@@ -476,12 +479,28 @@ CMP.ui.scoreboard = (function () {
       advance = null;
     }
 
+    /** What comes after this, or null at the end. */
+    function nextStage(from) {
+      var at = REGION_ORDER.indexOf(from);
+      if (at !== -1) {
+        // Regions nobody has campaigned in yet are skipped rather than shown
+        // empty: a screen saying "no results" is not a result.
+        for (var i = at + 1; i < REGION_ORDER.length; i++) {
+          if (regionRows(REGION_ORDER[i]).length) return REGION_ORDER[i];
+        }
+        return 'overall';
+      }
+      return null;
+    }
+
     function go(next) {
       stopAdvance();
       stage = next;
       render();
-      if (next === 'changes') queue('leading', changesDwell());
-      else if (next === 'leading') queue('done', LEADER_DWELL);
+
+      var after = nextStage(next);
+      if (after) queue(after, regionDwell(next));
+      else queue('done', LEADER_DWELL);
     }
 
     function queue(next, ms) {
@@ -496,19 +515,250 @@ CMP.ui.scoreboard = (function () {
       }, ms);
     }
 
-    /** About a second and a half a change, and never more than eight. */
-    function changesDwell() {
-      // Long enough to read what is on the screen, and no longer. Wins and
-      // conflicts are on this screen too, so they buy time the same way.
-      var rows = Math.min(5, ((result && result.changes) || []).length) +
-        Math.min(6, ((result && result.won) || []).length) +
-        Math.min(6, ((result && result.conflicts) || []).length);
-      return Math.min(9000, 2200 + rows * 1000);
+    /** Long enough to read the districts on screen, and no longer. */
+    function regionDwell(region) {
+      var rows = regionRows(region).length;
+      return Math.min(9000, 2600 + rows * 700);
     }
 
-    var LEADER_DWELL = 5000;
+    var LEADER_DWELL = 6000;
 
     var root = el('section', { class: 'round-results' });
+
+    /* ------------------------------------------------ reading the board */
+
+    /**
+     * How a district stands, from the board the engine already settled.
+     *
+     * Nothing here computes a result. The shares are the same shares the
+     * campaign panel and the map read, averaged across the district's seats
+     * so the four numbers add up to a position somebody can read — and the
+     * seats won and led are counted from the game's own record of them.
+     */
+    function districtRow(district) {
+      var game = opts.game && opts.game();
+      if (!game) return null;
+
+      var won = game.wonSeats || {};
+      var totals = {};
+      var seatsWon = {};
+      var seatsLed = {};
+      var touched = false;
+
+      district.seats.forEach(function (n) {
+        var support = game.support[n] || {};
+        var ranked = CMP.campaign.standings(support);
+        if (ranked.length) touched = true;
+        ranked.forEach(function (row) {
+          totals[row.partyId] = (totals[row.partyId] || 0) + row.support;
+        });
+
+        var w = won[String(n)];
+        if (w) {
+          seatsWon[w.party] = (seatsWon[w.party] || 0) + 1;
+        } else if (ranked.length) {
+          seatsLed[ranked[0].partyId] = (seatsLed[ranked[0].partyId] || 0) + 1;
+        }
+      });
+
+      if (!touched) return null;
+
+      var count = district.seats.length || 1;
+      var rows = Object.keys(totals).map(function (id) {
+        return {
+          partyId: id,
+          share: Math.round((totals[id] / count) * 10) / 10,
+          won: seatsWon[id] || 0,
+          leading: seatsLed[id] || 0,
+        };
+      }).sort(function (a, b) {
+        return b.share - a.share;
+      });
+
+      return { district: district, rows: rows.slice(0, 4) };
+    }
+
+    /** Every district in a region that anybody has campaigned in. */
+    function regionRows(region) {
+      if (!CMP.DISTRICTS) return [];
+      var out = [];
+      CMP.DISTRICTS.forEach(function (d) {
+        if (d.region !== region) return;
+        var row = districtRow(d);
+        if (row) out.push(row);
+      });
+      return out.sort(function (a, b) {
+        return b.district.seats.length - a.district.seats.length;
+      });
+    }
+
+    /* -------------------------------------------------- the presentation */
+
+    /**
+     * The bar across the top of every results screen.
+     *
+     * SKIP is always there and always goes to the same place — the overall
+     * leader — because somebody who does not want to watch the districts
+     * wants the answer, not the next region.
+     */
+    function resultsBar(title, kicker) {
+      return el('div', { class: 'rr-bar' }, [
+        el('div', { class: 'rr-bar-text' }, [
+          el('span', { class: 'rr-bar-kicker', text: kicker }),
+          el('h2', { class: 'rr-bar-title', text: title }),
+        ]),
+        stage !== 'overall'
+          ? el('button', {
+              class: 'rr-skip',
+              type: 'button',
+              text: 'Skip',
+              onclick: function () {
+                go('overall');
+              },
+            })
+          : null,
+      ]);
+    }
+
+    /** One region: its districts, and who is ahead in each. */
+    function regionScreen() {
+      var region = CMP.getRegion ? CMP.getRegion(stage) : null;
+      var rows = regionRows(stage);
+      var after = nextStage(stage);
+
+      return [
+        resultsBar(region ? region.name : stage, 'Round ' + result.round + ' results'),
+
+        el('div', { class: 'rr-districts' }, rows.map(function (row, i) {
+          var top = row.rows[0];
+          return el('section', {
+            class: 'rr-district',
+            style: { animationDelay: Math.min(i, 6) * 60 + 'ms' },
+          }, [
+            el('header', { class: 'rr-district-head' }, [
+              el('h3', { class: 'rr-district-name', text: row.district.name }),
+              el('span', {
+                class: 'rr-district-seats',
+                text: row.district.seats.length +
+                  (row.district.seats.length === 1 ? ' seat' : ' seats'),
+              }),
+            ]),
+
+            el('div', { class: 'rr-runners' }, row.rows.map(function (r, place) {
+              var party = partyOf(r.partyId);
+              var mine = opts.you && opts.you() === r.partyId;
+              return el('div', {
+                class: 'rr-runner' + (place === 0 ? ' is-first' : '') +
+                  (mine ? ' is-you' : ''),
+                style: { '--party': party.colour },
+              }, [
+                CMP.ui.portrait.render(avatarFor(r.partyId), 30, party.name),
+                el('span', { class: 'rr-runner-name', text: party.short }),
+                el('span', { class: 'rr-runner-track' }, [
+                  el('span', {
+                    class: 'rr-runner-fill',
+                    style: { width: Math.max(2, r.share) + '%' },
+                  }),
+                ]),
+                el('span', { class: 'rr-runner-share', text: r.share.toFixed(1) + '%' }),
+                r.won
+                  ? el('span', { class: 'rr-runner-won', text: '\u2713' + r.won })
+                  : null,
+              ]);
+            })),
+
+            top
+              ? el('p', {
+                  class: 'rr-district-lead',
+                  style: { '--party': partyOf(top.partyId).colour },
+                  text: partyOf(top.partyId).short + ' leading',
+                })
+              : null,
+          ]);
+        })),
+
+        el('button', {
+          class: 'btn btn-primary btn-wide',
+          type: 'button',
+          text: after === 'overall' ? 'See who is leading' : 'Next region',
+          onclick: function () {
+            go(after || 'overall');
+          },
+        }),
+      ];
+    }
+
+    /**
+     * Who is leading, and nothing else.
+     *
+     * A face, a party and a number of seats each. Everything a player might
+     * want to work out from it — the majority, how far off it they are, the
+     * share of the vote — is a calculation they can go and make, and putting
+     * it here turns the one screen that should answer a question into another
+     * screen to read.
+     */
+    function overallScreen() {
+      var mine = opts.you && opts.you();
+      var rows = (result.standings || []).slice().sort(function (a, b) {
+        return (b.seats || 0) - (a.seats || 0);
+      });
+
+      return [
+        resultsBar('Overall leader', 'After round ' + result.round),
+
+        el('div', { class: 'rr-grid' }, rows.map(function (row, i) {
+          var party = partyOf(row.partyId || row.party);
+          return el('article', {
+            class: 'rr-card' + (i === 0 ? ' is-leading' : '') +
+              ((row.partyId || row.party) === mine ? ' is-you' : ''),
+            style: { '--party': party.colour },
+          }, [
+            CMP.ui.portrait.render(row.avatar || avatarFor(row.partyId || row.party),
+              58, row.candidateName || party.name),
+            el('span', { class: 'rr-card-party', text: party.short }),
+            el('strong', { class: 'rr-card-seats', text: String(row.seats || 0) }),
+            el('span', { class: 'rr-card-label', text: (row.seats === 1 ? 'seat' : 'seats') }),
+            i === 0 ? el('span', { class: 'rr-card-badge', text: 'Leading' }) : null,
+          ]);
+        })),
+
+        milestoneKind()
+          ? el('button', {
+              class: 'btn btn-quiet btn-wide',
+              type: 'button',
+              text: milestoneKind() === 'checkpoint'
+                ? 'Round 15 review'
+                : 'Halfway: alliances close',
+              onclick: function () {
+                stopAdvance();
+                stage = 'milestone';
+                render();
+              },
+            })
+          : null,
+
+        el('button', {
+          class: 'btn btn-primary btn-wide',
+          type: 'button',
+          text: result.isFinalRound ? 'Go to the count' : 'Continue to next round',
+          onclick: function () {
+            stopAdvance();
+            if (opts.onFinished) opts.onFinished();
+          },
+        }),
+      ];
+    }
+
+    /** A face for a party, from whoever is playing it. */
+    function avatarFor(partyId) {
+      var rows = result.standings || [];
+      for (var i = 0; i < rows.length; i++) {
+        if ((rows[i].partyId || rows[i].party) === partyId && rows[i].avatar) {
+          return rows[i].avatar;
+        }
+      }
+      return (CMP.AVATARS || [])[0];
+    }
 
     function head(title, kicker, secondsLeft) {
       return el('div', { class: 'results-head' }, [
@@ -538,243 +788,15 @@ CMP.ui.scoreboard = (function () {
      * a hundred flips from nobody.
      */
     /*
-     * Seats taken for good, and money two campaigns burned on each other.
+     * The seats-changed screen, the wins block, the conflicts block and the
+     * old standings screen used to live here.
      *
-     * Both belong on this screen rather than under it. A permanent win is the
-     * only thing in the game that cannot be undone, and a conflict is the only
-     * time a player spends and gets nothing — finding either of them out by
-     * noticing a tick on the map next round is finding it out too late.
+     * They were correct and they were too much: five stacked sections of what
+     * moved, what was taken for good and what two campaigns burned on each
+     * other, in the eight seconds between rounds. What replaced them is up
+     * above — the regions one at a time, then who is leading — and a seat won
+     * is a tick on its district's row rather than a section of its own.
      */
-    function wonBlock() {
-      var won = result.won || [];
-      if (!won.length) return null;
-      var mine = opts.you && opts.you();
-
-      return el('div', { class: 'rr-block is-won' }, [
-        el('h3', {
-          class: 'results-title',
-          text: won.length === 1 ? 'Seat won' : won.length + ' seats won',
-        }),
-        el('ul', { class: 'rr-wins' }, won.slice(0, 6).map(function (w, i) {
-          var party = partyOf(w.party);
-          return el('li', {
-            class: 'rr-win' + (mine && w.party === mine ? ' is-mine' : ''),
-            style: { '--to': party.colour, animationDelay: i * 70 + 'ms' },
-          }, [
-            el('span', { class: 'rr-win-tick', 'aria-hidden': 'true', text: '✓' }),
-            el('strong', { class: 'rr-win-name', text: seatName(w.seat) }),
-            el('span', { class: 'rr-badge is-to', text: party.short }),
-            el('span', {
-              class: 'rr-win-note',
-              text: mine && w.party === mine
-                ? 'Yours for the rest of the election.'
-                : 'Locked. Nobody can campaign here again.',
-            }),
-          ]);
-        })),
-        won.length > 6
-          ? el('p', {
-              class: 'rr-block-more',
-              text: 'and ' + (won.length - 6) + ' more.',
-            })
-          : null,
-      ]);
-    }
-
-    function conflictBlock() {
-      var conflicts = result.conflicts || [];
-      if (!conflicts.length) return null;
-      var mine = opts.you && opts.you();
-
-      return el('div', { class: 'rr-block is-conflict' }, [
-        el('h3', { class: 'results-title', text: 'Campaign conflict' }),
-        el('ul', { class: 'rr-conflicts' }, conflicts.slice(0, 6).map(function (c, i) {
-          var involved = (c.parties || []).map(partyOf);
-          var yours = mine && (c.parties || []).indexOf(mine) !== -1;
-          return el('li', {
-            class: 'rr-conflict' + (yours ? ' is-mine' : ''),
-            style: { animationDelay: i * 70 + 'ms' },
-          }, [
-            el('span', { class: 'rr-conflict-mark', 'aria-hidden': 'true', text: '⚔' }),
-            el('strong', { class: 'rr-conflict-name', text: seatName(c.seat) }),
-            el('span', { class: 'rr-conflict-parties' }, involved.map(function (p) {
-              return el('span', {
-                class: 'rr-badge is-to',
-                style: { '--to': p.colour },
-                text: p.short,
-              });
-            })),
-            el('span', {
-              class: 'rr-conflict-note',
-              text: involved.length + ' campaigns matched at ' + money.words(c.amount) +
-                '. Nobody gained, nobody was refunded.',
-            }),
-          ]);
-        })),
-        conflicts.length > 6
-          ? el('p', {
-              class: 'rr-block-more',
-              text: 'and ' + (conflicts.length - 6) + ' more.',
-            })
-          : null,
-      ]);
-    }
-
-    function changesScreen(secondsLeft) {
-      /*
-       * Your own seats first.
-       *
-       * Round one decides all 117 at once, so which five appear at the top
-       * decides whether this screen is news or a list. The ones that matter
-       * to the person reading are the ones they took and the ones they lost.
-       */
-      var mineNow = opts.you && opts.you();
-      var changes = (result.changes || []).slice().sort(function (a, b) {
-        var aMine = (a.to === mineNow ? 2 : 0) + (a.from === mineNow ? 1 : 0);
-        var bMine = (b.to === mineNow ? 2 : 0) + (b.from === mineNow ? 1 : 0);
-        return bMine - aMine || a.seat - b.seat;
-      });
-      var shown = showAllChanges ? changes : changes.slice(0, 5);
-      var hidden = changes.length - shown.length;
-
-      if (!changes.length) {
-        var quietWon = wonBlock();
-        var quietConflict = conflictBlock();
-        return [
-          head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
-          quietWon,
-          quietConflict,
-          quietWon || quietConflict ? null : el('div', { class: 'rr-quiet' }, [
-            el('strong', { class: 'rr-quiet-title', text: 'No major seat changes' }),
-            el('span', {
-              class: 'rr-quiet-note',
-              text: 'All current leaders held their positions.',
-            }),
-          ]),
-          el('button', {
-            class: 'btn btn-primary btn-wide',
-            type: 'button',
-            text: 'See who’s leading',
-            onclick: function () {
-              go('leading');
-            },
-          }),
-        ];
-      }
-
-      return [
-        head('Round ' + result.round + ' complete', 'Punjab Assembly', secondsLeft),
-        wonBlock(),
-        conflictBlock(),
-        el('h3', { class: 'results-title', text: 'Seats changed' }),
-
-        el('ul', { class: 'rr-changes' }, shown.map(function (change, i) {
-          var from = change.from ? partyOf(change.from) : null;
-          var to = partyOf(change.to);
-          var mine = opts.you && opts.you();
-          var won = mine && change.to === mine;
-          var lost = mine && change.from === mine;
-
-          return el('li', {
-            class: 'rr-change' + (won ? ' is-won' : lost ? ' is-lost' : ''),
-            style: {
-              '--from': from ? from.colour : 'var(--line)',
-              '--to': to.colour,
-              animationDelay: i * 70 + 'ms',
-            },
-          }, [
-            el('span', {
-              class: 'rr-change-tag',
-              text: won ? 'Seat won' : lost ? 'Seat lost' : from ? 'New leader' : 'Seat decided',
-            }),
-            el('strong', { class: 'rr-change-name', text: seatName(change.seat) }),
-            el('span', { class: 'rr-change-flip' }, [
-              from
-                ? el('span', { class: 'rr-badge is-from', text: from.short })
-                : el('span', { class: 'rr-badge is-none', text: '—' }),
-              el('span', { class: 'rr-arrow', 'aria-hidden': 'true', text: '→' }),
-              el('span', { class: 'rr-badge is-to', text: to.short }),
-            ]),
-            el('span', {
-              class: 'rr-change-note',
-              text: to.short + ' takes the lead.',
-            }),
-          ]);
-        })),
-
-        hidden > 0
-          ? el('button', {
-              class: 'btn btn-quiet btn-wide',
-              type: 'button',
-              text: '+ ' + hidden + ' more change' + (hidden === 1 ? '' : 's') + ' · view all',
-              onclick: function () {
-                stopAdvance();
-                showAllChanges = true;
-                render();
-              },
-            })
-          : null,
-
-        el('button', {
-          class: 'btn btn-primary btn-wide',
-          type: 'button',
-          text: 'Continue',
-          onclick: function () {
-            go('leading');
-          },
-        }),
-      ];
-    }
-
-    /* ------------------------------------------------ screen two */
-
-    function leadingScreen(secondsLeft) {
-      return [
-        head('Who’s leading?', 'After round ' + result.round, secondsLeft),
-        leaderboard(result, opts.you ? opts.you() : null, { compact: true }),
-        el('div', { class: 'results-totals' }, [
-          el('span', {}, ['Total ', el('strong', { text: String(result.totalSeats) })]),
-          el('span', {}, ['Majority ', el('strong', { text: String(result.majority) })]),
-        ]),
-        position(result),
-
-        el('button', {
-          class: 'btn btn-quiet btn-wide',
-          type: 'button',
-          text: 'Skip',
-          onclick: function () {
-            stopAdvance();
-            if (opts.onFinished) opts.onFinished();
-          },
-        }),
-
-        milestoneKind()
-          ? el('button', {
-              class: 'btn btn-primary btn-wide',
-              type: 'button',
-              text: milestoneKind() === 'checkpoint'
-                ? 'The round 15 review'
-                : 'Halfway: where this stands',
-              onclick: function () {
-                stopAdvance();
-                stage = 'milestone';
-                render();
-              },
-            })
-          : null,
-
-        el('button', {
-          class: 'btn btn-quiet btn-wide',
-          type: 'button',
-          text: 'Back to what changed',
-          onclick: function () {
-            stopAdvance();
-            stage = 'changes';
-            render();
-          },
-        }),
-      ];
-    }
 
     /* --------------------------------------- screen three, twice a game */
 
@@ -845,7 +867,7 @@ CMP.ui.scoreboard = (function () {
           text: 'Back to the standings',
           onclick: function () {
             stopAdvance();
-            stage = 'leading';
+            stage = 'overall';
             render();
           },
         }),
@@ -900,7 +922,7 @@ CMP.ui.scoreboard = (function () {
           text: 'Back to the standings',
           onclick: function () {
             stopAdvance();
-            stage = 'leading';
+            stage = 'overall';
             render();
           },
         }),
@@ -915,21 +937,29 @@ CMP.ui.scoreboard = (function () {
         var fresh = !result || next.round !== result.round;
         result = next;
         if (fresh) {
-          showAllChanges = false;
-          go('changes');
+          var first = null;
+          for (var i = 0; i < REGION_ORDER.length && !first; i++) {
+            if (regionRows(REGION_ORDER[i]).length) first = REGION_ORDER[i];
+          }
+          // A round in which nobody campaigned anywhere goes straight to the
+          // standings rather than through three empty regions.
+          go(first || 'overall');
           return;
         }
       }
       if (!result) return;
 
       var kind = milestoneKind();
-      if (stage === 'milestone' && !kind) stage = 'leading';
+      if (stage === 'milestone' && !kind) stage = 'overall';
 
-      mount(root, stage === 'changes'
-        ? changesScreen(secondsLeft)
-        : stage === 'milestone'
-          ? (kind === 'checkpoint' ? checkpointScreen(secondsLeft) : halfwayScreen(secondsLeft))
-          : leadingScreen(secondsLeft));
+      if (stage === 'milestone') {
+        mount(root, kind === 'checkpoint'
+          ? checkpointScreen(secondsLeft)
+          : halfwayScreen(secondsLeft));
+        return;
+      }
+
+      mount(root, stage === 'overall' ? overallScreen() : regionScreen());
     }
 
     return { root: root, render: render, stop: stopAdvance };

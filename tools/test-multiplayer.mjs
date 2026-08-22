@@ -172,7 +172,7 @@ function goHome(c) {
 /**
  * Open a screen the way a player does.
  *
- * My Areas and Alliances are the two buttons above the map; everything else
+ * Loan, Grant and Alliances are the three buttons above the map; everything else
  * is under More, because none of it is opened every round.
  */
 function menuItem(c, label) {
@@ -438,20 +438,28 @@ goHome(host);
 check('2. the dashboard of buttons is gone', host.qq('.g-menu-item').length === 0,
   host.qq('.g-menu-item').length + ' buttons');
 check('4. the map is the home screen', !!host.q('.punjab-map'));
-check('3. with My Areas and Alliances above it',
-  host.qq('.g-strategy-item').length === 2);
+check('2. Loan, Grant and Alliances are above the map',
+  host.qq('.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/') ===
+    'Loan/Grant/Alliances',
+  host.qq('.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/'));
 check('2. corruption and bribe are still reachable, under More',
   !!menuItem(host, 'Corruption') && !!menuItem(host, 'Bribe'));
 goHome(host);
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
-check('it opens on round 1 of 20', /Round\s*1\s*\/\s*20/.test(host.q('.round-bar').textContent),
-  host.q('.round-bar').textContent.slice(0, 40));
+check('it opens on round 1', host.q('.round-of').textContent === 'Round 1',
+  host.q('.round-of').textContent);
+check('1. and never says the total', !/\/\s*20/.test(host.q('.round-of').textContent),
+  host.q('.round-of').textContent);
 check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
-check('and the majority line says how many more are needed, or that none are decided',
-  /needs \d+ more|past the majority|none decided yet/.test(host.q('.g-majority-text').textContent),
-  host.q('.g-majority-text').textContent.slice(0, 60));
+// 9. No majority arithmetic on the board: it is a calculation somebody can go
+// and make, and the game screen should not do it at them mid-round.
+check('9. no majority arithmetic on the game screen',
+  !host.q('.g-majority') && !/needs \d+ more/.test(host.text()));
+check('8. and every leader row carries a face',
+  host.qq('.lb-row .portrait').length === 4,
+  host.qq('.lb-row .portrait').length + ' faces');
 
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);

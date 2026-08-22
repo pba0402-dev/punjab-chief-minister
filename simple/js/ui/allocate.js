@@ -27,10 +27,37 @@ CMP.ui.allocate = (function () {
    * @param opts.onPlay    (actionId, seats, amount) -> Promise of a result
    * @param opts.onClose   called when the sheet closes
    */
+  /**
+   * The campaign to open on.
+   *
+   * Asked of the game rather than named, because it used to be named — this
+   * opened on `rally`, which was one of the eleven actions deleted when
+   * campaigning became one action and an amount. `getAction` answered null,
+   * the first thing to read the action threw, and the sheet never rendered:
+   * pressing the button did nothing at all, from every region, which is
+   * exactly what being stuck looks like.
+   */
+  function defaultAction() {
+    var menu = CMP.actionsByMenu ? CMP.actionsByMenu('campaign') : [];
+    if (menu.length) return menu[0].id;
+    var safe = CMP.actionsByGroup ? CMP.actionsByGroup('safe') : [];
+    return safe.length ? safe[0].id : (CMP.ACTIONS[0] || {}).id;
+  }
+
   function open(opts) {
     var game = opts.game;
-    var seats = (opts.seats || []).slice();
-    var actionId = 'rally';
+
+    /*
+     * A seat that has been won is finished, and nothing here may reopen it.
+     * The server refuses a move into one anyway, so including them would
+     * spend the player's attention on seats that were going to be rejected.
+     */
+    var seats = (opts.seats || []).slice().filter(function (n) {
+      return !(CMP.campaign.isWon && CMP.campaign.isWon(game, n));
+    });
+    var lockedOut = (opts.seats || []).length - seats.length;
+
+    var actionId = defaultAction();
     var amount = 0;
     var busy = false;
 
@@ -42,6 +69,7 @@ CMP.ui.allocate = (function () {
     /** The most this allocation could usefully absorb. */
     function ceilingFor(id) {
       var action = CMP.getAction(id);
+      if (!action) return 0;
       var perSeat = CMP.campaign.amountRange(action).max;
       return perSeat * seats.length;
     }
@@ -102,7 +130,10 @@ CMP.ui.allocate = (function () {
           el('p', {
             class: 'al-sub',
             text: seats.length + ' seat' + (seats.length === 1 ? '' : 's') +
-              ' · ' + money.words(affordable()) + ' available here',
+              ' · ' + money.words(affordable()) + ' available here' +
+              (lockedOut
+                ? ' · ' + lockedOut + ' already won and locked'
+                : ''),
           }),
         ]),
 

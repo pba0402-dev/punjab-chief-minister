@@ -52,7 +52,7 @@ CMP.ui.election = (function () {
   /*
    * The menu: eight destinations, two columns.
    *
-   * My Areas and Alliances used to be here and are not any more. They are not
+   * Loan, Grant and Alliances used to be here and are not any more. They are not
    * gone — My Areas is reached from the map and the constituency list, which
    * is where somebody thinking about territory already is, and Alliances is
    * under More with the other things that are about the election rather than
@@ -78,7 +78,7 @@ CMP.ui.election = (function () {
     { id: 'bribe', label: 'Bribe', hint: 'Risk', icon: '▲', risky: true },
     { id: 'map', label: 'Map', hint: 'Punjab', icon: '◉' },
     { id: 'seats', label: 'Constituencies', hint: '117', icon: '☰' },
-    { id: 'priorities', label: 'My Areas', hint: 'Targets', icon: '★' },
+    { id: 'priorities', label: 'Grant', hint: 'Regions', icon: '₹' },
     { id: 'allies', label: 'Alliances', hint: 'Partners', icon: '⚭' },
   ];
 
@@ -130,6 +130,14 @@ CMP.ui.election = (function () {
       you: function () {
         return game ? game.partyId : null;
       },
+      /*
+       * The results read the board the engine already settled rather than
+       * working anything out for themselves — there is one election result
+       * in this game and this is a presentation of it.
+       */
+      game: function () {
+        return game;
+      },
       trend: function () {
         return (game && game.seatTrend) || [];
       },
@@ -162,13 +170,19 @@ CMP.ui.election = (function () {
       },
     });
 
-    var myAreasView = CMP.ui.myAreas.create({
-      onAllocate: function (actionId, seats, amount) {
-        return allocate(actionId, seats, amount);
-      },
-      onChanged: function () {
-        paintPlayer();
-        paintEndRound();
+    /*
+     * Grants: what the campaign earns, and where the next of it is.
+     *
+     * This is where My Areas was. That screen led with how many seats you
+     * were leading, which is a fact about the board rather than a decision
+     * about money, and it pushed the question a player comes here with —
+     * where does the next crore a round come from — below the fold.
+     */
+    var grantView = CMP.ui.grant.create({
+      onDistrict: function (districtId) {
+        var d = CMP.getDistrict(districtId);
+        if (!d || !d.seats.length) return;
+        campaignHere(d.seats[0], districtId);
       },
     });
 
@@ -244,11 +258,11 @@ CMP.ui.election = (function () {
       el('div', { class: 'g-inner' }, [
         headNode,
         roundNode,
+        endNode,
         noticeNode,
         summaryNode,
         resultsNode,
         bodyNode,
-        endNode,
       ]),
     ]);
 
@@ -429,7 +443,96 @@ CMP.ui.election = (function () {
       ]);
     }
 
-    /** Everything that is not part of a round: history, closing, leaving. */
+    /**
+     * One switch in the menu.
+     *
+     * It says what it is for and what state it is in, and it keeps that state
+     * across games — a preference somebody sets once should not need setting
+     * again next election.
+     */
+    function settingRow(key, glyph, label, note) {
+      var on = CMP.settings.get(key);
+      var row = el('button', {
+        class: 'sheet-item is-toggle' + (on ? ' is-on' : ''),
+        type: 'button',
+        role: 'switch',
+        'aria-checked': on ? 'true' : 'false',
+      }, [
+        el('span', { class: 'sheet-item-glyph', 'aria-hidden': 'true', text: glyph }),
+        el('span', { class: 'sheet-item-body' }, [
+          el('strong', { class: 'sheet-item-title', text: label }),
+          el('span', { class: 'sheet-item-note', text: note }),
+        ]),
+        el('span', { class: 'sheet-item-state', text: on ? 'On' : 'Off' }),
+      ]);
+
+      row.addEventListener('click', function () {
+        var now = CMP.settings.toggle(key);
+        row.classList.toggle('is-on', now);
+        row.setAttribute('aria-checked', now ? 'true' : 'false');
+        row.querySelector('.sheet-item-state').textContent = now ? 'On' : 'Off';
+      });
+      return row;
+    }
+
+    /**
+     * Leaving, with a question first.
+     *
+     * Exit is one tap from the map, so it asks — and it says which kind of
+     * leaving this is, because in multiplayer the election carries on without
+     * you and solo it waits.
+     */
+    function confirmExit() {
+      CMP.ui.dialog
+        .confirm({
+          title: 'Exit game?',
+          body: game.mode === 'multiplayer'
+            ? 'The election carries on without you. You can rejoin it from the ' +
+              'home screen while it is still running.'
+            : 'Your progress is saved. You can pick this election up again from ' +
+              'the home screen.',
+          confirmLabel: 'Exit game',
+        })
+        .then(function (yes) {
+          if (yes && opts.onMenu) opts.onMenu();
+        });
+    }
+
+    /**
+     * What the map is and is not claiming.
+     *
+     * This used to sit under the board on every screen, taking space during
+     * play to say something a player needs once. It is still said, in the
+     * place people go to read rather than the place they go to campaign.
+     */
+    function showAboutSheet() {
+      var sheet = el('div', { class: 'sheet' }, [
+        el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('h2', { class: 'sheet-title', text: 'About the map' }),
+          el('p', { class: 'sheet-note' }, [
+            'Constituency names, numbers and districts are real public ' +
+            'information. Positions and neighbours are real; the cell shapes ' +
+            'are approximate and are not official constituency boundaries. ' +
+            'The tiles view makes no geographic claim at all.',
+          ]),
+          el('p', { class: 'sheet-note' }, [
+            'Everything else in this game is invented: the parties, the ' +
+            'candidates, and every percentage and seat on the board.',
+          ]),
+          el('button', {
+            class: 'btn btn-quiet btn-wide',
+            type: 'button',
+            text: 'Close',
+            onclick: function () {
+              if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+            },
+          }),
+        ]),
+      ]);
+      document.body.appendChild(sheet);
+    }
+
+    /** Everything that is not part of a round: history, sound, leaving. */
     function openMenu() {
       var view = opts.getServerView && opts.getServerView();
       var isHost = !!(view && view.youAreHost);
@@ -477,6 +580,33 @@ CMP.ui.election = (function () {
             },
           }),
 
+          /*
+           * Sound, and what the map is not claiming.
+           *
+           * The audio switches remember what the player asked for whether or
+           * not anything is playing yet — see js/settings.js, which says so
+           * rather than offering a switch that quietly does nothing.
+           */
+          el('div', { class: 'sheet-group' }, [
+            settingRow('music', '\u266a', 'Music', 'Background music'),
+            settingRow('sound', '\u25b6', 'Sound', 'Game sound effects'),
+          ]),
+
+          el('button', {
+            class: 'sheet-item',
+            type: 'button',
+            onclick: function () {
+              close();
+              showAboutSheet();
+            },
+          }, [
+            el('strong', { class: 'sheet-item-title', text: 'About the map' }),
+            el('span', {
+              class: 'sheet-item-note',
+              text: 'What the shapes do and do not claim',
+            }),
+          ]),
+
           isHost
             ? el('button', {
                 class: 'sheet-item is-danger',
@@ -492,14 +622,14 @@ CMP.ui.election = (function () {
           // Stepping away and finishing for good are different things and
           // are worded so nobody has to guess which is which.
           el('button', {
-            class: 'sheet-item',
+            class: 'sheet-item is-exit',
             type: 'button',
             onclick: function () {
               close();
-              if (opts.onMenu) opts.onMenu();
+              confirmExit();
             },
           }, [
-            el('strong', { class: 'sheet-item-title', text: 'Leave for now' }),
+            el('strong', { class: 'sheet-item-title', text: '\u23fb  Exit game' }),
             el('span', {
               class: 'sheet-item-note',
               text: game.mode === 'multiplayer'
@@ -709,18 +839,22 @@ CMP.ui.election = (function () {
         return;
       }
 
+      /*
+       * Compact, and up with the round it ends.
+       *
+       * It used to be a full-width two-line button at the foot of the screen,
+       * under everything else — which meant scrolling past the whole board to
+       * finish a turn, and a large target for something that cannot be undone
+       * within the round. It asks before it acts, so it does not need to be
+       * hard to reach as well.
+       */
       mount(endNode, [
         el('button', {
           class: 'btn btn-end',
           type: 'button',
+          text: 'End round',
           onclick: confirmEndRound,
-        }, [
-          el('span', { class: 'btn-end-title', text: 'End round' }),
-          el('span', {
-            class: 'btn-end-note',
-            text: 'When you have finished spending',
-          }),
-        ]),
+        }),
       ]);
     }
 
@@ -947,12 +1081,12 @@ CMP.ui.election = (function () {
           setSection('priorities');
         },
       }, [
-        el('span', { class: 'g-jump-icon', 'aria-hidden': 'true', text: '★' }),
+        el('span', { class: 'g-jump-icon', 'aria-hidden': 'true', text: '₹' }),
         el('span', { class: 'g-jump-body' }, [
-          el('strong', { class: 'g-jump-label', text: 'My Areas' }),
+          el('strong', { class: 'g-jump-label', text: 'Grant' }),
           el('span', {
             class: 'g-jump-note',
-            text: 'Districts, grants and where to attack',
+            text: 'Regions, what they pay and where to attack',
           }),
         ]),
         el('span', { class: 'g-jump-chev', 'aria-hidden': 'true', text: '›' }),
@@ -981,14 +1115,26 @@ CMP.ui.election = (function () {
       var counts = CMP.campaign.heldSeats(game);
       var people = roster();
 
+      /*
+       * The board, and who is leading. That is the screen.
+       *
+       * Under the map there used to be the seat you last touched, the four
+       * appearances a cell can have, the majority as a bar, the standings as
+       * percentages, and a paragraph about what the shapes do not claim.
+       * All true, all of it competing with the one thing somebody looks down
+       * for: who is winning.
+       *
+       * Nothing was deleted. The district panel opens when a district is
+       * tapped, and what the map is not claiming is under More.
+       */
       return [
         el('div', { class: 'g-strategy' }, [
-          strategyButton('priorities', '★', 'My Areas', 'Districts and grants'),
+          strategyButton('loan', '⌾', 'Loan', 'Borrow against what is coming'),
+          strategyButton('priorities', '₹', 'Grant', 'Regions and targets'),
           strategyButton('allies', '⚭', 'Alliances', 'Partners'),
         ]),
         mapSection(),
         leaderboardBlock(counts, people),
-        majorityLine(counts),
       ];
     }
 
@@ -1147,8 +1293,8 @@ CMP.ui.election = (function () {
      * would be unusable.
      */
     function prioritiesSection() {
-      myAreasView.render(game);
-      return [myAreasView.root];
+      grantView.render(game);
+      return [grantView.root];
     }
 
     function alliesSection() {
@@ -1225,18 +1371,21 @@ CMP.ui.election = (function () {
       });
 
       if (!anySeats) {
+        /*
+         * Nobody is leading yet.
+         *
+         * Before the first round is settled every campaign is on nothing, and
+         * ranking four zeroes one to four would invent a leader out of sort
+         * order. So it says so in three words and still lists everybody,
+         * because tapping through to a rival is how you look them up.
+         */
         return el('section', { class: 'g-block' }, [
           el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
-          el('div', { class: 'lb-none' }, [
-            el('strong', { class: 'lb-none-title', text: 'No leader yet' }),
-            el('span', {
-              class: 'lb-none-note',
-              text: 'All ' + rows.length + ' campaigns are on 0 seats and no ' +
-                'constituency has been decided. Round one decides all ' +
-                total + '.',
-            }),
-          ]),
+          el('p', { class: 'lb-none-title', text: 'No leader yet' }),
           el('ol', { class: 'lb is-flat' }, rows.map(function (row) {
+            var who = people.filter(function (r) {
+              return r.partyId === row.party.id;
+            })[0];
             return el('li', {}, [el('button', {
               class: 'lb-row' + (row.isYou ? ' is-you' : ''),
               type: 'button',
@@ -1246,10 +1395,10 @@ CMP.ui.election = (function () {
                 openCandidate(row.party.id);
               },
             }, [
-              el('span', { class: 'lb-sym' }, [CMP.ui.symbol.render(row.party.symbol, 18)]),
+              CMP.ui.portrait.render(who && who.avatar, 36, row.candidate || row.party.name),
               el('span', { class: 'lb-party', text: row.party.short }),
-              el('span', { class: 'lb-name', text: row.candidate || row.party.name }),
               el('strong', { class: 'lb-seats', text: '0' }),
+              el('span', { class: 'lb-seats-label', text: 'seats' }),
               el('span', {
                 class: 'lb-tag' + (row.isYou ? ' is-leading' : ''),
                 text: row.isYou ? 'You' : '',
@@ -1259,9 +1408,20 @@ CMP.ui.election = (function () {
         ]);
       }
 
+      /*
+       * A face, a party and a number of seats.
+       *
+       * The bars, the ranks, the percentage line and the majority line all
+       * went: they were four ways of saying the same thing, and the seat
+       * count says it. Tapping a row still opens that campaign, which is
+       * where the detail lives.
+       */
       return el('section', { class: 'g-block' }, [
         el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
         el('ol', { class: 'lb' }, rows.map(function (row, i) {
+          var who = people.filter(function (r) {
+            return r.partyId === row.party.id;
+          })[0];
           return el('li', {}, [el('button', {
             class: 'lb-row' + (i === 0 ? ' is-leading' : '') + (row.isYou ? ' is-you' : ''),
             type: 'button',
@@ -1271,29 +1431,15 @@ CMP.ui.election = (function () {
               openCandidate(row.party.id);
             },
           }, [
-            el('span', { class: 'lb-rank', text: String(i + 1) }),
+            CMP.ui.portrait.render(who && who.avatar, 36, row.candidate || row.party.name),
             el('span', { class: 'lb-party', text: row.party.short }),
-            el('span', { class: 'lb-bar' }, [
-              el('span', {
-                class: 'lb-bar-fill',
-                style: { width: Math.round((row.seats / most) * 100) + '%' },
-              }),
-            ]),
             el('strong', { class: 'lb-seats', text: String(row.seats) }),
+            el('span', { class: 'lb-seats-label', text: row.seats === 1 ? 'seat' : 'seats' }),
             el('span', {
               class: 'lb-tag' + (i === 0 ? ' is-leading' : ''),
               text: row.isYou ? 'You' : i === 0 ? 'Leading' : '',
             }),
           ])]);
-        })),
-
-        // The same standings as a share, which is the other way people read a
-        // result. Small, and only worth a line.
-        el('p', { class: 'lb-shares' }, rows.map(function (row, i) {
-          return el('span', { class: 'lb-share', style: { '--party': row.party.colour } }, [
-            row.party.short + ' ' + Math.round((row.seats / total) * 1000) / 10 + '%',
-            i < rows.length - 1 ? '  ' : '',
-          ]);
         })),
       ]);
     }

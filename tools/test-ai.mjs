@@ -426,14 +426,15 @@ check('13. and no two faces are the same picture',
   new Set(cast.map((f) => f.src)).size === roster.length,
   new Set(cast.map((f) => f.src)).size + ' distinct');
 
-// Round results now open on what changed; the standings, with faces, are one
-// tap further in. Walk there the way a player does.
-const toStandings = host.qq('button').find((b) => /^Continue$|who.s leading/i.test(b.textContent));
-if (toStandings) host.click(toStandings);
+// The results run region by region; the overall leader is behind Skip, which
+// is where somebody who wants the answer rather than the tour goes.
+const skip = host.q('.rr-skip');
+if (skip) host.click(skip);
 await sleep(120);
 
-const faces = host.qq('.board-row .portrait');
-check('every candidate on screen has a portrait', faces.length === 4, faces.length + ' shown');
+const faces = host.qq('.rr-card .portrait');
+check('every candidate on screen has a portrait', faces.length === 4,
+  faces.length + ' shown of ' + host.qq('.rr-card').length + ' cards');
 check('each is an image from the asset folder',
   faces.every((n) => {
     const img = n.querySelector('img');

@@ -1,0 +1,299 @@
+/* ------------------------------------------------------------------
+   Grants: what the campaign earns, and where the next of it is.
+   Loaded after areas.css.
+   ------------------------------------------------------------------ */
+
+.gr {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ------------------------------------------------------ the three regions */
+
+.gr-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.gr-card {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  font-family: var(--font);
+  text-align: left;
+  color: var(--cream);
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.gr-card.is-open { border-color: var(--wheat); }
+.gr-card:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+
+.gr-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gr-card-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.gr-card-held {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/*
+ * Three figures that answer three different questions: what this region
+ * already pays every round, what has accumulated and is sitting there, and
+ * what the rest of it would be worth.
+ */
+.gr-figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.gr-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gr-fig-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.gr-fig-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+.gr-fig.is-won .gr-fig-value { color: var(--good); }
+.gr-fig.is-purse .gr-fig-value { color: var(--wheat); }
+
+/* ------------------------------------------------------------- blocks */
+
+.gr-block {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.gr-block-title {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.gr-block-note {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+
+/* ----------------------------------------------- a region's districts */
+
+.gr-districts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gr-district {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: 'name seats grant' 'state state state';
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 9px 0 9px 10px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 2px solid var(--party, var(--line));
+}
+.gr-district:first-child { border-top: 0; }
+.gr-district.is-held { border-left-color: var(--good); }
+.gr-district.is-lost { opacity: 0.6; }
+
+.gr-district-name {
+  grid-area: name;
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-district-seats {
+  grid-area: seats;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.gr-district-grant {
+  grid-area: grant;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--wheat);
+  font-variant-numeric: tabular-nums;
+}
+.gr-district-state {
+  grid-area: state;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.gr-district.is-held .gr-district-state { color: var(--good); }
+
+/* -------------------------------------------------- how to earn more */
+
+.gr-how {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.gr-how-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.gr-how-region {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--cream);
+}
+.gr-how-note { font-size: 0.72rem; line-height: 1.45; color: var(--muted-2); }
+
+/* ------------------------------------------------------- best targets */
+
+.gr-targets { display: flex; flex-direction: column; gap: 9px; }
+
+.gr-target {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--party, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.gr-target-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gr-target-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+.gr-target-region {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.gr-target-priority {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  color: var(--muted-2);
+}
+.gr-target.is-high .gr-target-priority { color: var(--wheat); }
+.gr-target.is-medium .gr-target-priority { color: var(--river); }
+
+.gr-target-figs {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gr-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.74rem;
+}
+.gr-line dt { color: var(--muted-2); }
+.gr-line dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------- target an opponent */
+
+.gr-rivals {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.gr-rival {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--ink-2);
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.gr-rival.is-on { border-color: var(--party); color: var(--cream); }
+.gr-rival:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+.gr-rival-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--party);
+  flex: none;
+}
+
+@media (max-width: 379px) {
+  /* "Available now" needs the width more than a third column does. */
+  .gr-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 720px) {
+  .gr-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gr-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

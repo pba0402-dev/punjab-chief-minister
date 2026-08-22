@@ -139,7 +139,7 @@ function goHome(d) {
 /*
  * Open a screen the way a player does.
  *
- * My Areas and Alliances are the two buttons above the map; everything else
+ * Loan, Grant and Alliances are the three buttons above the map; everything else
  * lives under More, because none of it is opened every round.
  */
 function openSection(d, label) {
@@ -452,9 +452,16 @@ check('2. the ring shows the round, not a countdown',
 check('2. no numerical countdown anywhere on the screen',
   !/\d:\d\d/.test(q(dom, '.round-bar').textContent),
   q(dom, '.round-bar').textContent);
-check('3. with the round out of twenty beside it',
-  /Round 1 \/ 20/.test(q(dom, '.round-of').textContent),
+/*
+ * 1. The round, and not the total.
+ *
+ * "Round 15 / 20" is two numbers where one is wanted. The dots under the bar
+ * already say how far through the campaign this is.
+ */
+check('1. the round number is beside it', /^Round 1$/.test(q(dom, '.round-of').textContent),
   q(dom, '.round-of').textContent);
+check('1. and the total is not', !/\/\s*20/.test(q(dom, '.round-bar').textContent),
+  q(dom, '.round-bar').textContent.slice(0, 60));
 
 /*
  * The player card is gone. A portrait, a name and a party took a third of a
@@ -499,9 +506,16 @@ const menuLabels = () =>
 check('2. the dashboard of buttons is gone', qq(dom, '.g-menu-item').length === 0,
   qq(dom, '.g-menu-item').length + ' buttons');
 check('4. the map is on the home screen', !!q(dom, '.punjab-map'));
-check('3. with My Areas and Alliances above it',
+/*
+ * 2 + 3. Loan is one tap from the board, and Grant and Alliances stay
+ * beside each other.
+ *
+ * Borrowing was three taps down a menu, which is a long way for the thing a
+ * player reaches for when they have run out of money mid-round.
+ */
+check('2. Loan, Grant and Alliances are above the map',
   qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/') ===
-  'My Areas/Alliances',
+  'Loan/Grant/Alliances',
   qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/'));
 check('5. the map offers Punjab and its three regions',
   qq(dom, '.map-regions .term-option').length === 4,
@@ -591,13 +605,26 @@ check('3. at the full extent',
  * nothing — and somebody who called their party the Unity Punjab Front did
  * not call it UPF.
  */
-const legendNames = qq(dom, '.map-legend .legend-label').map((n) => n.textContent);
-check('8. the legend names every party in the game',
-  dom.window.CMP.PARTIES.every((party) => legendNames.indexOf(party.name) !== -1),
-  legendNames.join(' / '));
-check('8. and says what it is a legend of',
-  /leading/i.test(q(dom, '.legend-title').textContent),
-  q(dom, '.legend-title') ? q(dom, '.legend-title').textContent : 'no title');
+/*
+ * 7 + 10. The block under the board is gone.
+ *
+ * The party legend, the four-appearance key, the majority and the paragraph
+ * about what the shapes do not claim all lived under the map on every screen.
+ * The key is beside the summary above the board now, the parties are the
+ * summary itself, and the disclaimer is under More.
+ */
+check('10. no legend block under the map', !q(dom, '.map-legend'));
+check('10. and no paragraph explaining the shapes',
+  !q(dom, '.map-note') && !/not official constituency boundaries/i.test(text(dom)));
+check('7. the four appearances are still explained, above the board',
+  !!q(dom, '.map-summary .legend-key') &&
+  ['open', 'leading', 'contested', 'won']
+    .every((w) => new RegExp(w, 'i').test(q(dom, '.legend-key').textContent)),
+  q(dom, '.legend-key') ? q(dom, '.legend-key').textContent : 'no key');
+check('7. and the parties are named in the summary line',
+  qq(dom, '.map-summary-short').length > 0 || /Nobody has campaigned/i.test(
+    q(dom, '.map-summary').textContent),
+  q(dom, '.map-summary').textContent.slice(0, 80));
 
 
 /*
@@ -624,9 +651,6 @@ check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(do
 check('27. no leader is claimed before a round is settled',
   !!q(dom, '.lb-none-title') && /No leader yet/i.test(q(dom, '.lb-none-title').textContent),
   q(dom, '.lb-none-title') ? q(dom, '.lb-none-title').textContent : 'no block');
-check('27. and it says every campaign is on nothing',
-  /0 seats/.test(q(dom, '.lb-none-note').textContent),
-  q(dom, '.lb-none-note').textContent);
 check('27. nobody is marked as leading', !q(dom, '.lb-row.is-leading'));
 check('27. and no bar is drawn', qq(dom, '.lb-bar-fill').length === 0);
 check('   all four campaigns are still listed', qq(dom, '.lb-row').length === 4);
@@ -634,15 +658,21 @@ check('   with every seat count at zero',
   qq(dom, '.lb-seats').every((n) => n.textContent.trim() === '0'),
   qq(dom, '.lb-seats').map((n) => n.textContent).join('/'));
 check('   and you are marked', !!q(dom, '.lb-row.is-you'));
-check('8. the majority is one line, not a chart',
-  qq(dom, '.g-majority').length === 1 &&
-  /of 59|majority of 59|past the majority|59 seats form a government/
-    .test(q(dom, '.g-majority-text').textContent),
-  q(dom, '.g-majority-text').textContent);
-// 27. And it names nobody while nobody has anything.
-check('27. the majority line claims no leader before a round is settled',
-  /none decided yet/.test(q(dom, '.g-majority-text').textContent),
-  q(dom, '.g-majority-text').textContent);
+
+/*
+ * 9 + 12. A face, a party and a number of seats — and nothing else.
+ *
+ * The bars, the ranks, the percentage line and the majority line were four
+ * ways of saying the same thing, and the seat count says it. Somebody who
+ * wants the arithmetic can open a campaign; the board should not do it at
+ * them while they are deciding where to spend.
+ */
+check('8. every row carries a face', qq(dom, '.lb-row .portrait').length === 4,
+  qq(dom, '.lb-row .portrait').length + ' faces');
+check('9. the majority line is gone from the game screen',
+  !q(dom, '.g-majority'));
+check('9. and so are the seat percentages', !q(dom, '.lb-shares'),
+  q(dom, '.lb-shares') ? q(dom, '.lb-shares').textContent : 'gone');
 
 check('8. and no constituency list on the game home screen',
   !q(dom, '.lf-group') && !q(dom, '.seat-row'));
@@ -870,19 +900,23 @@ check('20. and one with a leader takes that leader\u2019s colour',
   cellFills.filter((f) => /^#[0-9a-f]{6}$/i.test(f)).length === decidedHere,
   cellFills.filter((f) => /^#[0-9a-f]{6}$/i.test(f)).length + ' coloured');
 
-// The legend counts seats that have a leader, so it can only ever add up to
-// what has actually been decided.
-const legendCounts = qq(dom, '.legend-count').map((n) => Number(n.textContent));
-const legendTotal = legendCounts.reduce((a2, b2) => a2 + b2, 0);
+/*
+ * The summary above the board counts seats that have a leader, so it can only
+ * ever add up to what has actually been decided. It replaced the legend block
+ * that used to sit under the map saying the same thing further away from it.
+ */
+const summaryCounts = qq(dom, '.map-summary-n').map((n) => Number(n.textContent));
+const summaryTotal = summaryCounts.reduce((a2, b2) => a2 + b2, 0);
 const decidedNow = Object.keys(
   dom.window.CMP.campaign.currentLeaders(dom.window.CMP.app.getGame().support)
 ).length;
-check('the legend counts every decided seat and no others',
-  legendTotal === decidedNow, legendTotal + ' counted, ' + decidedNow + ' decided');
-check('the legend states the majority', /majority 59/.test(q(dom, '.map-legend').textContent));
+check('the summary counts every decided seat and no others',
+  summaryTotal === decidedNow, summaryTotal + ' counted, ' + decidedNow + ' decided');
 
-check('the map says the shapes are not official boundaries',
-  /not official constituency boundaries/i.test(q(dom, '.map-note').textContent));
+// 10. And what the shapes do not claim is still said — under More, where
+// people go to read rather than to campaign.
+check('10. the disclaimer is not on the game screen',
+  !/not official constituency boundaries/i.test(text(dom)));
 
 /*
  * 36. Tapping a seat opens the campaign panel over the map.
@@ -1253,8 +1287,7 @@ clickIt(dom, dom.window.document.querySelector('.btn-xl'));
 await settle();
 
 check('the round bar is shown', !!q(dom, '.round-bar'));
-check('it opens on round 1 of 20',
-  /Round\s*1\s*\/\s*20/.test(q(dom, '.round-bar').textContent),
+check('it opens on round 1', /Round\s*1(?!\d)/.test(q(dom, '.round-bar').textContent),
   q(dom, '.round-bar').textContent.slice(0, 40));
 check('2. the ring carries the round, not a clock',
   q(dom, '.round-clock').textContent === 'R1',
@@ -1262,9 +1295,11 @@ check('2. the ring carries the round, not a clock',
 check('2. and the ring itself is what drains',
   !!q(dom, '.rt-arc') && !!q(dom, '.rt-arc').getAttribute('stroke-dasharray'));
 check('the leaderboard is shown', qq(dom, '.lb-row').length === 4);
-check('and how many more seats are needed, or that none are decided',
-  /needs \d+ more|past the majority|none decided yet/.test(q(dom, '.g-majority-text').textContent),
-  q(dom, '.g-majority-text').textContent);
+// 9. And no majority arithmetic on the board. It is a calculation somebody
+// can go and make; the game screen should not do it at them while they are
+// deciding where to spend.
+check('9. no majority arithmetic on the game screen',
+  !q(dom, '.g-majority') && !/needs \d+ more/.test(text(dom)));
 
 /**
  * Run a round out and let the shell pick it up. A round now has two stages:
@@ -1303,45 +1338,112 @@ check('the clock running out settles the round', solo.stage === 'results', solo.
 check('the scoreboard appears', !!q(dom, '.round-results'));
 
 /*
- * Two screens, in order: what changed, then who leads. The news first, the
- * table second — a scoreboard that has barely moved is not what anybody is
- * waiting to see.
+ * 4-11. Election night, region by region.
+ *
+ * Malwa, then Majha, then Doaba, then who is leading. It used to be one
+ * screen with everything that changed, the seats taken for good and the money
+ * two campaigns burned on each other, all stacked — correct, and more than
+ * anybody reads in the seconds between rounds.
  */
-check('4. what changed comes first',
-  /Seats changed|No major seat changes/.test(q(dom, '.round-results').textContent),
-  q(dom, '.round-results').textContent.slice(0, 80));
-check('5. and the standings are not on that screen yet',
-  !q(dom, '.board-row'), qq(dom, '.board-row').length + ' rows');
-check('1. round one decided every seat', qq(dom, '.rr-change').length > 0,
-  qq(dom, '.rr-change').length + ' shown');
-check('8. no more than five are listed at once',
-  qq(dom, '.rr-change').length <= 5, qq(dom, '.rr-change').length + ' shown');
-check('7. each names the seat and who took it',
-  qq(dom, '.rr-change').every((n) => !!n.querySelector('.rr-change-name')
-    && !!n.querySelector('.rr-badge.is-to')));
-check('8. with a way to see the rest',
-  !!qq(dom, 'button').find((b) => /more change/i.test(b.textContent)),
-  qq(dom, 'button').map((b) => b.textContent).join(' | ').slice(0, 120));
+check('4. the results open on a region, not a summary',
+  /Malwa|Majha|Doaba/i.test(q(dom, '.rr-bar-title').textContent),
+  q(dom, '.rr-bar-title').textContent);
+check('4. and say which round they are for',
+  /Round \d+ results/i.test(q(dom, '.rr-bar-kicker').textContent),
+  q(dom, '.rr-bar-kicker').textContent);
+check('5. the standings are not on the region screen',
+  !q(dom, '.rr-grid') && !q(dom, '.board-row'));
+
+check('7. it lists the districts of that region',
+  qq(dom, '.rr-district').length > 0,
+  qq(dom, '.rr-district').length + ' districts');
+check('7. each named, with its size',
+  qq(dom, '.rr-district').every((n) =>
+    !!n.querySelector('.rr-district-name') && /seat/.test(n.textContent)),
+  q(dom, '.rr-district-head') ? q(dom, '.rr-district-head').textContent : 'none');
+
+/*
+ * 6 + 17. A face, a bar and a share for each runner, from the board the
+ * engine already settled. Nothing here computes a result of its own.
+ */
+const runners = qq(dom, '.rr-district')[0].querySelectorAll('.rr-runner');
+check('6. the runners in a district are shown', runners.length > 0,
+  runners.length + ' runners');
+check('6. each with a face', [...runners].every((n) => !!n.querySelector('.portrait')));
+check('6. a bar', [...runners].every((n) => !!n.querySelector('.rr-runner-fill')));
+check('6. and its calculated share',
+  [...runners].every((n) => /%$/.test(n.querySelector('.rr-runner-share').textContent)),
+  [...runners].map((n) => n.querySelector('.rr-runner-share').textContent).join(' '));
+check('6. the leader is first and marked',
+  runners[0].classList.contains('is-first'));
+check('17. and the shares are the engine\'s own, not invented',
+  (() => {
+    const name = q(dom, '.rr-district-name').textContent;
+    const district = dom.window.CMP.DISTRICTS.find((d) => d.name === name);
+    const g = dom.window.CMP.app.getGame();
+    const totals = {};
+    district.seats.forEach((n) => {
+      dom.window.CMP.campaign.standings(g.support[n] || {}).forEach((r) => {
+        totals[r.partyId] = (totals[r.partyId] || 0) + r.support;
+      });
+    });
+    const top = Object.keys(totals).sort((a, b) => totals[b] - totals[a])[0];
+    const want = Math.round((totals[top] / district.seats.length) * 10) / 10;
+    return runners[0].querySelector('.rr-runner-share').textContent ===
+      want.toFixed(1) + '%';
+  })(),
+  runners[0].querySelector('.rr-runner-share').textContent);
 
 check('play is locked while the round is counted',
   !q(dom, '.action-card') && !q(dom, '.panel-tab'));
 
-/* 10. Continue, and the standings follow. */
-clickIt(dom, qq(dom, 'button').find((b) => /^Continue$/i.test(b.textContent)));
+/*
+ * 8 + 14. Skip is always there, and always goes to the answer.
+ *
+ * Somebody who does not want to watch the districts wants to know who is
+ * leading, not to be shown the next region.
+ */
+check('8. Skip is offered on a region screen', !!q(dom, '.rr-skip'),
+  qq(dom, '.round-results button').map((b) => b.textContent).join(' | '));
+clickIt(dom, q(dom, '.rr-skip'));
 await settle();
-check('10. continuing shows who is leading',
-  /Who’s leading/i.test(q(dom, '.round-results').textContent),
-  q(dom, '.round-results').textContent.slice(0, 60));
-check('10. it ranks all four candidates', qq(dom, '.board-row').length === 4,
-  qq(dom, '.board-row').length + ' rows');
-check('10. and states the majority',
-  /59/.test(q(dom, '.results-totals').textContent));
-check('10. and how far the leader is from it',
-  /more seats? needed|Majority reached/.test(q(dom, '.position').textContent),
-  q(dom, '.position').textContent.slice(0, 60));
+
+check('11. Skip goes straight to the overall leader',
+  /Overall leader/i.test(q(dom, '.rr-bar-title').textContent),
+  q(dom, '.rr-bar-title').textContent);
+check('11. which is a grid of the players', qq(dom, '.rr-card').length === 4,
+  qq(dom, '.rr-card').length + ' cards');
+check('11. each with a face, a party and a seat count',
+  qq(dom, '.rr-card').every((n) => !!n.querySelector('.portrait') &&
+    !!n.querySelector('.rr-card-party') && /^\d+$/.test(
+      n.querySelector('.rr-card-seats').textContent)),
+  qq(dom, '.rr-card-seats').map((n) => n.textContent).join(','));
+check('11. sorted by seats, most first',
+  qq(dom, '.rr-card-seats').map((n) => Number(n.textContent))
+    .every((v, i, a) => i === 0 || a[i - 1] >= v),
+  qq(dom, '.rr-card-seats').map((n) => n.textContent).join(' >= '));
+check('9. and the leader is marked as leading',
+  qq(dom, '.rr-card.is-leading').length === 1 &&
+  /Leading/i.test(q(dom, '.rr-card.is-leading').textContent),
+  q(dom, '.rr-card.is-leading').textContent);
 
 /*
- * Round one is not a milestone round, so the third screen is not offered.
+ * 12. And nothing technical on it. The majority, the distance from it and
+ * the vote shares are all calculations somebody can go and make; putting
+ * them here turns the one screen that answers a question into another
+ * screen to read.
+ */
+const overallText = q(dom, '.round-results').textContent;
+check('12. no majority arithmetic on the leader screen',
+  !/needs \d+ more|of 59|Majority/i.test(overallText), overallText.slice(0, 120));
+check('12. and no percentages', !/%/.test(overallText), overallText.slice(0, 120));
+
+check('15. one way onward, and it is not a trap',
+  !!qq(dom, '.round-results button').find((b) => /Continue to next round/i.test(b.textContent)),
+  qq(dom, '.round-results button').map((b) => b.textContent).join(' | '));
+
+/*
+ * Round one is not a milestone round, so the extra screen is not offered.
  * The button appearing every round would make the two rounds that matter
  * look like every other one.
  */
@@ -1391,7 +1493,8 @@ function stageOn(re) {
 
 /* ---- round ten: alliances close ---- */
 await settledAt(10);
-clickIt(dom, stageOn(/^Continue$|who.s leading/i));
+// Skip the regions: the milestone hangs off the overall screen.
+clickIt(dom, q(dom, '.rr-skip'));
 await settle();
 
 const halfwayBtn = stageOn(/Halfway/i);
@@ -1424,11 +1527,12 @@ check('every other round keeps the short one',
 clickIt(dom, qq(dom, '.round-results button').find((b) => /Back to the standings/i.test(b.textContent)));
 await settle();
 check('and it goes back to the standings',
-  /Who.s leading/i.test(q(dom, '.round-results').textContent));
+  /Overall leader/i.test(q(dom, '.rr-bar-title').textContent),
+  q(dom, '.rr-bar-title') ? q(dom, '.rr-bar-title').textContent : 'no title');
 
 /* ---- round fifteen: the review ---- */
 const checkpoint = await settledAt(15);
-clickIt(dom, stageOn(/^Continue$|who.s leading/i));
+clickIt(dom, q(dom, '.rr-skip'));
 await settle();
 
 const reviewBtn = stageOn(/round 15 review/i);
@@ -1470,7 +1574,8 @@ await settle();
 
 goHome(dom);
 check('and the board is back',
-  qq(dom, '.g-strategy-item').length === 2 && !!q(dom, '.punjab-map'));
+  qq(dom, '.g-strategy-item').length === 3 && !!q(dom, '.punjab-map'),
+  qq(dom, '.g-strategy-item').length + ' strategy buttons');
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
@@ -1697,29 +1802,58 @@ const wonResult = {
 const rr = wonWin.CMP.ui.scoreboard.create({
   you: () => MINE,
   trend: () => [],
+  game: () => wonGame,
   onFinished: () => {},
 });
 rr.render(wonResult, 30);
 rr.stop();
+
+/*
+ * 18. A won seat shows as won, on the district it belongs to.
+ *
+ * It used to have a section of its own on a screen of stacked sections —
+ * seats changed, seats won, campaign conflicts — which was correct and more
+ * than anybody reads between rounds. It is a tick beside the party's bar in
+ * the district now, which is where somebody looking at that district would
+ * expect to find it.
+ */
+const lockedDistrict = wonWin.CMP.DISTRICTS.find((d) => d.seats.indexOf(LOCKED) !== -1);
+rr.root.querySelectorAll('.rr-skip').forEach(() => {});
+
+// Drive the sequence to the region the won seat is in.
+const wonRegion = lockedDistrict.region;
+rr.render(null, 30);
+const regionTitle = () => (rr.root.querySelector('.rr-bar-title') || {}).textContent || '';
+for (let i = 0; i < 4 && !new RegExp(wonWin.CMP.getRegion(wonRegion).name, 'i')
+  .test(regionTitle()); i++) {
+  const next = [...rr.root.querySelectorAll('button')]
+    .find((b) => /Next region|See who is leading/i.test(b.textContent));
+  if (!next) break;
+  next.click();
+  rr.stop();
+}
+
+check('18. the results reach the region the seat was won in',
+  new RegExp(wonWin.CMP.getRegion(wonRegion).name, 'i').test(regionTitle()),
+  regionTitle());
+
+const wonRow = [...rr.root.querySelectorAll('.rr-district')]
+  .find((n) => n.querySelector('.rr-district-name').textContent === lockedDistrict.name);
+check('18. the district it is in is listed', !!wonRow,
+  [...rr.root.querySelectorAll('.rr-district-name')].map((n) => n.textContent).join(', '));
+check('18. and the seat is marked won rather than merely led',
+  !!wonRow && !!wonRow.querySelector('.rr-runner-won'),
+  wonRow ? wonRow.textContent.replace(/\s+/g, ' ').slice(0, 80) : 'no row');
+
+/*
+ * 12. And none of the technical detail that used to sit beside it.
+ *
+ * Campaign conflicts are a rule the engine settles; they are not something a
+ * player needs read to them on election night.
+ */
 const rrText = rr.root.textContent;
-
-check('the round result announces the seat won', !!rr.root.querySelector('.rr-win'));
-check('it says the seat is locked from now on',
-  /rest of the election|Locked/i.test(rr.root.querySelector('.rr-win-note').textContent),
-  rr.root.querySelector('.rr-win-note').textContent);
-check('it announces the campaign conflict', !!rr.root.querySelector('.rr-conflict'));
-check('and says nobody gained and nobody was refunded',
-  /Nobody gained, nobody was refunded/.test(
-    rr.root.querySelector('.rr-conflict-note').textContent),
-  rr.root.querySelector('.rr-conflict-note').textContent);
-check('the conflict names what was matched',
-  /crore|lakh/.test(rr.root.querySelector('.rr-conflict-note').textContent));
-check('both sides of the conflict are named',
-  rr.root.querySelectorAll('.rr-conflict-parties .rr-badge').length === 2,
-  rr.root.querySelectorAll('.rr-conflict-parties .rr-badge').length + ' named');
-check('a round with wins is never called quiet',
-  !/No major seat changes/.test(rrText));
-
+check('12. no conflict ledger in the results', !/Nobody gained, nobody was refunded/.test(rrText));
+check('12. and no talk of what was matched', !/campaigns matched at/i.test(rrText));
 
 /* ---- the grants ledger counts won seats, not led ones ---- */
 const district = wonWin.CMP.DISTRICTS.find((d) => d.seats.indexOf(LOCKED) !== -1);
@@ -1778,6 +1912,240 @@ check('the region says how many seats are won',
 const everywhere = dom.window.document.body.textContent;
 check('no "3 moves" rule survives in the UI',
   !/3\s*\/\s*3|three moves|3 moves/i.test(everywhere));
+
+section('My Areas: comparing a district and campaigning across it');
+
+/*
+ * The bulk sheet opened on an action that no longer exists.
+ *
+ * It defaulted to `rally`, one of the eleven campaigns deleted when
+ * campaigning became one action and an amount. `getAction` answered null, the
+ * first thing to read it threw, and the sheet never rendered — so pressing the
+ * button on My Areas did nothing at all, from every region. Nothing caught it
+ * because nothing opened it.
+ */
+const areaGame = dom.window.CMP.state.startElection({
+  candidateName: 'Simran Kaur Gill',
+  partyName: 'Punjab Development Party',
+});
+dom.window.CMP.app.setGame(areaGame);
+
+function clearSheets() {
+  qq(dom, '.sheet').forEach((n) => {
+    if (n.parentNode) n.parentNode.removeChild(n);
+  });
+}
+clearSheets();
+
+const REGIONS = ['malwa', 'majha', 'doaba'];
+for (const region of REGIONS) {
+  const district = dom.window.CMP.DISTRICTS.find((d) => d.region === region);
+  let threw = null;
+  try {
+    dom.window.CMP.ui.allocate.open({
+      game: areaGame,
+      seats: district.seats.slice(),
+      title: district.name,
+      onPlay: () => Promise.resolve({ ok: true, reports: [] }),
+      onClose: () => {},
+    });
+  } catch (e) {
+    threw = e.message;
+  }
+  await settle();
+
+  check('the sheet opens for ' + region, threw === null && !!q(dom, '.al-panel'),
+    threw || (q(dom, '.al-panel') ? 'open' : 'nothing rendered'));
+  check('  and offers a campaign to run', qq(dom, '.al-move').length > 0,
+    qq(dom, '.al-move-name').map((n) => n.textContent).join(', '));
+  check('  with one of them already chosen',
+    qq(dom, '.al-move.is-active').length === 1,
+    qq(dom, '.al-move.is-active').length + ' active');
+  check('  and every offered campaign is one the game has',
+    qq(dom, '.al-move-name').every((n) =>
+      dom.window.CMP.ACTIONS.some((a) => a.label === n.textContent)),
+    qq(dom, '.al-move-name').map((n) => n.textContent).join(', '));
+
+  clearSheets();
+  await settle();
+}
+
+/*
+ * 18. And a seat that has been won is never reopened by it.
+ *
+ * The server refuses a move into one anyway, so offering it here would spend
+ * the player's attention on something that was going to be rejected.
+ */
+const lockDistrict = dom.window.CMP.DISTRICTS.find((d) => d.seats.length >= 3);
+areaGame.wonSeats = areaGame.wonSeats || {};
+areaGame.wonSeats[String(lockDistrict.seats[0])] =
+  { party: areaGame.partyId, round: 4, share: 80 };
+
+clearSheets();
+dom.window.CMP.ui.allocate.open({
+  game: areaGame,
+  seats: lockDistrict.seats.slice(),
+  title: lockDistrict.name,
+  onPlay: () => Promise.resolve({ ok: true, reports: [] }),
+  onClose: () => {},
+});
+await settle();
+
+check('18. a won seat is left out of the spread',
+  new RegExp((lockDistrict.seats.length - 1) + ' seats').test(q(dom, '.al-sub').textContent),
+  q(dom, '.al-sub').textContent);
+check('18. and it says so rather than quietly dropping it',
+  /already won and locked/.test(q(dom, '.al-sub').textContent),
+  q(dom, '.al-sub').textContent);
+
+clearSheets();
+await settle();
+
+section('Grants: what a campaign earns, and where the next of it is');
+
+/*
+ * This replaced My Areas, which led with how many seats you were leading —
+ * a fact about the board rather than a decision about money. The question a
+ * player comes here with is where the next crore a round comes from, so the
+ * three regions answer it first.
+ *
+ * Every figure is the engine's. Nothing on this screen runs an economy of
+ * its own, and this checks that by working the numbers out independently and
+ * expecting the same answers.
+ */
+const grantGame = dom.window.CMP.state.startElection({
+  candidateName: 'Simran Kaur Gill',
+  partyName: 'Punjab Development Party',
+});
+
+// A district taken outright, so there is a grant to report rather than three
+// empty regions.
+const paid = dom.window.CMP.DISTRICTS.find((d) => d.region === 'malwa');
+grantGame.wonSeats = grantGame.wonSeats || {};
+paid.seats.forEach((n) => {
+  grantGame.wonSeats[String(n)] = { party: grantGame.partyId, round: 3, share: 85 };
+});
+// And one the player is close to but has not finished.
+const close = dom.window.CMP.DISTRICTS.find(
+  (d) => d.region === 'majha' && d.seats.length >= 3
+);
+close.seats.slice(0, close.seats.length - 1).forEach((n) => {
+  grantGame.wonSeats[String(n)] = { party: grantGame.partyId, round: 4, share: 80 };
+});
+
+dom.window.CMP.app.setGame(grantGame);
+dom.window.CMP.app.goTo('election');
+await settle();
+
+check('1. the board offers Grant, not My Areas',
+  qq(dom, '.g-strategy-label').map((n) => n.textContent).indexOf('Grant') !== -1 &&
+  !/My Areas/.test(text(dom)),
+  qq(dom, '.g-strategy-label').map((n) => n.textContent).join('/'));
+
+clickIt(dom, qq(dom, '.g-strategy-item').find((b) => /Grant/.test(b.textContent)));
+await settle();
+
+/* ---- the three regions ---- */
+check('3. it opens on the three regions', qq(dom, '.gr-card').length === 3,
+  qq(dom, '.gr-card-name').map((n) => n.textContent).join(' / '));
+check('3. each named for its region',
+  qq(dom, '.gr-card-name').every((n) => /grant$/i.test(n.textContent)),
+  qq(dom, '.gr-card-name').map((n) => n.textContent).join(' / '));
+check('4. each with what it pays, what is banked and what is open',
+  qq(dom, '.gr-card')[0].querySelectorAll('.gr-fig').length === 3,
+  qq(dom, '.gr-card')[0].querySelectorAll('.gr-fig-label').length + ' figures');
+
+/*
+ * 18. And the figures are the game's own.
+ *
+ * Worked out here from the districts and the engine's own purse, and expected
+ * to match what the screen says to the rupee.
+ */
+const malwaCard = qq(dom, '.gr-card')
+  .find((c) => /Malwa/i.test(c.querySelector('.gr-card-name').textContent));
+const wonFig = malwaCard.querySelector('.gr-fig.is-won .gr-fig-value').textContent;
+const expectWon = dom.window.CMP.ui.money.words(paid.grant);
+check('18. the grant a region pays is the district grant, not a guess',
+  wonFig === expectWon, wonFig + ' vs ' + expectWon);
+
+const purseFig = malwaCard.querySelector('.gr-fig.is-purse .gr-fig-value').textContent;
+const expectPurse = dom.window.CMP.ui.money.words(
+  dom.window.CMP.campaign.grantIn(grantGame, 'malwa')) || '₹0';
+check('18. and the purse is the engine\'s purse',
+  purseFig === expectPurse, purseFig + ' vs ' + expectPurse);
+
+/* ---- a region opens its districts ---- */
+clickIt(dom, malwaCard);
+await settle();
+check('7. tapping a region lists its districts',
+  qq(dom, '.gr-district').length > 0, qq(dom, '.gr-district').length + ' districts');
+check('7. and only that region\'s',
+  qq(dom, '.gr-district-name').every((n) =>
+    (dom.window.CMP.DISTRICTS.find((d) => d.name === n.textContent) || {}).region === 'malwa'),
+  qq(dom, '.gr-district-name').map((n) => n.textContent).slice(0, 4).join(', '));
+check('7. the one that is paying says so',
+  qq(dom, '.gr-district.is-held').length === 1 &&
+  /Paying/i.test(q(dom, '.gr-district.is-held').textContent),
+  q(dom, '.gr-district.is-held') ? q(dom, '.gr-district.is-held').textContent : 'none');
+
+/* ---- how to earn more, about this game rather than in general ---- */
+check('8. it says how to earn more', !!q(dom, '.gr-how'));
+check('8. naming every region', qq(dom, '.gr-how-region').length === 3,
+  qq(dom, '.gr-how-region').map((n) => n.textContent).join('/'));
+check('8. and saying something about this board rather than a platitude',
+  qq(dom, '.gr-how-note').some((n) => /\d/.test(n.textContent)),
+  qq(dom, '.gr-how-note').map((n) => n.textContent).join(' | ').slice(0, 140));
+
+/* ---- best targets ---- */
+check('9. it recommends targets', qq(dom, '.gr-target').length > 0,
+  qq(dom, '.gr-target-name').map((n) => n.textContent).join(', '));
+check('13. each with a priority',
+  qq(dom, '.gr-target-priority').every((n) => /high|medium|low/i.test(n.textContent)),
+  qq(dom, '.gr-target-priority').map((n) => n.textContent).join(', '));
+check('9. and never a district that is already paying',
+  qq(dom, '.gr-target-name').every((n) => n.textContent !== paid.name),
+  qq(dom, '.gr-target-name').map((n) => n.textContent).join(', '));
+
+/*
+ * 9. Not simply the biggest district.
+ *
+ * The near-complete district is worth far less per seat than the largest one
+ * in the game, and the recommendation should prefer it — that is the whole
+ * difference between a target and a list sorted by size.
+ */
+const biggest = dom.window.CMP.DISTRICTS.slice().sort(
+  (a, b) => b.seats.length - a.seats.length)[0];
+const topTarget = q(dom, '.gr-target-name').textContent;
+check('9. the recommendation is not just the largest district',
+  topTarget !== biggest.name || close.name === biggest.name,
+  topTarget + ' (largest is ' + biggest.name + ')');
+check('9. the district one seat from paying is recommended',
+  qq(dom, '.gr-target-name').map((n) => n.textContent).indexOf(close.name) !== -1,
+  qq(dom, '.gr-target-name').map((n) => n.textContent).join(', '));
+
+/* ---- targeting an opponent ---- */
+check('10. every rival can be targeted',
+  qq(dom, '.gr-rival').length === dom.window.CMP.PARTIES.length - 1,
+  qq(dom, '.gr-rival-name').map((n) => n.textContent).join('/'));
+check('10. and the player is not one of them',
+  qq(dom, '.gr-rival-name').map((n) => n.textContent)
+    .indexOf(dom.window.CMP.getParty(grantGame.partyId).short) === -1,
+  qq(dom, '.gr-rival-name').map((n) => n.textContent).join('/'));
+
+const beforeRival = qq(dom, '.gr-target').length;
+clickIt(dom, qq(dom, '.gr-rival')[0]);
+await settle();
+check('11. choosing one changes what is recommended',
+  qq(dom, '.gr-rival.is-on').length === 1,
+  qq(dom, '.gr-rival.is-on').length + ' selected');
+check('12. and it says what taking a district would and would not do',
+  /does not take money they already have/i.test(text(dom)) ||
+  /not close to a grant anywhere/i.test(text(dom)),
+  text(dom).match(/does not take money[^.]*\.|not close to a grant[^.]*\./) || 'no note');
+
+/* ---- 2. and none of the old dashboard came with it ---- */
+check('2. no seats-led summary on the grant screen',
+  !q(dom, '.ma-control') && !/Your control/i.test(text(dom)));
 
 section('12. Console');
 const realErrors = consoleErrors.filter((e) => !/Could not parse CSS|Not implemented/.test(e));

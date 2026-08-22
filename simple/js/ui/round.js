@@ -240,8 +240,15 @@ CMP.ui.round = (function () {
       var round = game.round || 1;
       var total = game.roundsTotal || CMP.ROUNDS.total;
 
+      /*
+       * The round, and not the total.
+       *
+       * "Round 15 / 20" is two numbers where one is wanted; the dots under
+       * the bar already show how far through the campaign this is, and the
+       * final round says so in a word rather than by arithmetic.
+       */
       mount(labelNode, [
-        el('span', { class: 'round-of', text: 'Round ' + round + ' / ' + total }),
+        el('span', { class: 'round-of', text: 'Round ' + round }),
         round >= total ? el('span', { class: 'round-final', text: 'Final' }) : null,
         game.stage === 'results'
           ? el('span', { class: 'round-final is-quiet', text: 'Round complete' })

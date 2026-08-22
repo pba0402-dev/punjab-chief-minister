@@ -39,7 +39,7 @@ function startGame() {
 /**
  * Open the game screen on one of its sections.
  *
- * My Areas and Alliances are the two buttons above the map; everything else is
+ * Loan, Grant and Alliances are the three buttons above the map; everything else is
  * under More, because none of it is opened every round.
  */
 function sectionScene(label) {
@@ -230,6 +230,47 @@ const SCENES = {
     "CMP.app.goTo('setup');" +
     "setTimeout(function(){window.scrollTo(0,400);},400);",
 
+  /*
+   * Election night: a region, and then who is leading.
+   *
+   * Twelve rounds first, so the districts have real shares in them rather
+   * than the flat board of round one.
+   */
+  'results-region':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});" +
+    "for(var r=0;r<12;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<11)CMP.campaign.startNextRound(g);" +
+    "}" +
+    "var d=CMP.getDistrict('ludhiana');" +
+    "(d?d.seats.slice(0,3):[]).forEach(function(n){" +
+    "  g.wonSeats[String(n)]={party:g.partyId,round:9,share:82};" +
+    "});" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');",
+
+  'results-overall':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});" +
+    "for(var r=0;r<12;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<11)CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var s=document.querySelector('.rr-skip');if(s)s.click();" +
+    "},200);",
+
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
@@ -335,7 +376,7 @@ const SCENES = {
     "  var rival=rows.filter(function(x){return !x.classList.contains('is-you');})[0];" +
     "  if(rival)rival.click();" +
     "},80);",
-  'sec-priorities': sectionScene('My Areas'),
+  'sec-priorities': sectionScene('Grant'),
   'sec-allies': sectionScene('Alliances'),
 
   // The money screen with something in the ledger to show.

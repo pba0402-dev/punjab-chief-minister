@@ -103,7 +103,6 @@ CMP.ui.map = (function () {
     );
 
     var readout = el('div', { class: 'map-readout' });
-    var legend = el('div', { class: 'map-legend' });
     var summary = el('div', { class: 'map-summary' });
 
     var modeToggle = el('div', { class: 'term-options map-modes' }, [
@@ -155,15 +154,20 @@ CMP.ui.map = (function () {
       summary,
       el('div', { class: 'map-toolbar' }, [modeToggle, zoomControls]),
       el('div', { class: 'map-frame' }, [svg]),
+
+      /*
+       * The readout, and nothing else.
+       *
+       * The legend and the note about what the shapes do not claim used to
+       * live here, under the board, on every screen. Both are things a player
+       * needs once: the legend is now the key inside the summary line above
+       * the map, and the disclaimer is under More, where people go to read
+       * rather than to campaign.
+       *
+       * The readout stays because it is the answer to a tap — and it says
+       * nothing at all until there has been one.
+       */
       readout,
-      legend,
-      el('p', {
-        class: 'map-note',
-        text:
-          'Positions and neighbours are real; cell shapes are approximate and ' +
-          'are not official constituency boundaries. Tiles view makes no ' +
-          'geographic claim at all.',
-      }),
     ]);
 
     function modeButton(id, label) {
@@ -384,7 +388,6 @@ CMP.ui.map = (function () {
 
       paintDistrictLines();
       paintSummary();
-      paintLegend();
       showReadout(selected);
     }
 
@@ -538,49 +541,16 @@ CMP.ui.map = (function () {
           class: 'map-summary-seats',
           text: seatsOnScreen().length + ' seats',
         }),
+
+        // What the four appearances mean, said once and small. It used to be
+        // a block under the board; it belongs beside the thing it explains.
+        el('span', { class: 'legend-key' }, [
+          el('span', { class: 'legend-key-item', text: '○ open' }),
+          el('span', { class: 'legend-key-item', text: '● leading' }),
+          el('span', { class: 'legend-key-item', text: '⚔ contested' }),
+          el('span', { class: 'legend-key-item', text: '✓ won' }),
+        ]),
       ]);
-    }
-
-    /*
-     * Who the colours belong to.
-     *
-     * The parties are invented at the start of every game, so the legend has
-     * to name them rather than assume anybody recognises a colour — and it
-     * names them properly, because a player who called their party the Unity
-     * Punjab Front did not call it UPF.
-     */
-    function paintLegend() {
-      var counts = {};
-      CMP.CONSTITUENCIES.forEach(function (c) {
-        if (!inRegion(c.number)) return;
-        var lead = CMP.ui.constituency.leaderOf(game.support[c.number]);
-        if (lead) counts[lead.partyId] = (counts[lead.partyId] || 0) + 1;
-      });
-
-      mount(
-        legend,
-        [el('span', { class: 'legend-title', text: 'Leading' })].concat(
-        CMP.PARTIES.map(function (p) {
-          var n = counts[p.id] || 0;
-          return el('span', {
-            class: 'legend-item' + (p.id === game.partyId ? ' is-you' : ''),
-            title: p.name,
-          }, [
-            el('span', { class: 'legend-swatch', style: { background: p.colour } }),
-            el('span', { class: 'legend-label', text: p.name }),
-            el('span', { class: 'legend-count', text: n }),
-          ]);
-        })).concat([
-          // What the three appearances mean, said once and small.
-          el('span', { class: 'legend-key' }, [
-            el('span', { class: 'legend-key-item', text: '○ open' }),
-            el('span', { class: 'legend-key-item', text: '● leading' }),
-            el('span', { class: 'legend-key-item', text: '⚔ contested' }),
-            el('span', { class: 'legend-key-item', text: '✓ won' }),
-          ]),
-          el('span', { class: 'legend-majority', text: 'majority ' + CMP.MAJORITY }),
-        ])
-      );
     }
 
     /**
@@ -617,10 +587,9 @@ CMP.ui.map = (function () {
 
     function showReadout(num) {
       if (num === null || num === undefined || !game.support[num]) {
-        mount(readout, [
-          districtLine(),
-          el('span', { class: 'muted', text: 'Hover or tap a constituency.' }),
-        ]);
+        // An empty readout collapses to nothing rather than inviting a tap
+        // the board itself already invites.
+        mount(readout, selectedDistrict ? [districtLine()] : []);
         return;
       }
       var def = null;
