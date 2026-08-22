@@ -149,6 +149,29 @@ const SCENES = {
     "});};" +
     "CMP.app.goTo('setup');setTimeout(function(){CMP.app.goTo('home');},40);",
 
+  /*
+   * One region on the board, which is what the map is for.
+   *
+   * Rendered so the audit can see that Majha genuinely replaces the frame
+   * rather than Punjab being cropped to it — no Malwa in the corners, and the
+   * region fitted without anybody zooming out.
+   */
+  'map-majha':
+    startGame() +
+    "setTimeout(function(){" +
+    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
+    "    .filter(function(x){return x.textContent==='Majha';})[0];" +
+    "  if(b)b.click();" +
+    "},120);",
+
+  'map-doaba':
+    startGame() +
+    "setTimeout(function(){" +
+    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
+    "    .filter(function(x){return x.textContent==='Doaba';})[0];" +
+    "  if(b)b.click();" +
+    "},120);",
+
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +

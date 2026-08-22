@@ -150,3 +150,127 @@
   .readout-mla { margin-left: 0; width: 100%; }
   .legend-majority { margin-left: 0; }
 }
+
+/* ------------------------------------------------ one region, not a crop */
+
+/*
+ * Choosing Majha used to frame Majha and leave Malwa and Doaba drawn just
+ * outside the frame, where a pinch would find them again. Now the camera is
+ * the viewBox and everything outside the chosen region is not drawn at all,
+ * so the region genuinely replaces the board rather than being a view of it.
+ */
+.map-cell.is-outside,
+.map-district-line.is-outside,
+.map-seat-num.is-outside,
+.map-outline.is-outside {
+  display: none;
+}
+
+/*
+ * With one region on screen the seats are much larger, so the strokes that
+ * separate them can afford to be finer without the map turning to mush.
+ */
+.punjab-map.is-region .map-district-line { stroke-width: 1.6; }
+
+/*
+ * Gestures belong to the map while the finger is inside it.
+ *
+ * `touch-action: none` on the SVG already stops the page scrolling under a
+ * drag; the frame takes it too so a finger that starts on the padding does
+ * not scroll the page either.
+ */
+.map-frame {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------- how this part stands */
+
+/*
+ * A line above the board saying who holds what, for whatever is on screen.
+ * It changes with the region, because that is the point of choosing one.
+ */
+.map-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 2px 0;
+  font-size: 0.66rem;
+}
+.map-summary-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.map-summary-rows {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.map-summary-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.map-summary-row.is-you .map-summary-short { color: var(--cream); }
+.map-summary-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--party);
+  flex: none;
+}
+.map-summary-short {
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.map-summary-n { font-weight: 700; color: var(--cream); }
+.map-summary-won {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--good);
+}
+.map-summary-none { color: var(--muted-2); }
+.map-summary-seats {
+  margin-left: auto;
+  font-size: 0.6rem;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend-title {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/*
+ * A selected district: every seat in it outlined, so the seat borders inside
+ * survive and it reads as a group rather than as one shape.
+ */
+.map-district-sel {
+  fill: none;
+  stroke: var(--wheat);
+  stroke-width: 2.2;
+  stroke-opacity: 0.9;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(212, 168, 83, 0.45));
+}
+
+@media (max-width: 430px) {
+  /* The seat count is the first thing to go: the map says it better. */
+  .map-summary-seats { display: none; }
+  .map-summary { gap: 6px; }
+  .map-summary-rows { gap: 7px; }
+}
