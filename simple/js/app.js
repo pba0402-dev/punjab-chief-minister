@@ -650,6 +650,16 @@ CMP.app = (function () {
     if (!game || !view) return;
     if (view.board && typeof view.board === 'object') game.support = view.board;
     if (view.leaders) game.leaders = view.leaders;
+    /*
+     * Which seats are finished, from the server that decided it.
+     *
+     * The server already refuses to play in a won seat, so leaving this out
+     * would not let anybody cheat — it would do something worse, and show
+     * four players a board that disagreed with the rules they were playing
+     * under. The map, the seat screen, the grants ledger and My Areas all
+     * read this.
+     */
+    if (view.wonSeats && typeof view.wonSeats === 'object') game.wonSeats = view.wonSeats;
     // A player who joins late, or reconnects, gets the parties with the poll.
     if (view.parties && view.parties.length) {
       game.parties = view.parties;

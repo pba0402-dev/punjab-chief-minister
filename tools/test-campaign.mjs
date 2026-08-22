@@ -964,6 +964,116 @@ check('the player is not marked as an opponent',
   board1.standings.filter((r) => !r.isAI).length === 1);
 check('three opponents fill the other parties',
   board1.standings.filter((r) => r.isAI).length === 3);
+
+/*
+ * The opponents keep playing as they get richer.
+ *
+ * Getting into a seat is capped at a crore, and an opponent whose budget has
+ * grown past that will have its move refused — and an opponent that is
+ * refused stops for the round, so it never becomes established, so it is
+ * refused again. The failure mode is silent and it gets worse the longer the
+ * game runs, which is exactly when a live opponent matters most. So this
+ * plays a long game and asks whether they were still spending at the end.
+ */
+const aiGame = freshGame();
+const aiSpendByRound = [];
+for (let r = 0; r < 12; r++) {
+  const before = aiGame.opponents.map((o) => o.spent || 0);
+  CMP.campaign.play(aiGame, 'invest', ((r * 13) % 117) + 1,
+    { outcome: 0.4, consequence: 0.99, consequencePick: 0.5 });
+  CMP.campaign.endRound(aiGame);
+  aiSpendByRound.push(aiGame.opponents.map((o, i) => (o.spent || 0) - before[i]));
+  if (r < 11) CMP.campaign.startNextRound(aiGame);
+}
+
+check('every opponent campaigns with its own money',
+  aiGame.opponents.every((o) => (o.spent || 0) > 0),
+  aiGame.opponents.map((o) => Math.round((o.spent || 0) / 100000) + 'L').join(' / '));
+
+// The last third of the campaign, when they are richest and the entry cap
+// bites hardest.
+const lateSpend = aiSpendByRound.slice(8);
+check('and they are still spending late in the campaign',
+  aiGame.opponents.every((o, i) => lateSpend.some((round) => round[i] > 0)),
+  lateSpend.map((round) => round.map((n) => Math.round(n / 100000) + 'L').join('+')).join(' | '));
+
+/*
+ * A rich opponent, late, on a board it has barely touched.
+ *
+ * This is the exact shape the cap breaks: the budget it would like to put
+ * behind a move is well over a crore, every seat left is an entry, and a
+ * refusal ends its round. Testing it needs the money made explicit, because
+ * an opponent playing its own game rarely gets rich enough by accident.
+ */
+const richGame = freshGame();
+richGame.round = 18;
+const richAI = richGame.opponents[0];
+richAI.cash = 60 * 10000000;
+richAI.incomeTotal = (richAI.incomeTotal || 0) + 60 * 10000000;
+const richAIBefore = richAI.spent || 0;
+const richMoves = CMP.ai.takeRound(richAI, richGame, 18);
+check('a rich opponent late in the campaign still plays',
+  richMoves.length > 0 && (richAI.spent || 0) > richAIBefore,
+  richMoves.length + ' moves, ' +
+    Math.round(((richAI.spent || 0) - richAIBefore) / 100000) + 'L spent');
+check('and it enters a new seat for no more than the cap',
+  richMoves.every((m) => !m.constituency ||
+    (richGame.support[m.constituency] || {})[richAI.partyId] <=
+      CMP.CAMPAIGN.spending.entryMaximum),
+  richMoves.map((m) => m.constituency).join(','));
+
+// The cap is what the engine would allow them, asked as they are asked.
+const capForOpponent = CMP.campaign.entryCapFor(
+  aiGame, aiGame.opponents[0], 116, CMP.getAction('invest')
+);
+/*
+ * And the same guarantee on the server, which is where multiplayer opponents
+ * actually run. Two implementations, one rule: an opponent with more money
+ * than the cap allows budgets down to the cap rather than going quiet.
+ */
+const phpRich = php('airound', JSON.stringify({
+  player: {
+    partyId: 'p2', budget: 0, cash: 60 * 10000000, spent: 0, heat: 0,
+    granted: 0, raised: 0, borrowed: 0, incomeTotal: 60 * 10000000,
+    actions: [], loans: [], grants: {}, record: {},
+  },
+  board: JSON.parse(JSON.stringify(freshGame().support)),
+  seed: 'probe-rich',
+  round: 18,
+  won: {},
+}));
+check('PHP: a rich opponent late in the campaign still plays',
+  phpRich.moves.length > 0 && phpRich.spent > 0,
+  phpRich.moves.length + ' moves, ' + Math.round(phpRich.spent / 100000) + 'L spent');
+check('PHP: and it never spends more than the cap to get in',
+  phpRich.spent <= phpRich.moves.length * CMP.CAMPAIGN.spending.entryMaximum,
+  Math.round(phpRich.spent / 100000) + 'L over ' + phpRich.moves.length + ' moves');
+
+check('an opponent is capped on a seat it has never been to',
+  capForOpponent === CMP.CAMPAIGN.spending.entryMaximum,
+  capForOpponent + ' vs ' + CMP.CAMPAIGN.spending.entryMaximum);
+
+/*
+ * And a seat that is won is closed to them.
+ *
+ * The opponents play through a view of the board built for them, and that
+ * view has to carry the won seats — otherwise the rule the player is held to
+ * is one the opponents are exempt from.
+ */
+aiGame.wonSeats['99'] = { party: aiGame.opponents[0].partyId, round: 5, share: 90 };
+const wonView = CMP.campaign.entryCapFor(
+  aiGame, aiGame.opponents[1], 99, CMP.getAction('invest')
+);
+const beforeWonTry = aiGame.opponents[1].spent || 0;
+const refusedByLock = CMP.campaign.playAs(
+  aiGame, aiGame.opponents[1], 'invest', 99,
+  { outcome: 0.4, consequence: 0.99, consequencePick: 0.5 }, wonView || 1000000
+);
+check('an opponent cannot campaign in a seat somebody has won',
+  refusedByLock === null, JSON.stringify(refusedByLock));
+check('and it is not charged for the attempt',
+  (aiGame.opponents[1].spent || 0) === beforeWonTry,
+  beforeWonTry + ' -> ' + (aiGame.opponents[1].spent || 0));
 /*
  * The board opens empty, so round one decides exactly the seats somebody
  * campaigned in — not all 117. A seat nobody went near stays uncontested,

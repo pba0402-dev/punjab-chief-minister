@@ -209,7 +209,7 @@ final class AI
 
             // How much goes behind it: cash spread over the moves still to
             // come, plus whatever the region purse can add.
-            $amount = self::chooseAmount($player, $action, $engine, $round, $target);
+            $amount = self::chooseAmount($player, $board, $action, $engine, $round, $target);
 
             if ($engine->blockedReason($player, $board, $action['id'], $target, $amount, $won) !== null) {
                 break;
@@ -248,6 +248,7 @@ final class AI
      */
     private static function chooseAmount(
         array $player,
+        array $board,
         array $action,
         Campaign $engine,
         int $round,
@@ -278,7 +279,22 @@ final class AI
         $budget = (int) floor($pot['cash'] / max(2, min(6, $roundsLeft))) + $pot['grant'];
 
         $range = $engine->amountRange($action);
-        return (int) max($range['min'], min($range['max'], $budget));
+        $want = (int) max($range['min'], min($range['max'], $budget));
+
+        /*
+         * Getting in costs a crore, for opponents as much as for the player.
+         *
+         * Without this the first move into every seat is refused — and since
+         * a refused opponent stops for the round, and an opponent that never
+         * plays never becomes established, it would be refused for the whole
+         * election. On an empty board that is every opponent, every game.
+         */
+        $cap = $engine->entryCap($player, $board, $target, $action);
+        if ($cap > 0 && $want > $cap) {
+            $want = (int) max($range['min'], $cap);
+        }
+
+        return $want;
     }
 
     /**

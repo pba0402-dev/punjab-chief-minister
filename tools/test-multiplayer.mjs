@@ -693,6 +693,76 @@ check('one bar is marked as leading, unless nobody leads',
   host.qq('.sd-bar.is-leading').length === (host.q('.sd-leader-share') ? 1 : 0),
   String(host.qq('.sd-bar.is-leading').length));
 
+/*
+ * A seat the server has declared won reaches every client's screens.
+ *
+ * The server already refuses to play in a won seat, so the risk here is not
+ * cheating — it is four people looking at a board that disagrees with the
+ * rules they are playing under. The seat is written into the server's own
+ * store rather than played to, because reaching a commanding share through
+ * the ₹1 crore entry cap takes more rounds than this suite runs.
+ */
+const storeFile = fs.readdirSync(DATA).find((f) => /^game-.*\.json$/.test(f));
+check('the server keeps the game in its store', !!storeFile, fs.readdirSync(DATA).join(','));
+
+const stored = JSON.parse(fs.readFileSync(path.join(DATA, storeFile), 'utf8'));
+const LOCKED_SEAT = 17;
+const lockedTo = Object.keys(stored.players)[0];
+const lockedParty = stored.players[lockedTo].partyId;
+stored.wonSeats = stored.wonSeats || {};
+stored.wonSeats[String(LOCKED_SEAT)] = { party: lockedParty, round: 2, share: 78 };
+fs.writeFileSync(path.join(DATA, storeFile), JSON.stringify(stored));
+
+// The clients learn about it on their next poll, not by being told.
+await host.until('the won seat reaches the client',
+  () => !!(host.dom.window.CMP.app.getGame().wonSeats || {})[String(LOCKED_SEAT)], 12000);
+check('a won seat reaches the client from the server',
+  !!(host.dom.window.CMP.app.getGame().wonSeats || {})[String(LOCKED_SEAT)],
+  JSON.stringify(host.dom.window.CMP.app.getGame().wonSeats || {}));
+check('and it names the party that won it and the round',
+  host.dom.window.CMP.app.getGame().wonSeats[String(LOCKED_SEAT)].party === lockedParty &&
+  host.dom.window.CMP.app.getGame().wonSeats[String(LOCKED_SEAT)].round === 2,
+  JSON.stringify(host.dom.window.CMP.app.getGame().wonSeats[String(LOCKED_SEAT)]));
+
+// Every client, not only the one whose party won it.
+await players[1].until('the guest sees it too',
+  () => !!(players[1].dom.window.CMP.app.getGame().wonSeats || {})[String(LOCKED_SEAT)], 12000);
+check('every client agrees the seat is finished',
+  !!(players[1].dom.window.CMP.app.getGame().wonSeats || {})[String(LOCKED_SEAT)]);
+
+// And the seat screen reads as finished rather than as a large lead.
+const lockedNode = host.dom.window.CMP.ui.constituency.render(
+  host.dom.window.CMP.app.getGame(), LOCKED_SEAT, { players: [] }
+);
+check('the seat screen says it is permanently won',
+  /Permanently won/i.test(lockedNode.querySelector('.sd-leader-kicker').textContent),
+  lockedNode.querySelector('.sd-leader-kicker').textContent);
+check('and offers no way to campaign there',
+  !lockedNode.querySelector('.btn-campaign') && !!lockedNode.querySelector('.sd-locked-note'));
+
+// The server refuses it as well, and takes no money for the attempt.
+const beforeLocked = host.dom.window.CMP.app.getGame().cash;
+const lockedTry = await fetch(BASE + 'api/index.php?action=campaign', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    code: stored.code,
+    playerId: lockedTo,
+    token: stored.players[lockedTo].token,
+    actionId: 'invest',
+    constituency: LOCKED_SEAT,
+    amount: 10000000,
+  }),
+}).then((r) => r.json()).catch((e) => ({ error: String(e) }));
+check('the server refuses a move into a won seat', lockedTry.ok !== true,
+  JSON.stringify(lockedTry).slice(0, 140));
+check('and says the seat is locked',
+  /SEAT_LOCKED|locked|won/i.test(JSON.stringify(lockedTry)),
+  JSON.stringify(lockedTry).slice(0, 140));
+check('no money was taken for the refused move',
+  host.dom.window.CMP.app.getGame().cash === beforeLocked,
+  beforeLocked + ' -> ' + host.dom.window.CMP.app.getGame().cash);
+
 section('Reporting a rival');
 // Rivals sit with the high-risk play they exist to police.
 tabButton(host, 'Corruption');

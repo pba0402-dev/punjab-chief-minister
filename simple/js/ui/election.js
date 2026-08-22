@@ -109,7 +109,6 @@ CMP.ui.election = (function () {
 
     var headNode = el('header', { class: 'g-head' });
     var roundNode = el('div', { class: 'g-round' });
-    var playerNode = el('div', { class: 'g-player' });
     var noticeNode = el('div', { class: 'g-notice' });
     var bodyNode = el('div', { class: 'g-body' });
     var resultsNode = el('div', { class: 'g-results' });
@@ -245,7 +244,6 @@ CMP.ui.election = (function () {
       el('div', { class: 'g-inner' }, [
         headNode,
         roundNode,
-        playerNode,
         noticeNode,
         summaryNode,
         resultsNode,
@@ -670,7 +668,6 @@ CMP.ui.election = (function () {
         figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
         debt ? figure('Owed', money.words(debt), 'is-debt') : null,
       ]);
-      mount(playerNode, []);
     }
 
     /* -------------------------------------------------------------- nav */

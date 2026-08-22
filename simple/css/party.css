@@ -374,6 +374,20 @@
   stroke-opacity: 0.85;
 }
 
+/*
+ * A contested seat is dashed rather than tinted.
+ *
+ * Opacity already carries how strong a lead is, and asking it to also carry
+ * "this is a toss-up" makes a close seat and a faint seat look the same. A
+ * broken outline says the boundary is not settled.
+ */
+.map-cell.is-contested {
+  stroke: var(--wheat);
+  stroke-width: 0.7;
+  stroke-opacity: 0.9;
+  stroke-dasharray: 1.6 1.2;
+}
+
 .legend-key {
   display: flex;
   gap: 8px;

@@ -446,10 +446,23 @@ check('3. with My Areas and Alliances above it',
 check('5. the map offers Punjab and its three regions',
   qq(dom, '.map-regions .term-option').length === 4,
   qq(dom, '.map-regions .term-option').map((n) => n.textContent).join('/'));
-check('23. and says what the three appearances mean',
-  !!q(dom, '.legend-key') && /won/i.test(q(dom, '.legend-key').textContent),
+check('23. and says what the four appearances mean',
+  !!q(dom, '.legend-key') &&
+  ['open', 'leading', 'contested', 'won']
+    .every((w) => new RegExp(w, 'i').test(q(dom, '.legend-key').textContent)),
   q(dom, '.legend-key') ? q(dom, '.legend-key').textContent : 'no key');
 check('1. the leaderboard is on it too', !!q(dom, '.lb'));
+
+/*
+ * 19. The money is in the header, and the card it replaced is gone.
+ *
+ * Not hidden, not emptied — removed. An empty bordered box under the round
+ * bar is a third of the saving given straight back.
+ */
+check('19. the finance card is gone from the tree', !q(dom, '.g-player'));
+check('1. and the round bar carries the money instead',
+  !!q(dom, '.round-aside') && qq(dom, '.round-aside .g-fig').length >= 3,
+  qq(dom, '.round-aside .g-fig-label').map((n) => n.textContent).join('/'));
 
 check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
 

@@ -1579,6 +1579,10 @@ CMP.campaign = (function () {
   function asActor(game, actor, fn) {
     var view = {
       support: game.support,
+      // Which seats are finished is a property of the board, not of the
+      // player looking at it. Leaving it out let an opponent campaign in a
+      // seat the player had already won.
+      wonSeats: game.wonSeats || {},
       partyId: actor.partyId,
       seed: game.seed,
       round: game.round,
@@ -1599,6 +1603,20 @@ CMP.campaign = (function () {
       if (view[k] !== undefined) actor[k] = view[k];
     });
     return out;
+  }
+
+  /**
+   * The entry cap as it applies to an opponent.
+   *
+   * Establishment is per party, so asking the player's own view would answer
+   * about the player. An opponent that skipped this cap would have its first
+   * move into every seat refused, which is not a handicap — it is an
+   * opponent that never plays.
+   */
+  function entryCapFor(game, actor, target, action) {
+    return asActor(game, actor, function (view) {
+      return entryCap(view, target, action);
+    });
   }
 
   /** Play one action for an opponent. Returns the report, or null. */
@@ -2171,6 +2189,7 @@ CMP.campaign = (function () {
     settleConflicts: settleConflicts,
     areaOf: areaOf,
     entryCap: entryCap,
+    entryCapFor: entryCapFor,
     isEstablishedIn: isEstablishedIn,
     isWon: isWon,
     wonBy: wonBy,

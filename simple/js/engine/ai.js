@@ -204,7 +204,7 @@ CMP.ai = (function () {
 
       // How much goes behind it: spread over the moves still to come, plus
       // whatever the region purse can add.
-      var amount = chooseAmount(opponent, action, round, target);
+      var amount = chooseAmount(game, opponent, action, round, target);
 
       var report = CMP.campaign.playAs(game, opponent, action.id, target, {
         outcome: rand(),
@@ -261,7 +261,7 @@ CMP.ai = (function () {
    * How much to put behind one move: cash divided by the moves still expected,
    * plus the region purse in full, clamped to what the action allows.
    */
-  function chooseAmount(opponent, action, round, target) {
+  function chooseAmount(game, opponent, action, round, target) {
     if (!action.allowsAmount) return null;
 
     // Spread over the moves still to come rather than the moves in a round,
@@ -279,7 +279,19 @@ CMP.ai = (function () {
     var pot = CMP.campaign.spendableOn(opponent, target);
     var budget = Math.floor(pot.cash / movesLeft) + pot.grant;
     var range = CMP.campaign.amountRange(action);
-    return Math.max(range.min, Math.min(range.max, budget));
+    var want = Math.max(range.min, Math.min(range.max, budget));
+
+    /*
+     * Getting in costs a crore, for opponents as much as for the player.
+     *
+     * Without this the first move into every seat is refused — and since an
+     * opponent that is refused stops for the round, and an opponent that never
+     * plays never becomes established, it would be refused for the whole
+     * election. On an empty board that is every opponent, every game.
+     */
+    var cap = CMP.campaign.entryCapFor(game, opponent, target, action);
+    if (cap > 0 && want > cap) want = Math.max(range.min, cap);
+    return want;
   }
 
   /**

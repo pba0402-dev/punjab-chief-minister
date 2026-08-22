@@ -251,14 +251,20 @@ CMP.ui.map = (function () {
         var won = CMP.campaign.wonBy(game, c.number);
 
         /*
-         * Three states, and they look like three states.
+         * Four states, and they look like four states.
          *
          * A seat that is won is the winner's colour at full strength with a
          * tick on it, because it is finished. A seat that is led is that
-         * colour faded by how close the race is. A seat nobody has been to is
+         * colour faded by how close the race is — and where the race is close
+         * enough to be a toss-up it is marked as contested, because a
+         * two-point lead and a thirty-point lead are different information
+         * and opacity alone does not carry it. A seat nobody has been to is
          * unclaimed ground — which, before round one, is all 117.
          */
+        var band = lead ? CMP.campaign.ratingFor(lead.margin) : null;
+
         node.classList.toggle('is-won', !!won);
+        node.classList.toggle('is-contested', !won && !!band && band.id === 'tossup');
         node.classList.toggle('is-selected', selected === c.number);
 
         if (won) {
@@ -273,7 +279,6 @@ CMP.ui.map = (function () {
         }
 
         var party = CMP.getParty(lead.partyId);
-        var band = CMP.campaign.ratingFor(lead.margin);
 
         node.setAttribute('fill', party.colour);
         node.setAttribute('fill-opacity', BAND_OPACITY[band.id]);
@@ -316,6 +321,7 @@ CMP.ui.map = (function () {
           el('span', { class: 'legend-key' }, [
             el('span', { class: 'legend-key-item', text: '○ open' }),
             el('span', { class: 'legend-key-item', text: '● leading' }),
+            el('span', { class: 'legend-key-item', text: '⚔ contested' }),
             el('span', { class: 'legend-key-item', text: '✓ won' }),
           ]),
           el('span', { class: 'legend-majority', text: 'majority ' + CMP.MAJORITY }),

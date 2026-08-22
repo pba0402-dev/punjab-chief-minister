@@ -13,6 +13,7 @@
  *   php tools/php-probe.php events <seed> <count>
  *   php tools/php-probe.php investigate <json-payload>
  *   php tools/php-probe.php rounds
+ *   php tools/php-probe.php airound <json-payload>
  */
 declare(strict_types=1);
 
@@ -23,6 +24,7 @@ require __DIR__ . '/../simple/api/lib/Campaign.php';
 require __DIR__ . '/../simple/api/lib/Rounds.php';
 require __DIR__ . '/../simple/api/lib/Coalition.php';
 require __DIR__ . '/../simple/api/lib/Investigation.php';
+require __DIR__ . '/../simple/api/lib/AI.php';
 
 $engine = new Campaign(__DIR__ . '/../simple/api/campaign-config.json');
 $cmd = $argv[1] ?? '';
@@ -88,6 +90,33 @@ switch ($cmd) {
                 $payload['actionId'],
                 $payload['target']
             ),
+        ]);
+        break;
+    }
+
+    /*
+     * One opponent's round, played by the server's own AI.
+     *
+     * Exists so the Node suite can hold the PHP opponents to the same
+     * guarantee as the JS ones: that a rich opponent late in the campaign
+     * still plays. The entry cap refuses a move that is too large, and a
+     * refused opponent stops for the round — so an opponent that does not
+     * budget against the cap goes quiet exactly when it matters.
+     */
+    case 'airound': {
+        $payload = json_decode($argv[2], true);
+        [$player, $board, $moves] = AI::takeRound(
+            $payload['player'],
+            $payload['board'],
+            $engine,
+            (string) ($payload['seed'] ?? 'probe'),
+            (int) ($payload['round'] ?? 1),
+            (array) ($payload['won'] ?? [])
+        );
+        echo json_encode([
+            'moves' => $moves,
+            'spent' => (int) ($player['spent'] ?? 0),
+            'cash' => (int) ($player['cash'] ?? 0),
         ]);
         break;
     }
