@@ -237,17 +237,17 @@ for (let i = 2; i <= 4; i++) {
   clients.push(c);
 }
 
-const PARTIES = ['Aam Aadmi Party', 'Indian National Congress', 'Bharatiya Janata Party', 'Shiromani Akali Dal'];
+const PARTIES = ['Punjab Development Party', 'Unity Punjab Front',
+  'Pind Vikas Manch', 'Sanjha Workers Alliance'];
 const NAMES = ['Simran Kaur Gill', 'Ravinder Singh Bajwa', 'Anita Sharma', 'Harjeet Singh Dhillon'];
 
 for (let i = 0; i < clients.length; i++) {
   const c = clients[i];
-  await c.until('party list', () => c.qq('.party-card').length >= 4);
-  c.click(c.qq('.party-card').find((b) => b.textContent.indexOf(PARTIES[i]) !== -1));
+  // Every player founds their own party: there is no list to claim from.
+  await c.until('party editor', () => !!c.q('.js-party-name'));
+  c.type(c.q('.js-party-name'), PARTIES[i]);
   await sleep(250);
-
-  const inputs = c.qq('.field-input');
-  c.type(inputs[0], NAMES[i]);
+  c.type(c.q('.js-candidate-name'), NAMES[i]);
   await sleep(900); // the details field debounces before it posts
   c.click(c.button('READY'));
   await sleep(250);
@@ -351,12 +351,25 @@ async function act(c, label) {
   c.click(open);
   await sleep(120);
 
-  const card = c.qq('.campaign-sheet .act').find((n) => {
+  /*
+   * The named action if it is affordable, otherwise the cheapest that is.
+   *
+   * A campaign that downed tools whenever its first choice was out of reach
+   * would be measuring the price list rather than the drill-down, and it
+   * varies: nobody starts with money, and what a round leaves behind depends
+   * on what the grants paid.
+   */
+  const affordable = c.qq('.campaign-sheet .act').filter((n) => {
+    const btn = n.querySelector('.act-use');
+    return btn && !btn.disabled;
+  });
+  const named = affordable.find((n) => {
     const t = n.querySelector('.act-name');
     return t && t.textContent === label;
   });
+  const card = named || affordable[affordable.length - 1];
   const use = card && card.querySelector('.act-use');
-  if (!use || use.disabled) {
+  if (!use) {
     const cancel = c.qq('.campaign-sheet button').find((b) => b.textContent === 'Cancel');
     if (cancel) c.click(cancel);
     return false;
@@ -522,7 +535,7 @@ for (let round = 1; round <= 20; round++) {
   if (lastBoard && lastBoard.newLeader) newLeaders++;
   if (lastBoard && !Object.keys(openingSeeds).length) {
     lastBoard.standings.forEach((row) => {
-      openingSeeds[row.party] = row.portraitSeed;
+      openingSeeds[row.party] = row.avatar;
     });
   }
   roundLog.push(
@@ -574,7 +587,7 @@ const finalBoard = host.game().lastResult;
 check('the scoreboard names four candidates', finalBoard.standings.length === 4);
 check('every candidate has a name', finalBoard.standings.every((x) => !!x.candidateName),
   JSON.stringify(finalBoard.standings.map((x) => x.candidateName)));
-check('every candidate has a portrait seed', finalBoard.standings.every((x) => !!x.portraitSeed));
+check('every candidate has a portrait seed', finalBoard.standings.every((x) => !!x.avatar));
 check('with four people playing there are no opponents to add',
   finalBoard.standings.filter((x) => x.isAI).length === 0,
   finalBoard.standings.filter((x) => x.isAI).length + ' AI');
@@ -590,7 +603,7 @@ console.log('     leader changed hands in ' + newLeaders + ' of ' + roundsSeen +
 
 const seedsNow = {};
 finalBoard.standings.forEach((x) => {
-  seedsNow[x.party] = x.portraitSeed;
+  seedsNow[x.party] = x.avatar;
 });
 check('portraits never changed during the campaign',
   Object.keys(seedsNow).every((party) => seedsNow[party] === openingSeeds[party]),

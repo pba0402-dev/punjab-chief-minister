@@ -42,7 +42,7 @@ CMP.ui.campaignSheet = (function () {
       }
       var support = game.support[seat];
       var ranked = CMP.campaign.standings(support);
-      var mine = support[game.partyId] || 0;
+      var mine = CMP.campaign.shareOf(support, game.partyId);
       var rival = ranked.filter(function (r) {
         return r.partyId !== game.partyId;
       })[0];
@@ -322,7 +322,7 @@ CMP.ui.campaignSheet = (function () {
         if (CMP.CONSTITUENCIES[i].number === Number(seat)) def = CMP.CONSTITUENCIES[i];
       }
       var support = game.support[seat] || {};
-      var after = support[game.partyId] || 0;
+      var after = CMP.campaign.shareOf(support, game.partyId);
       var party = CMP.getParty(game.partyId);
       var ranked = CMP.campaign.standings(support);
       var top = ranked[0];
@@ -346,18 +346,32 @@ CMP.ui.campaignSheet = (function () {
           el('h2', { class: 'sheet-title', text: def ? def.name : 'Result' }),
           el('p', { class: 'rs-headline', text: headline }),
 
-          el('div', { class: 'rs-moves' }, ranked.slice(0, 3).map(function (row) {
-            var p = CMP.getParty(row.partyId);
-            var was = row.partyId === game.partyId ? before : null;
-            return el('div', { class: 'rs-move', style: { '--party': p.colour } }, [
+          /*
+           * Where the seat stands now, for every campaign in the game.
+           *
+           * Parties with no presence here are shown as absent rather than
+           * left out: being unopposed in a seat is the most useful thing this
+           * screen can tell you, and an empty list would not say it.
+           */
+          el('div', { class: 'rs-moves' }, CMP.getParties().map(function (p) {
+            var row = ranked.filter(function (r) {
+              return r.partyId === p.id;
+            })[0];
+            var was = p.id === game.partyId ? before : null;
+            return el('div', {
+              class: 'rs-move' + (row ? '' : ' is-absent'),
+              style: { '--party': p.colour },
+            }, [
               el('span', { class: 'rs-move-party', text: p.short }),
-              el('span', { class: 'rs-move-value' }, was === null
-                ? [row.support.toFixed(1) + '%']
-                : [
-                    el('span', { class: 'rs-was', text: was.toFixed(1) + '%' }),
-                    ' → ',
-                    el('strong', { text: row.support.toFixed(1) + '%' }),
-                  ]),
+              el('span', { class: 'rs-move-value' }, !row
+                ? ['—']
+                : was === null
+                  ? [row.support.toFixed(1) + '%']
+                  : [
+                      el('span', { class: 'rs-was', text: was.toFixed(1) + '%' }),
+                      ' → ',
+                      el('strong', { text: row.support.toFixed(1) + '%' }),
+                    ]),
             ]);
           })),
 

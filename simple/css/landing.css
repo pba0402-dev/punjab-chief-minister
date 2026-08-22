@@ -127,7 +127,7 @@
 
 .av-picker {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 6px;
 }
 
@@ -195,3 +195,7 @@
 @media (max-width: 349px) {
   .av-picker { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* The faces are drawn on a dark ground of their own, so the ring around
+   them is the selection and not the edge of the picture. */
+.av-option .portrait { --portrait-bg: transparent; }

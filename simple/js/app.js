@@ -27,13 +27,27 @@ CMP.app = (function () {
   function mount(node) {
     root = node;
     var saved = CMP.storage.load();
-    if (saved) game = saved;
+    if (saved) adopt(saved);
     paint();
+  }
+
+  /**
+   * Point the party registry at this game.
+   *
+   * Parties belong to a game rather than to the game — they are invented at
+   * setup — so every screen that asks `CMP.getParty` is really asking about
+   * whichever election is open. This is the one place that gets set, and it
+   * has to happen before anything paints.
+   */
+  function adopt(next) {
+    game = next;
+    CMP.setParties((next && next.parties) || []);
+    return game;
   }
 
   /** The only writer of solo state, and the only place solo autosave runs. */
   function setGame(next, options) {
-    game = next;
+    adopt(next);
     if (game && (!options || options.save !== false)) CMP.storage.save(game);
     paint();
   }
@@ -145,7 +159,7 @@ CMP.app = (function () {
           partyId: game.partyId,
           candidateName: game.candidateName,
           slogan: game.slogan,
-          portraitSeed: game.portraitSeed,
+          avatar: game.avatar,
           seatsLed: game.seatsWon,
           cash: game.cash,
           spent: game.spent,
@@ -165,7 +179,7 @@ CMP.app = (function () {
             partyId: o.partyId,
             candidateName: o.candidateName,
             slogan: o.slogan,
-            portraitSeed: o.portraitSeed,
+            avatar: o.avatar,
             seatsLed: o.seatsLed,
             cash: o.cash,
             spent: o.spent,
@@ -280,8 +294,10 @@ CMP.app = (function () {
     mp.partyId = mine.partyId;
     mp.candidateName = mine.candidateName;
     mp.slogan = mine.slogan;
-    game = mp;
-    if (view.incumbency) game.incumbency = view.incumbency;
+    // The parties were invented by the people playing, so they arrive with
+    // the game rather than being known in advance.
+    mp.parties = view.parties || [];
+    adopt(mp);
     applyServerPlayer(mine);
 
     serverView = view;
@@ -367,7 +383,8 @@ CMP.app = (function () {
     mp.candidateName = mine.candidateName;
     mp.slogan = mine.slogan;
     mp.screen = 'election';
-    game = mp; // the server is the source of truth; nothing is saved locally
+    mp.parties = view.parties || [];
+    adopt(mp); // the server is the source of truth; nothing is saved locally
     applyServerGame(view);
     applyServerPlayer(mine);
     serverView = view;
@@ -502,7 +519,7 @@ CMP.app = (function () {
             goTo('setup');
             return;
           }
-          game = saved;
+          adopt(saved);
           // Through goTo, so resuming pulls the board in the same way
           // starting one does.
           goTo(saved.screen === 'election' ? 'election' : 'setup');
@@ -632,8 +649,12 @@ CMP.app = (function () {
   function applyServerGame(view) {
     if (!game || !view) return;
     if (view.board && typeof view.board === 'object') game.support = view.board;
-    if (view.incumbency) game.incumbency = view.incumbency;
     if (view.leaders) game.leaders = view.leaders;
+    // A player who joins late, or reconnects, gets the parties with the poll.
+    if (view.parties && view.parties.length) {
+      game.parties = view.parties;
+      CMP.setParties(view.parties);
+    }
     game.round = view.round || 1;
     game.roundsTotal = view.roundsTotal || CMP.ROUNDS.total;
     game.roundSeconds = view.roundSeconds || CMP.ROUNDS.seconds;

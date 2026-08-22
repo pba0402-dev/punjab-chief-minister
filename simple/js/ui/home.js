@@ -209,8 +209,8 @@ CMP.ui.home = (function () {
         el('ol', { class: 'h-board' }, rows.slice(0, 5).map(function (row, i) {
           return el('li', { class: 'h-board-row' }, [
             el('span', { class: 'h-board-rank', text: String(i + 1) }),
-            row.portraitSeed
-              ? CMP.ui.portrait.render(row.portraitSeed, 28, row.name)
+            row.avatar
+              ? CMP.ui.portrait.render(row.avatar, 28, row.name)
               : el('span', { class: 'h-board-blank' }),
             el('span', { class: 'h-board-name', text: row.name }),
             el('span', { class: 'h-board-score', text: row.score.toLocaleString('en-IN') }),
@@ -237,8 +237,8 @@ CMP.ui.home = (function () {
           }),
         ]),
         el('div', { class: 'h-profile' }, [
-          profile.portraitSeed
-            ? CMP.ui.portrait.render(profile.portraitSeed, 48, profile.name)
+          profile.avatar
+            ? CMP.ui.portrait.render(profile.avatar, 48, profile.name)
             : null,
           el('div', { class: 'h-profile-who' }, [
             el('strong', { class: 'h-profile-name', text: profile.name }),

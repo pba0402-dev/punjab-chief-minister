@@ -217,6 +217,16 @@ CMP.ui.map = (function () {
         if (!support) return;
 
         var lead = CMP.ui.constituency.leaderOf(support);
+
+        // A seat nobody has campaigned in is drawn as unclaimed ground rather
+        // than as somebody's — which, before round one, is all 117 of them.
+        if (!lead) {
+          node.setAttribute('fill', 'var(--line)');
+          node.setAttribute('fill-opacity', '0.35');
+          node.classList.toggle('is-selected', selected === c.number);
+          return;
+        }
+
         var party = CMP.getParty(lead.partyId);
         var band = CMP.campaign.ratingFor(lead.margin);
 
@@ -245,7 +255,7 @@ CMP.ui.map = (function () {
         var support = game.support[c.number];
         if (!support) return;
         var lead = CMP.ui.constituency.leaderOf(support);
-        counts[lead.partyId] = (counts[lead.partyId] || 0) + 1;
+        if (lead) counts[lead.partyId] = (counts[lead.partyId] || 0) + 1;
       });
 
       mount(
@@ -275,20 +285,22 @@ CMP.ui.map = (function () {
       }
       var support = game.support[num];
       var lead = CMP.ui.constituency.leaderOf(support);
-      var party = CMP.getParty(lead.partyId);
-      var band = CMP.campaign.ratingFor(lead.margin);
-      var sitting = CMP.getIncumbent(Number(num));
+      var party = lead ? CMP.getParty(lead.partyId) : null;
+      var band = lead ? CMP.campaign.ratingFor(lead.margin) : null;
 
       mount(readout, [
         el('span', { class: 'readout-ac', text: 'AC ' + def.number }),
         el('strong', { class: 'readout-name', text: def.name }),
-        el('span', {
-          class: 'readout-leading',
-          style: { '--party': party.colour, '--party-ink': party.ink },
-          text: party.short + ' LEADING',
-        }),
-        el('span', { class: 'readout-band rating-' + band.id, text: band.label }),
-        sitting ? el('span', { class: 'readout-mla', text: 'MLA: ' + sitting.mla + ' (' + sitting.party + ')' }) : null,
+        lead
+          ? el('span', {
+              class: 'readout-leading',
+              style: { '--party': party.colour, '--party-ink': party.ink },
+              text: party.short + ' LEADING',
+            })
+          : el('span', { class: 'readout-leading is-open', text: 'NO LEADER' }),
+        lead
+          ? el('span', { class: 'readout-band rating-' + band.id, text: band.label })
+          : el('span', { class: 'readout-band is-open', text: 'Uncontested' }),
       ]);
     }
 

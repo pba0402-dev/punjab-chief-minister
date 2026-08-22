@@ -41,17 +41,6 @@ CMP.campaign = (function () {
     return items[items.length - 1];
   }
 
-  /**
-   * Real incumbents include parties nobody plays (BSP) and independents.
-   * Those all sit under "Others" for game purposes; their real affiliation is
-   * still shown on the constituency screen.
-   */
-  function gamePartyFor(realPartyCode) {
-    var id = String(realPartyCode || '').toLowerCase();
-    var party = CMP.getParty(id);
-    return party && party.playable ? id : 'oth';
-  }
-
   function heatLevel(heat) {
     var levels = config().heat.levels;
     for (var i = 0; i < levels.length; i++) {
@@ -69,15 +58,57 @@ CMP.campaign = (function () {
     return ratings[ratings.length - 1];
   }
 
-  /** Sorted support for one constituency: [{partyId, support}, ...] desc. */
+  /**
+   * What a seat holds, as shares.
+   *
+   * A seat stores raw campaign influence — what has been spent and won there,
+   * accumulating — and never a percentage. A percentage is what that
+   * influence is *worth against the rest*, so it is worked out here and never
+   * stored: normalising into the board would mean a seat somebody had spent a
+   * crore in and a seat somebody had spent a lakh in read identically, and
+   * whoever campaigned first would keep a lead nobody could explain.
+   *
+   * A seat nobody has campaigned in has no shares at all, which is what
+   * "uncontested" means. It is the state every one of the 117 starts in.
+   *
+   * @return [{partyId, support}, ...] descending, empty for an untouched seat
+   */
   function standings(support) {
-    return Object.keys(support)
+    var ids = Object.keys(support || {});
+    var total = 0;
+    ids.forEach(function (id) {
+      total += Math.max(0, support[id] || 0);
+    });
+    if (total <= 0) return [];
+
+    return ids
+      .filter(function (id) {
+        return (support[id] || 0) > 0;
+      })
       .map(function (id) {
-        return { partyId: id, support: support[id] };
+        return { partyId: id, support: round1((support[id] / total) * 100) };
       })
       .sort(function (a, b) {
-        return b.support - a.support;
+        return b.support - a.support || (a.partyId < b.partyId ? -1 : 1);
       });
+  }
+
+  /** True once anybody has campaigned in a seat. */
+  function isContested(support) {
+    var ids = Object.keys(support || {});
+    for (var i = 0; i < ids.length; i++) {
+      if ((support[ids[i]] || 0) > 0) return true;
+    }
+    return false;
+  }
+
+  /** One party's share of a seat, as a percentage. Zero if untouched. */
+  function shareOf(support, partyId) {
+    var ranked = standings(support);
+    for (var i = 0; i < ranked.length; i++) {
+      if (ranked[i].partyId === partyId) return ranked[i].support;
+    }
+    return 0;
   }
 
   /**
@@ -87,8 +118,27 @@ CMP.campaign = (function () {
   function seatView(game, number) {
     var support = game.support[number];
     if (!support) return null;
+
     var ranked = standings(support);
-    var mine = support[game.partyId] || 0;
+
+    // Nobody has campaigned here. There is no leader, no margin and no rating,
+    // and saying "behind by 0" about a seat nobody has touched would be a
+    // reading of a number that does not exist.
+    if (!ranked.length) {
+      return {
+        number: number,
+        contested: false,
+        player: 0,
+        opponentId: null,
+        opponent: 0,
+        leaderId: null,
+        leading: false,
+        margin: 0,
+        rating: null,
+      };
+    }
+
+    var mine = shareOf(support, game.partyId);
     var best = null;
     for (var i = 0; i < ranked.length; i++) {
       if (ranked[i].partyId !== game.partyId) {
@@ -99,6 +149,7 @@ CMP.campaign = (function () {
     var margin = Math.abs(ranked[0].support - (ranked[1] ? ranked[1].support : 0));
     return {
       number: number,
+      contested: true,
       player: mine,
       opponentId: best ? best.partyId : null,
       opponent: best ? best.support : 0,
@@ -922,6 +973,9 @@ CMP.campaign = (function () {
     var out = {};
     Object.keys(support).forEach(function (key) {
       var ranked = standings(support[key]);
+      // An uncontested seat has no leader, and is left out rather than
+      // recorded as led by nobody — every consumer already treats a missing
+      // key as "not yours".
       if (ranked.length) out[key] = ranked[0].partyId;
     });
     return out;
@@ -970,7 +1024,7 @@ CMP.campaign = (function () {
         party: party.id,
         playerId: mine ? 'you' : (opponent ? opponent.id : null),
         candidateName: mine ? game.candidateName : (opponent ? opponent.candidateName : null),
-        portraitSeed: mine ? game.portraitSeed : (opponent ? opponent.portraitSeed : null),
+        avatar: mine ? game.avatar : (opponent ? opponent.avatar : null),
         isAI: !mine,
         seats: counts[party.id] || 0,
         change: (counts[party.id] || 0) - before,
@@ -1424,23 +1478,38 @@ CMP.campaign = (function () {
       if (targetParty) applied.opponent = shift(support, targetParty, outcome.opponentSupport);
     }
 
-    normalise(support);
     return applied;
   }
 
-  /** Add `delta` to one party, taking it from (or giving it to) the others. */
+  /**
+   * Move one party's influence in a seat.
+   *
+   * Raw and cumulative: campaigning builds influence rather than taking a
+   * percentage off somebody, because there is no percentage to take until at
+   * least one campaign has been somewhere. It floors at zero — an attack that
+   * would drive a rival below nothing simply removes what they had — and has
+   * no ceiling, because outspending everybody in one seat is a real and
+   * expensive thing to do.
+   */
   function shift(support, partyId, delta) {
     var before = support[partyId] || 0;
-    var after = clamp(before + delta, 1, 95);
+    var after = Math.max(0, round1(before + delta));
     support[partyId] = after;
-    return after - before;
+    return round1(after - before);
   }
 
+  /**
+   * Scale a share map so it sums to 100.
+   *
+   * Only election day needs this: it rolls noise over the final shares and
+   * then has to hand back something that reads as a result. The live board is
+   * never normalised — see `standings`.
+   */
   function normalise(support) {
     var ids = Object.keys(support);
     var total = 0;
     ids.forEach(function (id) {
-      support[id] = Math.max(0.5, support[id]);
+      support[id] = Math.max(0, support[id]);
       total += support[id];
     });
     if (total <= 0) return;
@@ -1503,7 +1572,6 @@ CMP.campaign = (function () {
     for (var i = 0; i < count; i++) {
       var number = ordered[i];
       shift(game.support[number], game.partyId, consequence.support);
-      normalise(game.support[number]);
       hit.push(Number(number));
     }
     return hit;
@@ -1535,10 +1603,38 @@ CMP.campaign = (function () {
       })
       .forEach(function (number) {
         var seat = game.support[number];
-        var final = {};
+
+        /*
+         * Polling day works on shares, not on raw influence: what decides a
+         * seat is how the campaigns stand against each other in it, and the
+         * noise has to be in the same units as the thing it disturbs.
+         *
+         * But part of every seat is still undecided, and that part is larger
+         * the less work has been done there. One rally in an untouched seat
+         * reads as 100% of a seat almost nobody has been reached in, and
+         * without this the whole board could be won by turning up once
+         * everywhere. See campaign-config.json.
+         */
+        var influence = 0;
         Object.keys(seat).forEach(function (id) {
-          final[id] = Math.max(0.5, seat[id] + (rand() - 0.5) * 2 * cfg.seatNoise);
+          influence += Math.max(0, seat[id] || 0);
         });
+        var k = cfg.undecidedWeight || 0;
+        var undecided = k > 0 ? k / (k + influence) : 0;
+
+        var final = {};
+        CMP.PARTIES.forEach(function (party) {
+          final[party.id] = undecided * 100 * rand();
+        });
+        standings(seat).forEach(function (row) {
+          final[row.partyId] = (final[row.partyId] || 0) +
+            (1 - undecided) * row.support +
+            (rand() - 0.5) * 2 * cfg.seatNoise;
+        });
+        Object.keys(final).forEach(function (id) {
+          final[id] = Math.max(0.01, final[id]);
+        });
+
         normalise(final);
 
         var ranked = standings(final);
@@ -1625,7 +1721,6 @@ CMP.campaign = (function () {
     var n = Math.min(Math.max(1, count), numbers.length);
     for (var i = 0; i < n; i++) {
       shift(game.support[numbers[i]], game.partyId, delta);
-      normalise(game.support[numbers[i]]);
       hit.push(Number(numbers[i]));
     }
     return hit;
@@ -1677,13 +1772,19 @@ CMP.campaign = (function () {
     return game.seatTotals;
   }
 
-  /** Mean support across the whole board, for one party. */
+  /**
+   * Mean share across the whole board, for one party.
+   *
+   * Averaged over every seat, contested or not, so a party leading three
+   * seats out of 117 does not read as though it were on 90% statewide. An
+   * uncontested seat contributes nothing to anybody.
+   */
   function averageSupport(support, partyId) {
     var numbers = Object.keys(support || {});
     if (!numbers.length || !partyId) return 0;
     var total = 0;
     numbers.forEach(function (n) {
-      total += support[n][partyId] || 0;
+      total += shareOf(support[n], partyId);
     });
     return round1(total / numbers.length);
   }
@@ -1766,9 +1867,10 @@ CMP.campaign = (function () {
     seatView: seatView,
     seatsLed: seatsLed,
     standings: standings,
+    isContested: isContested,
+    shareOf: shareOf,
     reviewField: reviewField,
     weightedPick: weightedPick,
-    gamePartyFor: gamePartyFor,
     normalise: normalise,
   };
 })();

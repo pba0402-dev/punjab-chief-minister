@@ -27,8 +27,8 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const f of [
   'js/data/parties.js',
+  'js/data/avatars.js',
   'js/data/constituencies.js',
-  'js/data/incumbents.js',
   'js/data/regions.js',
   'js/data/actions.js',
   'js/engine/rng.js',

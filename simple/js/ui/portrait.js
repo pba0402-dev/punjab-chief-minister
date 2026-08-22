@@ -1,21 +1,23 @@
 /**
- * Candidate portraits.
+ * Faces.
  * ------------------------------------------------------------------
- * Every candidate on the scoreboard has a face, so four players are told apart
- * at a glance rather than by reading four party codes.
+ * Twenty-four candidates, each one drawn here rather than assembled from a
+ * seed. That is a deliberate change from what this file used to do: a
+ * generator gives you unlimited faces and no good ones, because nobody ever
+ * looks at any single result and decides it is right. These were drawn one at
+ * a time and looked at.
  *
- * These are DRAWN, not photographed. Each portrait is a small piece of vector
- * illustration built from a seed: a face shape, a skin tone, a turban or hair,
- * a beard, sometimes glasses, sometimes the lines of an older face. That is a
- * deliberate choice rather than a shortcut. A photographic portrait of a
- * fictional candidate would sooner or later resemble somebody real, and this
- * game already puts real sitting MLAs on screen as reference — a drawn face
- * can never be mistaken for one of them, and nothing here is derived from any
- * real person's likeness.
+ * They are invented people. Not one is drawn from a photograph, a real
+ * candidate or a real officeholder, and the set exists precisely so that the
+ * game never needs a photograph of anybody. What they are meant to look like
+ * is a cast: a range of ages, of dress, of bearing, the sort of people who
+ * would plausibly be standing for something in Punjab — turbaned and
+ * bare-headed, in a dupatta and in a jacket, thirty and seventy.
  *
- * The seed is assigned once, when a player sits down, and stored with the
- * game. The same seed always draws the same face, so a candidate looks the
- * same in round one, in round fifteen, and after a disconnection and a rejoin.
+ * Every one is drawn on the same 100-unit square with the same construction —
+ * shoulders, neck, head, hair, features — so a grid of them reads as one cast
+ * and not as twenty-four separate drawings. What varies between them is the
+ * numbers, which is what makes them a set.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -23,333 +25,562 @@ CMP.ui = CMP.ui || {};
 CMP.ui.portrait = (function () {
   'use strict';
 
-  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var svg = CMP.ui.dom.svg;
 
-  /* Warm, muted tones. Deliberately a range, so four candidates in a row do
-     not look like the same person in four hats. */
-  var SKIN = [
-    { base: '#e8b98d', shade: '#cf9d70', line: '#a97a52' },
-    { base: '#d9a274', shade: '#bd8659', line: '#96653f' },
-    { base: '#c68a5c', shade: '#a97046', line: '#83522f' },
-    { base: '#a9714a', shade: '#8c5936', line: '#6b4025' },
-    { base: '#f0cba6', shade: '#d9b088', line: '#b08a63' },
+  /* ---------------------------------------------------------- materials */
+
+  // Skin, hair and cloth, kept as small named ranges rather than free colour,
+  // so that a new face cannot land outside the palette the rest sit in.
+  var SKIN = {
+    light: { base: '#E8C39E', shade: '#D2A87F', line: '#8A6B4C' },
+    warm: { base: '#DDAE81', shade: '#C4926A', line: '#7C5B3E' },
+    mid: { base: '#C68C5F', shade: '#AB744C', line: '#68452B' },
+    deep: { base: '#A9714A', shade: '#8D5B3A', line: '#553320' },
+    rich: { base: '#8A5836', shade: '#6F452A', line: '#3F2416' },
+  };
+
+  var HAIR = {
+    black: '#1E1A18',
+    dark: '#2E2521',
+    brown: '#4A362A',
+    grey: '#7E7873',
+    silver: '#B9B4AE',
+    white: '#D9D5D0',
+  };
+
+  /* ------------------------------------------------------------ the cast */
+
+  /*
+   * One entry per candidate.
+   *
+   * head    face width and jaw: wide/oval/narrow, and how square the jaw is
+   * skin    a key into SKIN
+   * hair    style + colour. 'turban' takes a cloth colour of its own.
+   * brow    thickness and angle, which does most of the work of an expression
+   * beard   none | stubble | short | full | flowing | moustache
+   * eyes    how open, and whether there are lines at the corners
+   * age     0 young, 1 middle, 2 older — drives lines, not colour
+   * dress   kurta | jacket | shawl | dupatta | waistcoat
+   * cloth   the garment colour
+   */
+  var CAST = [
+    { id: 'a1', head: [1.00, 0.55], skin: 'warm', hair: { style: 'turban', colour: '#D8562F' },
+      brow: [3.2, -2], beard: 'full', beardColour: 'black', eyes: [1.0, 0], age: 1,
+      dress: 'kurta', cloth: '#2C3A52' },
+
+    { id: 'a2', head: [0.94, 0.35], skin: 'light', hair: { style: 'bun', colour: 'black' },
+      brow: [2.4, -1], beard: 'none', eyes: [1.05, 0], age: 0,
+      dress: 'dupatta', cloth: '#B24A6B' },
+
+    { id: 'a3', head: [1.03, 0.7], skin: 'mid', hair: { style: 'turban', colour: '#2F6DA8' },
+      brow: [3.6, 1], beard: 'flowing', beardColour: 'grey', eyes: [0.9, 1], age: 2,
+      dress: 'shawl', cloth: '#6B6154' },
+
+    { id: 'a4', head: [0.96, 0.45], skin: 'deep', hair: { style: 'short', colour: 'black' },
+      brow: [3.0, -1], beard: 'stubble', beardColour: 'black', eyes: [1.0, 0], age: 0,
+      dress: 'jacket', cloth: '#243447' },
+
+    { id: 'a5', head: [0.92, 0.3], skin: 'warm', hair: { style: 'long', colour: 'dark' },
+      brow: [2.2, 0], beard: 'none', eyes: [1.05, 0], age: 1,
+      dress: 'dupatta', cloth: '#3E7A63' },
+
+    { id: 'a6', head: [1.05, 0.65], skin: 'light', hair: { style: 'turban', colour: '#E0B227' },
+      brow: [3.4, 0], beard: 'full', beardColour: 'dark', eyes: [0.95, 0], age: 1,
+      dress: 'waistcoat', cloth: '#3B3F4C' },
+
+    { id: 'a7', head: [0.90, 0.4], skin: 'rich', hair: { style: 'bun', colour: 'black' },
+      brow: [2.6, -2], beard: 'none', eyes: [1.0, 0], age: 1,
+      dress: 'jacket', cloth: '#5B3A6E' },
+
+    { id: 'a8', head: [1.02, 0.6], skin: 'mid', hair: { style: 'receding', colour: 'grey' },
+      brow: [3.0, 1], beard: 'moustache', beardColour: 'grey', eyes: [0.9, 1], age: 2,
+      dress: 'kurta', cloth: '#8C8272' },
+
+    { id: 'a9', head: [0.98, 0.5], skin: 'warm', hair: { style: 'turban', colour: '#3E7A63' },
+      brow: [3.2, -1], beard: 'short', beardColour: 'black', eyes: [1.0, 0], age: 0,
+      dress: 'kurta', cloth: '#C9C2B4' },
+
+    { id: 'a10', head: [0.93, 0.35], skin: 'light', hair: { style: 'short', colour: 'brown' },
+      brow: [2.4, 0], beard: 'none', eyes: [1.05, 0], age: 0,
+      dress: 'jacket', cloth: '#2E5F86' },
+
+    { id: 'a11', head: [1.06, 0.72], skin: 'deep', hair: { style: 'turban', colour: '#7A4E9E' },
+      brow: [3.6, 2], beard: 'flowing', beardColour: 'silver', eyes: [0.85, 1], age: 2,
+      dress: 'shawl', cloth: '#4A4238' },
+
+    { id: 'a12', head: [0.91, 0.32], skin: 'mid', hair: { style: 'long', colour: 'black' },
+      brow: [2.5, -1], beard: 'none', eyes: [1.0, 0], age: 0,
+      dress: 'dupatta', cloth: '#C4763A' },
+
+    { id: 'a13', head: [1.00, 0.58], skin: 'light', hair: { style: 'swept', colour: 'dark' },
+      brow: [3.0, -2], beard: 'stubble', beardColour: 'dark', eyes: [1.0, 0], age: 1,
+      dress: 'waistcoat', cloth: '#2F4038' },
+
+    { id: 'a14', head: [0.95, 0.42], skin: 'rich', hair: { style: 'turban', colour: '#B9B4AE' },
+      brow: [3.2, 0], beard: 'full', beardColour: 'white', eyes: [0.88, 1], age: 2,
+      dress: 'kurta', cloth: '#D6CFC0' },
+
+    { id: 'a15', head: [0.92, 0.36], skin: 'warm', hair: { style: 'bun', colour: 'grey' },
+      brow: [2.4, 1], beard: 'none', eyes: [0.92, 1], age: 2,
+      dress: 'shawl', cloth: '#7C6E8C' },
+
+    { id: 'a16', head: [1.04, 0.68], skin: 'mid', hair: { style: 'short', colour: 'black' },
+      brow: [3.4, -2], beard: 'short', beardColour: 'black', eyes: [1.0, 0], age: 1,
+      dress: 'jacket', cloth: '#1F3B52' },
+
+    { id: 'a17', head: [0.97, 0.48], skin: 'light', hair: { style: 'turban', colour: '#2B7C8C' },
+      brow: [3.0, 0], beard: 'moustache', beardColour: 'dark', eyes: [1.0, 0], age: 1,
+      dress: 'kurta', cloth: '#B4A88E' },
+
+    { id: 'a18', head: [0.90, 0.3], skin: 'deep', hair: { style: 'long', colour: 'dark' },
+      brow: [2.6, -1], beard: 'none', eyes: [1.05, 0], age: 1,
+      dress: 'dupatta', cloth: '#2F6F5E' },
+
+    { id: 'a19', head: [1.01, 0.62], skin: 'warm', hair: { style: 'receding', colour: 'silver' },
+      brow: [3.2, 2], beard: 'full', beardColour: 'silver', eyes: [0.85, 1], age: 2,
+      dress: 'waistcoat', cloth: '#544C42' },
+
+    { id: 'a20', head: [0.94, 0.38], skin: 'rich', hair: { style: 'short', colour: 'black' },
+      brow: [2.8, -1], beard: 'stubble', beardColour: 'black', eyes: [1.0, 0], age: 0,
+      dress: 'kurta', cloth: '#A8452F' },
+
+    { id: 'a21', head: [0.99, 0.54], skin: 'mid', hair: { style: 'turban', colour: '#C9A227' },
+      brow: [3.4, -1], beard: 'flowing', beardColour: 'black', eyes: [0.95, 0], age: 1,
+      dress: 'shawl', cloth: '#3A4A5C' },
+
+    { id: 'a22', head: [0.91, 0.34], skin: 'light', hair: { style: 'bun', colour: 'brown' },
+      brow: [2.4, 0], beard: 'none', eyes: [1.05, 0], age: 1,
+      dress: 'jacket', cloth: '#8C4A6E' },
+
+    { id: 'a23', head: [1.03, 0.66], skin: 'deep', hair: { style: 'swept', colour: 'grey' },
+      brow: [3.2, 1], beard: 'moustache', beardColour: 'grey', eyes: [0.9, 1], age: 2,
+      dress: 'jacket', cloth: '#33465E' },
+
+    { id: 'a24', head: [0.96, 0.44], skin: 'warm', hair: { style: 'turban', colour: '#D9D5D0' },
+      brow: [3.0, -1], beard: 'short', beardColour: 'dark', eyes: [1.0, 0], age: 0,
+      dress: 'kurta', cloth: '#4A6E8C' },
   ];
 
-  var TURBAN = [
-    { base: '#2f6fb5', shade: '#245691' },
-    { base: '#c8552f', shade: '#a44124' },
-    { base: '#e0e3e8', shade: '#c1c6ce' },
-    { base: '#3f8a5c', shade: '#2f6b46' },
-    { base: '#8b4a8f', shade: '#6f3a72' },
-    { base: '#d8a72c', shade: '#b3881f' },
-    { base: '#3a3f4a', shade: '#2a2e37' },
-    { base: '#b8332f', shade: '#932623' },
-  ];
+  function faceFor(id) {
+    for (var i = 0; i < CAST.length; i++) {
+      if (CAST[i].id === id) return CAST[i];
+    }
+    return CAST[0];
+  }
 
-  var HAIR = [
-    { base: '#241c15', shade: '#171009' },
-    { base: '#3b2f24', shade: '#2a2018' },
-    { base: '#6b6259', shade: '#544c44' },
-    { base: '#9a948c', shade: '#7d766e' },
-    { base: '#cfcac3', shade: '#aca69f' },
-  ];
+  /* ---------------------------------------------------------- the pencil */
 
-  var KURTA = [
-    { base: '#f2efe8', shade: '#d9d5cc' },
-    { base: '#dfe6ee', shade: '#c3ccd6' },
-    { base: '#e6ded2', shade: '#cbc2b4' },
-    { base: '#d5dcd6', shade: '#b9c1ba' },
-    { base: '#efe2dd', shade: '#d3c4be' },
-  ];
+  function p(tag, attrs) {
+    return svg(tag, attrs);
+  }
+
+  function ellipse(cx, cy, rx, ry, fill, extra) {
+    var a = { cx: String(cx), cy: String(cy), rx: String(rx), ry: String(ry), fill: fill };
+    if (extra) Object.keys(extra).forEach(function (k) { a[k] = extra[k]; });
+    return p('ellipse', a);
+  }
+
+  function shape(d, fill, extra) {
+    var a = { d: d, fill: fill || 'none' };
+    if (extra) Object.keys(extra).forEach(function (k) { a[k] = extra[k]; });
+    return p('path', a);
+  }
+
+  function stroke(d, colour, width, extra) {
+    return shape(d, 'none', Object.assign({
+      stroke: colour,
+      'stroke-width': String(width),
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+    }, extra || {}));
+  }
+
+  /* ------------------------------------------------------------ the head */
 
   /**
-   * A tiny deterministic stream. Not the game's RNG: portraits never touch
-   * gameplay, and keeping them off that stream means adding a face can never
-   * shift a single campaign roll.
+   * Hair, which is where most of the difference between two faces lives.
+   *
+   * A turban is drawn as a wrapped volume with a visible fold and a front
+   * knot, sitting on the brow rather than perched on top — a band across the
+   * forehead reads as a hat, and this is not a hat.
    */
-  function stream(seed) {
-    var h = 2166136261;
-    var text = String(seed == null ? '' : seed);
-    for (var i = 0; i < text.length; i++) {
-      h ^= text.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return function () {
-      h += 0x6d2b79f5;
-      var t = h;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
+  function hairFor(f, w, skin) {
+    var colour = HAIR[f.hair.colour] || f.hair.colour;
+    var style = f.hair.style;
 
-  /** The features one seed describes. Pure data — useful for testing. */
-  function describe(seed) {
-    var next = stream(seed);
-    var pick = function (list) {
-      return list[Math.floor(next() * list.length) % list.length];
-    };
-
-    var wearsTurban = next() < 0.55;
-    var age = 0.3 + next() * 0.6; // 0 young, 1 old
-
-    return {
-      skin: pick(SKIN),
-      turban: wearsTurban ? pick(TURBAN) : null,
-      hair: wearsTurban ? null : pick(HAIR),
-      beard: wearsTurban
-        ? (next() < 0.75 ? 'full' : 'short')
-        : ['none', 'stubble', 'short', 'full'][Math.floor(next() * 4) % 4],
-      moustache: next() < 0.8,
-      glasses: next() < 0.35 ? (next() < 0.5 ? 'round' : 'square') : null,
-      kurta: pick(KURTA),
-      jaw: 0.85 + next() * 0.3,
-      age: age,
-      greying: age > 0.65,
-      brow: next() < 0.5,
-    };
-  }
-
-  function node(tag, attrs) {
-    var el = document.createElementNS(SVG_NS, tag);
-    Object.keys(attrs || {}).forEach(function (k) {
-      el.setAttribute(k, attrs[k]);
-    });
-    return el;
-  }
-
-  /**
-   * Draw one portrait. `size` is the pixel width; the drawing is square.
-   * Head and shoulders, centred, on a plain ground — the composition of an
-   * official candidate photograph, without being one.
-   */
-  function render(seed, size, label) {
-    var f = describe(seed);
-    var svg = node('svg', {
-      viewBox: '0 0 100 100',
-      width: size || 48,
-      height: size || 48,
-      class: 'portrait',
-      role: 'img',
-      'aria-label': label ? 'Illustration of ' + label : 'Candidate illustration',
-    });
-
-    var id = 'pt' + Math.abs(Math.floor(stream(seed)() * 1e9)).toString(36);
-
-    var defs = node('defs', {});
-    var clip = node('clipPath', { id: id + 'c' });
-    clip.appendChild(node('circle', { cx: 50, cy: 50, r: 50 }));
-    defs.appendChild(clip);
-
-    var grad = node('linearGradient', { id: id + 'g', x1: 0, y1: 0, x2: 0, y2: 1 });
-    grad.appendChild(node('stop', { offset: '0', 'stop-color': '#3a3630' }));
-    grad.appendChild(node('stop', { offset: '1', 'stop-color': '#221f1a' }));
-    defs.appendChild(grad);
-    svg.appendChild(defs);
-
-    var g = node('g', { 'clip-path': 'url(#' + id + 'c)' });
-    svg.appendChild(g);
-
-    // Ground
-    g.appendChild(node('rect', { x: 0, y: 0, width: 100, height: 100, fill: 'url(#' + id + 'g)' }));
-
-    // Shoulders and kurta
-    g.appendChild(node('path', {
-      d: 'M50 66 C26 66 12 80 8 100 L92 100 C88 80 74 66 50 66 Z',
-      fill: f.kurta.base,
-    }));
-    g.appendChild(node('path', {
-      d: 'M50 68 L42 100 L58 100 Z',
-      fill: f.kurta.shade,
-    }));
-    // Collar
-    g.appendChild(node('path', {
-      d: 'M42 68 L50 80 L58 68 L54 66 L50 74 L46 66 Z',
-      fill: f.kurta.shade,
-    }));
-
-    // Neck
-    g.appendChild(node('path', { d: 'M42 56 L42 70 Q50 76 58 70 L58 56 Z', fill: f.skin.shade }));
-
-    // Ears
-    g.appendChild(node('ellipse', { cx: 27, cy: 46, rx: 4, ry: 6, fill: f.skin.shade }));
-    g.appendChild(node('ellipse', { cx: 73, cy: 46, rx: 4, ry: 6, fill: f.skin.shade }));
-
-    // Head
-    var jawW = 23 * f.jaw;
-    g.appendChild(node('path', {
-      d: 'M50 18 C' + (50 + jawW) + ' 18 ' + (50 + jawW) + ' 34 ' + (50 + jawW) + ' 42' +
-        ' C' + (50 + jawW) + ' 58 ' + (50 + jawW * 0.6) + ' 66 50 66' +
-        ' C' + (50 - jawW * 0.6) + ' 66 ' + (50 - jawW) + ' 58 ' + (50 - jawW) + ' 42' +
-        ' C' + (50 - jawW) + ' 34 ' + (50 - jawW) + ' 18 50 18 Z',
-      fill: f.skin.base,
-    }));
-
-    // Brow shadow
-    g.appendChild(node('path', {
-      d: 'M32 38 Q50 32 68 38 L68 41 Q50 36 32 41 Z',
-      fill: f.skin.shade,
-      opacity: '0.35',
-    }));
-
-    // Eyes
-    [39, 61].forEach(function (x) {
-      g.appendChild(node('ellipse', { cx: x, cy: 44, rx: 4.4, ry: 2.6, fill: '#f6f2ea' }));
-      g.appendChild(node('circle', { cx: x, cy: 44, r: 1.9, fill: '#2b1f14' }));
-      g.appendChild(node('circle', { cx: x + 0.6, cy: 43.3, r: 0.6, fill: '#ffffff', opacity: '0.8' }));
-    });
-
-    // Eyebrows
-    var browY = f.brow ? 38 : 39;
-    var browColour = f.greying ? '#8d867d' : (f.hair ? f.hair.base : '#2a2119');
-    g.appendChild(node('path', {
-      d: 'M33 ' + browY + ' Q39 ' + (browY - 2.6) + ' 44.5 ' + browY,
-      stroke: browColour, 'stroke-width': 2.2, fill: 'none', 'stroke-linecap': 'round',
-    }));
-    g.appendChild(node('path', {
-      d: 'M55.5 ' + browY + ' Q61 ' + (browY - 2.6) + ' 67 ' + browY,
-      stroke: browColour, 'stroke-width': 2.2, fill: 'none', 'stroke-linecap': 'round',
-    }));
-
-    // Nose
-    g.appendChild(node('path', {
-      d: 'M50 46 L47 54 Q50 56 53 54 Z',
-      fill: f.skin.shade, opacity: '0.75',
-    }));
-
-    // Age lines
-    if (f.age > 0.6) {
-      g.appendChild(node('path', {
-        d: 'M35 52 Q39 55 43 53', stroke: f.skin.line, 'stroke-width': 0.8,
-        fill: 'none', opacity: '0.5',
-      }));
-      g.appendChild(node('path', {
-        d: 'M57 53 Q61 55 65 52', stroke: f.skin.line, 'stroke-width': 0.8,
-        fill: 'none', opacity: '0.5',
-      }));
+    if (style === 'turban') {
+      var cloth = f.hair.colour && f.hair.colour.charAt(0) === '#'
+        ? f.hair.colour
+        : (HAIR[f.hair.colour] || '#D8562F');
+      return [
+        // The wrapped mass, wider than the head and coming down to the brow.
+        shape('M' + (50 - 25 * w) + ' 42 C' + (50 - 27 * w) + ' 16 ' +
+              (50 - 14 * w) + ' 8 50 8 C' + (50 + 14 * w) + ' 8 ' +
+              (50 + 27 * w) + ' 16 ' + (50 + 25 * w) + ' 42 ' +
+              'C' + (50 + 18 * w) + ' 34 ' + (50 - 18 * w) + ' 34 ' +
+              (50 - 25 * w) + ' 42 Z', cloth),
+        // Two folds, which is what makes it cloth rather than a dome.
+        stroke('M' + (50 - 22 * w) + ' 33 C' + (50 - 10 * w) + ' 22 ' +
+               (50 + 10 * w) + ' 22 ' + (50 + 22 * w) + ' 33',
+               'rgba(0,0,0,0.22)', 1.6),
+        stroke('M' + (50 - 20 * w) + ' 26 C' + (50 - 8 * w) + ' 16 ' +
+               (50 + 8 * w) + ' 16 ' + (50 + 20 * w) + ' 26',
+               'rgba(255,255,255,0.16)', 1.6),
+        // The front knot.
+        shape('M' + (50 - 4 * w) + ' 16 L50 9 L' + (50 + 4 * w) + ' 16 ' +
+              'L50 20 Z', 'rgba(0,0,0,0.18)'),
+      ];
     }
 
-    // Mouth
-    g.appendChild(node('path', {
-      d: 'M44 59 Q50 62 56 59',
-      stroke: f.skin.line, 'stroke-width': 1.4, fill: 'none', 'stroke-linecap': 'round',
-    }));
+    if (style === 'bun') {
+      return [
+        // The bun itself, behind the crown.
+        ellipse(50, 15, 10.5, 8.5, colour),
+        // Hair over the crown and down past the ears, parted rather than
+        // dropped over the brow — a cap that reaches the eyebrows reads as a
+        // helmet, which is what this used to look like.
+        shape('M' + (50 - 25 * w) + ' 38 C' + (50 - 27 * w) + ' 17 ' +
+              (50 - 13 * w) + ' 11 50 11 C' + (50 + 13 * w) + ' 11 ' +
+              (50 + 27 * w) + ' 17 ' + (50 + 25 * w) + ' 38 ' +
+              'C' + (50 + 23 * w) + ' 30 ' + (50 + 17 * w) + ' 25 ' +
+              (50 + 6 * w) + ' 24 C' + (50 + 2 * w) + ' 27 ' +
+              (50 - 2 * w) + ' 27 ' + (50 - 6 * w) + ' 24 ' +
+              'C' + (50 - 17 * w) + ' 25 ' + (50 - 23 * w) + ' 30 ' +
+              (50 - 25 * w) + ' 38 Z', colour),
+      ];
+    }
 
-    var facial = f.greying
-      ? { base: '#b8b2aa', shade: '#9a938b' }
-      : (f.hair || { base: '#241c15', shade: '#171009' });
+    if (style === 'long') {
+      return [
+        shape('M' + (50 - 27 * w) + ' 68 C' + (50 - 31 * w) + ' 30 ' +
+              (50 - 24 * w) + ' 12 50 12 C' + (50 + 24 * w) + ' 12 ' +
+              (50 + 31 * w) + ' 30 ' + (50 + 27 * w) + ' 68 ' +
+              'L' + (50 + 22 * w) + ' 68 C' + (50 + 24 * w) + ' 36 ' +
+              (50 + 20 * w) + ' 28 50 28 C' + (50 - 20 * w) + ' 28 ' +
+              (50 - 24 * w) + ' 36 ' + (50 - 22 * w) + ' 68 Z', colour),
+      ];
+    }
 
-    // Beard
+    if (style === 'receding') {
+      return [
+        shape('M' + (50 - 24 * w) + ' 34 C' + (50 - 25 * w) + ' 20 ' +
+              (50 - 14 * w) + ' 17 ' + (50 - 8 * w) + ' 20 ' +
+              'C' + (50 - 4 * w) + ' 18 ' + (50 + 4 * w) + ' 18 ' +
+              (50 + 8 * w) + ' 20 C' + (50 + 14 * w) + ' 17 ' +
+              (50 + 25 * w) + ' 20 ' + (50 + 24 * w) + ' 34 ' +
+              'C' + (50 + 20 * w) + ' 26 ' + (50 + 12 * w) + ' 24 50 25 ' +
+              'C' + (50 - 12 * w) + ' 24 ' + (50 - 20 * w) + ' 26 ' +
+              (50 - 24 * w) + ' 34 Z', colour),
+      ];
+    }
+
+    if (style === 'swept') {
+      return [
+        shape('M' + (50 - 26 * w) + ' 36 C' + (50 - 28 * w) + ' 14 ' +
+              (50 - 6 * w) + ' 9 ' + (50 + 16 * w) + ' 14 ' +
+              'C' + (50 + 26 * w) + ' 17 ' + (50 + 27 * w) + ' 27 ' +
+              (50 + 25 * w) + ' 36 C' + (50 + 22 * w) + ' 24 ' +
+              (50 + 6 * w) + ' 21 ' + (50 - 26 * w) + ' 36 Z', colour),
+      ];
+    }
+
+    // short
+    return [
+      shape('M' + (50 - 25 * w) + ' 36 C' + (50 - 27 * w) + ' 14 ' +
+            (50 - 14 * w) + ' 10 50 10 C' + (50 + 14 * w) + ' 10 ' +
+            (50 + 27 * w) + ' 14 ' + (50 + 25 * w) + ' 36 ' +
+            'C' + (50 + 20 * w) + ' 24 ' + (50 - 20 * w) + ' 24 ' +
+            (50 - 25 * w) + ' 36 Z', colour),
+    ];
+  }
+
+  /** Beards, which change a face more than anything except age. */
+  function beardFor(f, w, skin) {
+    if (f.beard === 'none') return [];
+    var colour = HAIR[f.beardColour] || f.beardColour || HAIR.black;
+    var jaw = 62 + f.head[1] * 6;
+
+    if (f.beard === 'moustache') {
+      return [shape('M' + (50 - 9 * w) + ' 58.6 C' + (50 - 4.5 * w) + ' 55.8 ' +
+                    (50 + 4.5 * w) + ' 55.8 ' + (50 + 9 * w) + ' 58.6 ' +
+                    'C' + (50 + 4.5 * w) + ' 60.6 ' + (50 - 4.5 * w) + ' 60.6 ' +
+                    (50 - 9 * w) + ' 58.6 Z', colour)];
+    }
+
     if (f.beard === 'stubble') {
-      g.appendChild(node('path', {
-        d: 'M31 48 Q34 66 50 68 Q66 66 69 48 Q64 62 50 63 Q36 62 31 48 Z',
-        fill: facial.base, opacity: '0.28',
-      }));
-    } else if (f.beard === 'short') {
-      g.appendChild(node('path', {
-        d: 'M31 46 Q33 66 50 69 Q67 66 69 46 Q65 60 50 61 Q35 60 31 46 Z',
-        fill: facial.base,
-      }));
-    } else if (f.beard === 'full') {
-      g.appendChild(node('path', {
-        d: 'M30 42 Q30 70 50 76 Q70 70 70 42 Q66 62 50 63 Q34 62 30 42 Z',
-        fill: facial.base,
-      }));
-      g.appendChild(node('path', {
-        d: 'M40 66 Q50 72 60 66 Q50 70 40 66 Z',
-        fill: facial.shade,
-      }));
+      // A shadow along the jaw rather than a shape: stubble is not a beard,
+      // and drawing it as one is what makes a face look like a sticker.
+      return [
+        shape('M' + (50 - 21 * w) + ' 51 C' + (50 - 21 * w) + ' ' + (jaw + 4) +
+              ' ' + (50 - 11 * w) + ' ' + (jaw + 5) + ' 50 ' + (jaw + 5) +
+              ' C' + (50 + 11 * w) + ' ' + (jaw + 5) + ' ' + (50 + 21 * w) +
+              ' ' + (jaw + 4) + ' ' + (50 + 21 * w) + ' 51 Z',
+              colour, { opacity: '0.22' }),
+      ];
     }
 
-    // Moustache
-    if (f.moustache) {
-      g.appendChild(node('path', {
-        d: 'M42 56.5 Q50 54.5 58 56.5 Q50 59.5 42 56.5 Z',
-        fill: facial.base,
-      }));
-    }
+    /*
+     * The beard follows the jaw rather than filling the lower face.
+     *
+     * A block of colour from the cheekbones down reads as a mask, not as
+     * hair — especially a grey one. So this is drawn as a band that hugs the
+     * jawline, opens around the mouth, and comes to a point below the chin,
+     * with the moustache as a separate stroke so the philtrum is still there.
+     */
+    var drop = f.beard === 'flowing' ? 17 : (f.beard === 'full' ? 9 : 5);
+    var outer = 20 * w;
+    var top = 52;
 
-    // Turban or hair
-    if (f.turban) {
-      // A dastaar sits tall and comes forward to a point above the brow,
-      // built from layered wraps rather than a single smooth cap.
-      g.appendChild(node('path', {
-        d: 'M23 39 Q21 14 39 7 Q52 3 64 9 Q78 16 77 39' +
-           ' Q70 31 50 30 Q30 31 23 39 Z',
-        fill: f.turban.base,
-      }));
+    return [
+      // The jaw band: down one side, round the chin, back up the other, then
+      // an inner edge that leaves the mouth and the philtrum clear.
+      shape('M' + (50 - outer) + ' ' + top +
+            ' C' + (50 - outer - 1) + ' ' + (jaw + 3) +
+            ' ' + (50 - 11 * w) + ' ' + (jaw + drop) + ' 50 ' + (jaw + drop) +
+            ' C' + (50 + 11 * w) + ' ' + (jaw + drop) +
+            ' ' + (50 + outer + 1) + ' ' + (jaw + 3) +
+            ' ' + (50 + outer) + ' ' + top +
+            ' C' + (50 + 13 * w) + ' ' + (top + 3) +
+            ' ' + (50 + 9 * w) + ' 64 50 64' +
+            ' C' + (50 - 9 * w) + ' 64 ' + (50 - 13 * w) + ' ' + (top + 3) +
+            ' ' + (50 - outer) + ' ' + top + ' Z', colour),
 
-      // The wraps, angled the way the cloth is actually wound.
-      g.appendChild(node('path', {
-        d: 'M23 33 Q34 16 52 11 Q36 20 27 38 Z',
-        fill: f.turban.shade, opacity: '0.55',
-      }));
-      g.appendChild(node('path', {
-        d: 'M30 15 Q48 6 63 11', stroke: f.turban.shade, 'stroke-width': 1.6,
-        fill: 'none', opacity: '0.8', 'stroke-linecap': 'round',
-      }));
-      g.appendChild(node('path', {
-        d: 'M25 24 Q44 12 68 17', stroke: f.turban.shade, 'stroke-width': 1.6,
-        fill: 'none', opacity: '0.75', 'stroke-linecap': 'round',
-      }));
-      g.appendChild(node('path', {
-        d: 'M23 32 Q45 20 74 28', stroke: f.turban.shade, 'stroke-width': 1.6,
-        fill: 'none', opacity: '0.7', 'stroke-linecap': 'round',
-      }));
+      // The moustache, above the mouth and clear of it.
+      shape('M' + (50 - 8.5 * w) + ' 58.4 C' + (50 - 4 * w) + ' 55.6 ' +
+            (50 + 4 * w) + ' 55.6 ' + (50 + 8.5 * w) + ' 58.4 ' +
+            'C' + (50 + 4 * w) + ' 60.4 ' + (50 - 4 * w) + ' 60.4 ' +
+            (50 - 8.5 * w) + ' 58.4 Z', colour),
 
-      // The front point, slightly off centre as it is when tied.
-      g.appendChild(node('path', {
-        d: 'M44 26 L49 11 L55 25 Q50 28 44 26 Z',
-        fill: f.turban.shade, opacity: '0.9',
-      }));
-
-      // The band along the brow.
-      g.appendChild(node('path', {
-        d: 'M23 37 Q50 28 77 37 Q50 33 23 37 Z',
-        fill: f.turban.shade,
-      }));
-    } else {
-      var receding = f.age > 0.7;
-      g.appendChild(node('path', {
-        d: receding
-          ? 'M29 38 Q31 22 50 21 Q69 22 71 38 Q68 28 50 27 Q32 28 29 38 Z'
-          : 'M28 40 Q28 18 50 18 Q72 18 72 40 Q68 26 50 25 Q32 26 28 40 Z',
-        fill: f.hair.base,
-      }));
-      g.appendChild(node('path', {
-        d: 'M32 30 Q42 22 56 23 Q42 26 33 36 Z',
-        fill: f.hair.shade, opacity: '0.6',
-      }));
-    }
-
-    // Glasses
-    if (f.glasses) {
-      var rx = f.glasses === 'round' ? 6.5 : 7;
-      var ry = f.glasses === 'round' ? 6.5 : 5;
-      var stroke = { stroke: '#2f2a24', 'stroke-width': 1.4, fill: 'none' };
-      [39, 61].forEach(function (x) {
-        var lens = node(f.glasses === 'round' ? 'circle' : 'rect',
-          f.glasses === 'round'
-            ? { cx: x, cy: 44, r: rx }
-            : { x: x - rx, y: 44 - ry, width: rx * 2, height: ry * 2, rx: 1.6 });
-        Object.keys(stroke).forEach(function (k) {
-          lens.setAttribute(k, stroke[k]);
-        });
-        g.appendChild(lens);
-      });
-      g.appendChild(node('path', {
-        d: 'M46 44 L54 44', stroke: '#2f2a24', 'stroke-width': 1.2,
-      }));
-    }
-
-    // A soft vignette, so the faces sit together as a set.
-    g.appendChild(node('rect', {
-      x: 0, y: 0, width: 100, height: 100,
-      fill: 'none', stroke: 'rgba(0,0,0,0.35)', 'stroke-width': 6,
-    }));
-
-    return svg;
+      // One line where the beard meets the cheek, so it sits on the face
+      // rather than floating in front of it. Drawn as a single stroke across:
+      // two meeting in the middle left a notch under the mouth.
+      stroke('M' + (50 - outer) + ' ' + top +
+             ' C' + (50 - 13 * w) + ' ' + (top + 3) + ' ' + (50 - 9 * w) + ' 64 50 64' +
+             ' C' + (50 + 9 * w) + ' 64 ' + (50 + 13 * w) + ' ' + (top + 3) +
+             ' ' + (50 + outer) + ' ' + top, 'rgba(0,0,0,0.16)', 1),
+    ];
   }
 
-  return { render: render, describe: describe };
+  /** Clothing, which is only ever the top of a shoulder — but it reads. */
+  function dressFor(f) {
+    var c = f.cloth;
+    var dark = 'rgba(0,0,0,0.22)';
+
+    if (f.dress === 'dupatta') {
+      return [
+        shape('M14 100 C16 84 30 76 50 76 C70 76 84 84 86 100 Z', c),
+        shape('M34 78 C38 90 40 96 40 100 L28 100 C28 92 30 84 34 78 Z', dark),
+        shape('M66 78 C62 90 60 96 60 100 L72 100 C72 92 70 84 66 78 Z', dark),
+      ];
+    }
+    if (f.dress === 'jacket') {
+      return [
+        shape('M14 100 C16 84 30 76 50 76 C70 76 84 84 86 100 Z', c),
+        shape('M50 76 L40 100 L34 100 L44 77 Z', 'rgba(255,255,255,0.14)'),
+        shape('M50 76 L60 100 L66 100 L56 77 Z', 'rgba(255,255,255,0.14)'),
+        shape('M44 77 L50 88 L56 77 C54 76 46 76 44 77 Z', '#EDE8DE'),
+      ];
+    }
+    if (f.dress === 'waistcoat') {
+      return [
+        shape('M14 100 C16 84 30 76 50 76 C70 76 84 84 86 100 Z', '#EDE8DE'),
+        shape('M50 76 C40 78 34 86 32 100 L14 100 C16 84 30 76 50 76 Z', c),
+        shape('M50 76 C60 78 66 86 68 100 L86 100 C84 84 70 76 50 76 Z', c),
+      ];
+    }
+    if (f.dress === 'shawl') {
+      return [
+        shape('M14 100 C16 84 30 76 50 76 C70 76 84 84 86 100 Z', c),
+        shape('M14 100 C16 88 24 80 34 77 C30 84 28 92 28 100 Z', dark),
+        shape('M86 100 C84 88 76 80 66 77 C70 84 72 92 72 100 Z', dark),
+      ];
+    }
+    // kurta
+    return [
+      shape('M14 100 C16 84 30 76 50 76 C70 76 84 84 86 100 Z', c),
+      stroke('M50 78 L50 100', 'rgba(0,0,0,0.18)', 1.4),
+    ];
+  }
+
+  /* ------------------------------------------------------------ drawing */
+
+  /**
+   * One portrait, at a given size.
+   *
+   * `id` is one of the cast. Anything unrecognised draws the first, so a save
+   * written before a face existed still shows a face.
+   */
+  function render(id, size, label) {
+    var f = faceFor(id);
+    var skin = SKIN[f.skin];
+    var w = f.head[0];
+    var jaw = f.head[1];
+    var chin = 62 + jaw * 6;
+
+    var eyeOpen = f.eyes[0];
+    var lines = f.eyes[1];
+    var browW = f.brow[0];
+    var browTilt = f.brow[1];
+
+    var parts = [];
+
+    // Ground, so a portrait on any background is its own object.
+    parts.push(p('circle', { cx: '50', cy: '50', r: '50', fill: 'var(--portrait-bg, #1A1D24)' }));
+
+    // Shoulders first: everything else overlaps them.
+    parts = parts.concat(dressFor(f));
+
+    // Neck, with the shadow under the jaw that stops the head floating.
+    parts.push(shape('M42 62 L42 80 C46 83 54 83 58 80 L58 62 Z', skin.shade));
+
+    // The head.
+    parts.push(shape(
+      'M' + (50 - 26 * w) + ' 40 C' + (50 - 26 * w) + ' 22 ' +
+      (50 - 15 * w) + ' 14 50 14 C' + (50 + 15 * w) + ' 14 ' +
+      (50 + 26 * w) + ' 22 ' + (50 + 26 * w) + ' 40 ' +
+      'C' + (50 + 26 * w) + ' 54 ' + (50 + 20 * w) + ' ' + chin + ' 50 ' + (chin + 4) +
+      ' C' + (50 - 20 * w) + ' ' + chin + ' ' + (50 - 26 * w) + ' 54 ' +
+      (50 - 26 * w) + ' 40 Z', skin.base));
+
+    // A little modelling down one side, which is the whole difference between
+    // a shape and a face.
+    parts.push(shape(
+      'M' + (50 + 26 * w) + ' 40 C' + (50 + 26 * w) + ' 54 ' +
+      (50 + 20 * w) + ' ' + chin + ' 50 ' + (chin + 4) +
+      ' C' + (50 + 12 * w) + ' ' + (chin - 4) + ' ' + (50 + 18 * w) + ' 50 ' +
+      (50 + 18 * w) + ' 34 Z', skin.shade, { opacity: '0.55' }));
+
+    // Ears.
+    parts.push(ellipse(50 - 26 * w, 42, 3.2, 5.4, skin.shade));
+    parts.push(ellipse(50 + 26 * w, 42, 3.2, 5.4, skin.shade));
+
+    parts = parts.concat(hairFor(f, w, skin));
+
+    // Brows.
+    // Brows sit closer to the eye than a cartoon puts them, and thin toward
+    // the nose, which is most of what makes an expression readable.
+    var browColour = f.hair.colour && f.hair.colour.charAt(0) === '#'
+      ? (HAIR[f.beardColour] || HAIR.dark)
+      : (HAIR[f.hair.colour] || HAIR.black);
+    [-1, 1].forEach(function (side) {
+      parts.push(stroke(
+        'M' + (50 + side * 15.5 * w) + ' ' + (42 + browTilt) +
+        ' Q' + (50 + side * 10.5 * w) + ' ' + (39.2 + browTilt) + ' ' +
+        (50 + side * 5.2 * w) + ' ' + (41.4 + browTilt),
+        browColour, browW * 0.8));
+    });
+
+    // Eyes: a white, an iris, a lid line. The lid is what stops them staring.
+    /*
+     * Eyes, drawn small.
+     *
+     * The single thing that decides whether a face reads as a person or as an
+     * emoji is how big the eyes are — a wide white oval with a dark disc in it
+     * is a cartoon whatever else is around it. So these are almond-shaped,
+     * roughly life-proportioned against the head, cut across the top by a lid
+     * that actually overlaps the iris, and the white is a warm off-white
+     * rather than paper.
+     */
+    [-1, 1].forEach(function (side) {
+      var ex = 50 + side * 10.5 * w;
+      var half = 4.1;
+      var open = 2.3 * eyeOpen;
+
+      // The eye opening: two arcs meeting at the corners, so it is an almond
+      // rather than an oval.
+      parts.push(shape(
+        'M' + (ex - half) + ' 47 Q' + ex + ' ' + (47 - open - 0.6) + ' ' +
+        (ex + half) + ' 47 Q' + ex + ' ' + (47 + open) + ' ' + (ex - half) + ' 47 Z',
+        '#E8E2D6'));
+
+      // Iris and pupil, sized to the opening and clipped by the lid above.
+      parts.push(ellipse(ex, 47, 1.95, Math.min(1.95, open + 0.5), '#4A3020'));
+      parts.push(ellipse(ex, 47, 0.95, Math.min(0.95, open), '#1A1210'));
+      parts.push(ellipse(ex + 0.7, 46.3, 0.5, 0.5, '#FFFFFF', { opacity: '0.85' }));
+
+      // The upper lid, which is what stops them staring.
+      parts.push(stroke(
+        'M' + (ex - half - 0.6) + ' 46.9 Q' + ex + ' ' + (47 - open - 1.5) + ' ' +
+        (ex + half + 0.6) + ' 46.9', skin.line, 1.15));
+
+      // A soft lower lid, no darker than the skin.
+      parts.push(stroke(
+        'M' + (ex - half + 0.4) + ' 48.4 Q' + ex + ' ' + (47 + open + 0.9) + ' ' +
+        (ex + half - 0.4) + ' 48.4', skin.shade, 0.8, { opacity: '0.7' }));
+
+      if (lines) {
+        parts.push(stroke('M' + (ex + side * 5.2) + ' 45.6 L' +
+          (ex + side * 7.6) + ' 44.2', skin.line, 0.8, { opacity: '0.45' }));
+        parts.push(stroke('M' + (ex + side * 5.2) + ' 48.6 L' +
+          (ex + side * 7.6) + ' 49.8', skin.line, 0.8, { opacity: '0.35' }));
+      }
+    });
+
+    // Nose: two strokes, never an outline.
+    // The nose is a shadow down one side and a soft base — never an outline,
+    // which is the other thing that turns a face into a cartoon.
+    parts.push(stroke('M' + (50 - 0.6 * w) + ' 49 L' + (50 - 2.4 * w) + ' 54.6',
+      skin.line, 1.1, { opacity: '0.42' }));
+    parts.push(stroke('M' + (50 - 2.4 * w) + ' 54.8 Q50 56.4 ' +
+      (50 + 2.4 * w) + ' 54.8', skin.line, 1.1, { opacity: '0.6' }));
+
+    parts = parts.concat(beardFor(f, w, skin));
+
+    // Mouth, drawn last so a beard does not swallow it.
+    // A closed mouth, drawn as a line with a little weight to it rather than
+    // a smile. Nobody in this cast is grinning at the camera.
+    parts.push(stroke('M' + (50 - 5.6 * w) + ' 61.6 Q50 63.4 ' +
+      (50 + 5.6 * w) + ' 61.6', '#7E4238', 1.5));
+    parts.push(stroke('M' + (50 - 4.2 * w) + ' 63.4 Q50 64.4 ' +
+      (50 + 4.2 * w) + ' 63.4', skin.shade, 0.9, { opacity: '0.55' }));
+
+    // Age, as lines rather than as colour.
+    if (f.age === 2) {
+      parts.push(stroke('M' + (50 - 14 * w) + ' 33 C' + (50 - 6 * w) + ' 31 ' +
+        (50 + 6 * w) + ' 31 ' + (50 + 14 * w) + ' 33', skin.line, 1,
+        { opacity: '0.4' }));
+      parts.push(stroke('M' + (50 - 12 * w) + ' 57 C' + (50 - 9 * w) + ' 60 ' +
+        (50 - 9 * w) + ' 62 ' + (50 - 10 * w) + ' 64', skin.line, 1,
+        { opacity: '0.35' }));
+      parts.push(stroke('M' + (50 + 12 * w) + ' 57 C' + (50 + 9 * w) + ' 60 ' +
+        (50 + 9 * w) + ' 62 ' + (50 + 10 * w) + ' 64', skin.line, 1,
+        { opacity: '0.35' }));
+    }
+
+    return svg('svg', {
+      class: 'portrait',
+      viewBox: '0 0 100 100',
+      width: String(size || 48),
+      height: String(size || 48),
+      role: 'img',
+      'aria-label': label
+        ? 'Illustration of ' + label
+        : 'Illustration of a fictional candidate',
+    }, parts);
+  }
+
+  /** Every face, in a fixed order. A stored choice is an id from this list. */
+  function ids() {
+    return CAST.map(function (f) {
+      return f.id;
+    });
+  }
+
+  /**
+   * What a face is made of. Only the tests use this — it is how they check
+   * that two ids really do draw two different people.
+   */
+  function describe(id) {
+    var f = faceFor(id);
+    return {
+      id: f.id,
+      skin: f.skin,
+      hair: f.hair.style,
+      beard: f.beard,
+      age: f.age,
+      dress: f.dress,
+    };
+  }
+
+  return { render: render, ids: ids, describe: describe, count: CAST.length };
 })();

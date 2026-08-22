@@ -150,7 +150,7 @@ CMP.ui.profile = (function () {
         mount(bodyNode, me
           ? [
               el('div', { class: 'pf-card' }, [
-                CMP.ui.portrait.render(me.portraitSeed, 64, me.name),
+                CMP.ui.portrait.render(me.avatar, 64, me.name),
                 el('div', { class: 'pf-who' }, [
                   el('strong', { class: 'pf-name', text: me.name }),
                 ]),
@@ -175,8 +175,8 @@ CMP.ui.profile = (function () {
       mount(bodyNode, [
         /* ---- who ---- */
         el('div', { class: 'pf-card' }, [
-          profile.portraitSeed
-            ? CMP.ui.portrait.render(profile.portraitSeed, 64, profile.name)
+          profile.avatar
+            ? CMP.ui.portrait.render(profile.avatar, 64, profile.name)
             : null,
           el('div', { class: 'pf-who' }, [
             el('strong', { class: 'pf-name', text: profile.name }),
@@ -317,8 +317,8 @@ CMP.ui.profile = (function () {
       mount(listNode, rows.map(function (row, i) {
         return el('div', { class: 'lbd-row' + (i === 0 ? ' is-top' : '') }, [
           el('span', { class: 'lbd-rank', text: String(i + 1) }),
-          row.portraitSeed
-            ? CMP.ui.portrait.render(row.portraitSeed, 40, row.name)
+          row.avatar
+            ? CMP.ui.portrait.render(row.avatar, 40, row.name)
             : el('span', { class: 'h-board-blank' }),
           el('div', { class: 'lbd-who' }, [
             el('strong', { class: 'lbd-name', text: row.name }),

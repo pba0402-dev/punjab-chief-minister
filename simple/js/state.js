@@ -65,9 +65,20 @@ CMP.state = (function () {
       totalSeats: CMP.TOTAL_SEATS,
       majority: CMP.MAJORITY,
 
-      // Support per constituency, keyed by number: { aap: 31.2, inc: 28.0, ... }
+      /*
+       * Campaign influence per constituency, keyed by seat number.
+       *
+       * Every one of the 117 starts as {} — nobody has campaigned anywhere,
+       * so no seat has a leader, a percentage or a status. Influence
+       * accumulates as money is spent; the percentages shown anywhere are
+       * that influence expressed as a share, worked out when it is needed and
+       * never stored. See `standings` in the engine.
+       */
       support: {},
-      incumbency: {},
+
+      // The parties in this game, invented by whoever is playing. There is no
+      // fixed list any more.
+      parties: [],
       // Every action taken, newest last.
       actions: [],
 
@@ -97,7 +108,7 @@ CMP.state = (function () {
       intermissionLeft: 0,
 
       // A fictional candidate portrait, fixed for the whole game.
-      portraitSeed: null,
+      avatar: null,
 
       // The parties nobody is playing get opponents, so the scoreboard always
       // has four competitors and a solo game is still an election.
@@ -113,69 +124,34 @@ CMP.state = (function () {
   }
 
   /**
-   * Build the opening political map from the real sitting MLAs.
+   * An empty board.
    *
-   * The party holding a seat starts ahead in it, by an amount rolled per seat
-   * from the game seed so the map is not uniform. Incumbents whose party is
-   * not one of the four playable ones sit under "Others".
+   * Every one of the 117 constituencies starts with nothing in it: no
+   * influence, no leader, no percentage, no status. That is the whole
+   * starting position, and it is deliberately not built from anything.
    *
-   * This is a starting position, not a prediction: campaigning can overturn
-   * any of it, and the game never reproduces the real result on its own.
+   * This used to deal the board from the real sitting members, which made the
+   * opening screen read as a live election tracker rather than as a game
+   * nobody had played yet — and handed one side a lead it had not earned. A
+   * seat is now worth exactly what has been spent in it.
    */
-  function seedSupport(game) {
-    var rand = CMP.rng.create(game.seed + ':support');
-    var cfg = CMP.CAMPAIGN.incumbency;
-    var parties = CMP.PARTIES.map(function (p) {
-      return p.id;
-    });
-
-    // One swing per party per game, applied to every seat. This is what stops
-    // the real membership replaying itself: the incumbent bloc can start the
-    // game under real pressure, or with a commanding lead, depending on the roll.
-    var swing = {};
-    parties.forEach(function (id) {
-      // Others never gets a statewide swing — small parties and independents
-      // hold seats one at a time, they do not surge across Punjab.
-      swing[id] = id === 'oth'
-        ? cfg.othersHandicap
-        : (rand() - 0.5) * cfg.partySwingSpread;
-    });
-
+  function emptyBoard(game) {
     var support = {};
-    var incumbency = {};
-
     CMP.CONSTITUENCIES.forEach(function (c) {
-      var sitting = CMP.getIncumbent(c.number);
-      var holder = sitting ? CMP.campaign.gamePartyFor(sitting.party) : 'oth';
-
-      // How entrenched is this particular incumbent?
-      var level = CMP.campaign.weightedPick(cfg.levels, rand());
-
-      var seat = {};
-      parties.forEach(function (id) {
-        seat[id] = Math.max(2, cfg.baseSupport + swing[id] + (rand() - 0.5) * cfg.spread);
-      });
-      seat[holder] += level.advantage;
-
-      CMP.campaign.normalise(seat);
-      support[c.number] = seat;
-      incumbency[c.number] = { party: holder, level: level.id, label: level.label };
+      support[c.number] = {};
     });
-
-    game.swing = swing;
     game.support = support;
-    game.incumbency = incumbency;
   }
 
   /** Check the setup form before starting. Budget is not asked for. */
   function validateSetup(draft) {
     var errors = {};
 
-    if (!draft.partyId || !CMP.getParty(draft.partyId)) {
-      errors.partyId = 'Choose a party to lead.';
-    }
     if (!draft.candidateName || !draft.candidateName.trim()) {
-      errors.candidateName = 'Enter your candidate’s name.';
+      errors.candidateName = 'Enter your name.';
+    }
+    if (!draft.partyName || !draft.partyName.trim()) {
+      errors.partyName = 'Name the party you are founding.';
     }
     // No slogan. It was one more thing to type before anybody could play, it
     // appeared on nothing that mattered, and a returning player had to invent
@@ -191,37 +167,57 @@ CMP.state = (function () {
   /** Apply a validated setup to a fresh game and open the election screen. */
   function startElection(draft) {
     var game = create();
-    game.partyId = draft.partyId;
-    game.candidateName = (draft.candidateName || '').trim();
-    game.slogan = (draft.slogan || '').trim();
     game.mode = draft.mode || 'solo';
     game.seed = draft.seed || CMP.rng.newSeed();
     game.screen = 'election';
-    game.portraitSeed = draft.portraitSeed || (game.seed + ':you');
-    seedSupport(game);
-    // Seats are settled at the end of round one, not dealt at the start.
 
-    // The districts each party is handed by the deal. They pay nothing — a
-    // grant is for a district taken during the election, not one inherited
-    // from the sitting MLAs.
-    game.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, game.partyId);
+    game.candidateName = (draft.candidateName || '').trim();
+    game.avatar = draft.avatar || CMP.avatarFor(game.seed + ':you');
 
     /*
-     * Everybody opens on nothing.
+     * The player's party, invented here and now.
      *
-     * The board underneath decides who is ahead in each seat; being ahead is
-     * not holding it. Seats are awarded when round one is settled, so the
-     * scoreboard opens 0 - 0 - 0 - 0 and the first round actually matters.
+     * Slot one is always the human, so the id is the same in every game and
+     * a save can be read without knowing who typed what.
      */
+    game.partyId = CMP.partyIdForSlot(1);
+    var mine = CMP.normalisePartyDef({
+      id: game.partyId,
+      slot: 1,
+      name: draft.partyName,
+      short: draft.partyShort,
+      slogan: draft.slogan,
+      symbol: draft.partySymbol,
+      colourId: draft.partyColour,
+    });
+    game.slogan = mine.slogan;
+
+    // The opponents invent theirs, avoiding whatever the player just took.
+    var rivals = CMP.ai.opponentsFor(game.partyId, game.seed, mine);
+    game.parties = [mine].concat(rivals.map(function (o) {
+      return o.party;
+    }));
+    CMP.setParties(game.parties);
+
+    emptyBoard(game);
+
+    /*
+     * Nobody holds anything, and no district is anybody's.
+     *
+     * There is no deal to inherit from any more — the board is empty — so the
+     * list of districts that pay nothing is empty too. Every district in the
+     * game is one somebody took.
+     */
+    game.openingDistricts = [];
     game.seatTotals = null;
     game.seatsDecided = false;
     game.seatsWon = 0;
 
-    game.opponents = CMP.ai.opponentsFor(game.partyId, game.seed);
+    game.opponents = rivals;
     game.opponents.forEach(function (o) {
       o.seatsLed = 0;
       o.seatsBefore = 0;
-      o.openingDistricts = CMP.campaign.openingDistrictsFor(game.support, o.partyId);
+      o.openingDistricts = [];
     });
 
     // No leader map yet either: with nothing decided, round one reports every
@@ -253,7 +249,7 @@ CMP.state = (function () {
   return {
     VERSION: VERSION,
     create: create,
-    seedSupport: seedSupport,
+    emptyBoard: emptyBoard,
     validateSetup: validateSetup,
     startElection: startElection,
     isValid: isValid,

@@ -512,6 +512,7 @@ CMP.CAMPAIGN = {
   },
   "election": {
     "seatNoise": 3.2,
+    "undecidedWeight": 14,
     "majority": 59,
     "totalSeats": 117
   },
@@ -944,6 +945,52 @@ CMP.CAMPAIGN = {
         "territoryFocus": 0.25,
         "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
       }
+    ],
+    "partyPrefixes": [
+      "Punjab",
+      "New Punjab",
+      "United Punjab",
+      "Greater Punjab",
+      "Sutlej",
+      "Beas",
+      "Ravi",
+      "Doaba",
+      "Malwa",
+      "Majha",
+      "Pind",
+      "Sanjha",
+      "Satluj Valley",
+      "Northern"
+    ],
+    "partyThemes": [
+      "Development",
+      "Reform",
+      "Progress",
+      "Farmers",
+      "Workers",
+      "Welfare",
+      "Unity",
+      "Youth",
+      "Village",
+      "Justice",
+      "Prosperity",
+      "Renewal",
+      "Future",
+      "Water",
+      "Livelihood",
+      "Heritage"
+    ],
+    "partyBodies": [
+      "Party",
+      "Front",
+      "Alliance",
+      "Morcha",
+      "Manch",
+      "Union",
+      "Sabha",
+      "Council",
+      "Movement",
+      "Coalition"
     ],
     "givenNames": [
       "Arjun",

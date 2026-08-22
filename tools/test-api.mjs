@@ -103,7 +103,7 @@ function player(code, id, token) {
     id,
     token,
     state: () => call('state', creds(), 'GET'),
-    party: (partyId) => call('party', { ...creds(), partyId }),
+    party: (party) => call('party', { ...creds(), ...(party || {}) }),
     details: (candidateName, slogan, budget) =>
       call('details', { ...creds(), candidateName, slogan, budget }),
     ready: (r) => call('ready', { ...creds(), ready: r === undefined ? true : r }),
@@ -182,35 +182,78 @@ check('refusal explains the game is full', /full/i.test(j5.error || ''), j5.erro
 
 /* ---------------------------------------------------------------- parties */
 
-section('Party selection');
-const r1 = await p1.party('aap');
-check('player 1 takes AAP', r1.ok === true);
-check('AAP shows as taken', (r1.game.takenParties || []).includes('aap'));
+/*
+ * Founding rather than claiming.
+ *
+ * There is no list of four to take from, so nothing can clash and nothing has
+ * to be freed. What the server owes each player instead is that the party they
+ * described is the party that comes back, and that its id is the slot they are
+ * sitting in — which is not theirs to send.
+ */
+section('Every player founds a party');
 
-const clash = await p2.party('aap');
-check('player 2 cannot also take AAP', clash.ok === false, clash.error);
-check('the clash explains itself', /already taken/i.test(clash.error || ''), clash.error);
-check('clash still returns the current lobby', !!clash.game);
+const r1 = await p1.party({
+  name: 'Punjab Development Party', short: 'PDP', symbol: 'tree', colourId: 'emerald',
+});
+check('player 1 founds a party', r1.ok === true, JSON.stringify(r1).slice(0, 90));
 
-check('player 2 takes INC', (await p2.party('inc')).ok === true);
-check('player 3 takes BJP', (await p3.party('bjp')).ok === true);
-check('player 4 takes SAD', (await p4.party('sad')).ok === true);
+const mine1 = r1.game.players.find((x) => x.isYou);
+check('the name they gave came back', mine1.party.name === 'Punjab Development Party',
+  mine1.party.name);
+check('so did the badge, the symbol and the colour',
+  mine1.party.short === 'PDP' && mine1.party.symbol === 'tree' &&
+  mine1.party.colourId === 'emerald',
+  JSON.stringify(mine1.party));
+check('and the id is the slot, not anything sent',
+  mine1.partyId === 'p' + mine1.slot, mine1.partyId);
+
+// Two players may found parties with the same name. They are different
+// parties: the id is the slot, so nothing collides.
+const same = await p2.party({ name: 'Punjab Development Party' });
+check('two players may use the same name', same.ok === true, same.error);
+const mine2 = same.game.players.find((x) => x.isYou);
+check('and they are still separate parties', mine2.partyId !== mine1.partyId,
+  mine1.partyId + ' vs ' + mine2.partyId);
+
+// A badge nobody supplied is worked out from the name.
+const guessed = await p3.party({ name: 'Unity Punjab Front' });
+const mine3 = guessed.game.players.find((x) => x.isYou);
+check('a short name is worked out when none is given', mine3.party.short === 'UPF',
+  mine3.party.short);
+
+// Nonsense is corrected rather than stored.
+const junk = await p4.party({
+  name: '', short: 'TOOLONGBADGE', symbol: 'not-a-symbol', colourId: 'not-a-colour',
+});
+const mine4 = junk.game.players.find((x) => x.isYou);
+check('an empty name is refused rather than stored blank',
+  mine4.party.name === 'Unnamed Party', mine4.party.name);
+check('an over-long badge is cut to four', mine4.party.short.length <= 4, mine4.party.short);
+check('an unknown symbol falls back to a real one',
+  ['star', 'tree', 'lion', 'sunrise', 'mountain', 'wheel', 'book', 'flower',
+   'handshake', 'torch', 'crown', 'river', 'shield', 'wheat', 'lamp', 'bridge']
+    .includes(mine4.party.symbol),
+  mine4.party.symbol);
+check('and an unknown colour becomes a real one',
+  /^#[0-9A-Fa-f]{6}$/.test(mine4.party.colour), mine4.party.colour);
+
+// Put player four's party right before the rest of the run needs it.
+await p4.party({ name: 'Sanjha Workers Alliance', short: 'SWA', symbol: 'wheat',
+  colourId: 'gold' });
 
 const afterParties = await p1.state();
-check('all four parties are taken', afterParties.game.takenParties.length === 4);
-check('unknown party is refused', (await p1.party('xyz')).ok === false);
-
-// Swapping frees the old party.
-await p4.party('');
-const freed = await p1.state();
-check('clearing a party frees it', !freed.game.takenParties.includes('sad'));
-check('player 4 can retake SAD', (await p4.party('sad')).ok === true);
+check('every player has a party', afterParties.game.parties.length === 4,
+  JSON.stringify(afterParties.game.parties.map((x) => x.name)));
+check('and no real party is among them',
+  afterParties.game.parties.every((x) => !/^(AAP|INC|BJP|SAD|BSP)$/i.test(x.short)),
+  afterParties.game.parties.map((x) => x.short).join(','));
 
 /* ---------------------------------------------------------------- details */
 
 section('Player details and ready');
 const notReadyYet = await p1.ready(true);
-check('cannot ready up with no details', notReadyYet.ok === false, notReadyYet.error);
+check('cannot ready up with no candidate name', notReadyYet.ok === false,
+  notReadyYet.error);
 
 await p1.details('Simran Kaur Gill', 'Naya Punjab, Sacha Punjab', 100000000);
 await p2.details('Ravinder Singh Bajwa', 'Punjab First', 90000000);
@@ -291,7 +334,9 @@ await sleep(21000);
 const afterSilence = await g.state(); // only the guest checks in
 check('the quiet host is shown as disconnected', afterSilence.game.players[0].connected === false);
 check('the quiet host keeps their slot', afterSilence.game.players[0].empty === false);
-check('their party is still theirs', afterSilence.game.players[0].partyId === 'aap');
+check('their party is still theirs',
+  afterSilence.game.players[0].partyId === 'p1',
+  afterSilence.game.players[0].partyId);
 check('host role moves to the connected player', afterSilence.game.youAreHost === true, 'guest should now host');
 check('host id points at the guest', afterSilence.game.hostId === g.id);
 
@@ -319,7 +364,13 @@ check('games are stored on the server', files.length >= 1, files.length + ' file
 const raw = JSON.parse(fs.readFileSync(path.join(DATA, files[0]), 'utf8'));
 check('stored game has a code', typeof raw.code === 'string');
 check('stored game has players', Object.keys(raw.players).length >= 1);
-check('stored game keeps the incumbency baseline', raw.incumbency !== undefined);
+// Nothing about a real election is stored. Checked on disk rather than on a
+// screen, because a screen can be made to hide what a file still holds.
+check('nothing about a real election is stored',
+  raw.incumbency === undefined && !/mla/i.test(JSON.stringify(raw)));
+check('and every party on disk is one somebody founded',
+  Object.values(raw.players).every((pl) => pl.party && pl.party.id === 'p' + pl.slot),
+  JSON.stringify(Object.values(raw.players).map((pl) => pl.party && pl.party.id)));
 check('stored game keeps coalition state', raw.coalition !== undefined);
 check('stored game keeps a result slot', 'result' in raw);
 check('the data directory is protected from the web', fs.existsSync(path.join(DATA, '.htaccess')));

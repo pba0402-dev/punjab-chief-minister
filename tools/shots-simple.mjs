@@ -31,7 +31,7 @@ if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 
 /** Start a solo campaign and open the game screen. */
 function startGame() {
-  return "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
+  return "CMP.app.setGame(CMP.state.startElection({partyName:'Unity Punjab Front',partyShort:'UPF'," +
     "candidateName:'Gurpreet Singh',slogan:'Naya Punjab'}));" +
     "CMP.app.goTo('election');";
 }
@@ -50,7 +50,7 @@ function sectionScene(label) {
 
 /** A game with a few rounds and some spending behind it. */
 function playedGame(rounds) {
-  return "var g=CMP.state.startElection({partyId:'aap'," +
+  return "var g=CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
     "for(var r=0;r<" + rounds + ";r++){" +
     "  for(var m=0;m<3;m++){" +
@@ -67,7 +67,7 @@ function playedGame(rounds) {
  * rather than raced against the app's own clock.
  */
 function roundSix() {
-  return "var g=CMP.state.startElection({partyId:'aap'," +
+  return "var g=CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
     "for(var r=0;r<6;r++){" +
     "  for(var m=0;m<3;m++){" +
@@ -83,7 +83,7 @@ function roundSix() {
 
 /** N rounds played, the last of them settling, handed straight to the shell. */
 function settledAt(rounds) {
-  return "var g=CMP.state.startElection({partyId:'aap'," +
+  return "var g=CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
     "for(var r=0;r<" + rounds + ";r++){" +
     "  for(var m=0;m<3;m++){" +
@@ -115,18 +115,22 @@ function throughStages(setup, clicks) {
 const SCENES = {
   home: '',
   'home-saved':
-    "CMP.storage.save(CMP.state.startElection({partyId:'aap'," +
+    "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
     "budget:100000000}));CMP.app.goTo('home');",
   setup: "CMP.app.goTo('setup');",
   'setup-filled':
     "CMP.app.goTo('setup');" +
-    "var cards=document.querySelectorAll('.party-card');cards[0].click();" +
-    "var f=document.querySelectorAll('.field-input');" +
     "function type(n,v){n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));}" +
-    "type(f[0],'Simran Kaur Gill');",
+    "var f=document.querySelectorAll('.field-input');" +
+    "type(f[0],'Simran Kaur Gill');" +
+    "type(document.querySelectorAll('.field-input')[1],'Punjab Development Party');" +
+    "setTimeout(function(){" +
+    "  var sy=document.querySelectorAll('.sym-option');if(sy[1])sy[1].click();" +
+    "  var co=document.querySelectorAll('.col-option');if(co[2])co[2].click();" +
+    "},60);",
   election:
-    "CMP.app.setGame(CMP.state.startElection({partyId:'inc'," +
+    "CMP.app.setGame(CMP.state.startElection({partyName:'Unity Punjab Front',partyShort:'UPF'," +
     "candidateName:'Gurpreet Singh',slogan:'Naya Punjab, Sacha Punjab'}));" +
     "CMP.app.goTo('election');",
 
@@ -257,7 +261,7 @@ const SCENES = {
    * four seconds long before the shutter opens — so the scene puts it back.
    */
   opening:
-    "CMP.app.setGame(CMP.state.startElection({partyId:'aap'," +
+    "CMP.app.setGame(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill'}));CMP.app.goTo('election');" +
     "setTimeout(function(){" +
     "  var s=document.querySelector('.sheet.is-opening');if(!s)return;" +
@@ -297,7 +301,7 @@ const SCENES = {
   'milestone-checkpoint': throughStages(settledAt(15), 2),
 
   'election-count':
-    "var g=CMP.state.startElection({partyId:'aap'," +
+    "var g=CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'});" +
     "for(var r=0;r<14;r++){" +
     "  for(var m=0;m<3;m++){" +

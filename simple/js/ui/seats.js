@@ -27,7 +27,7 @@ CMP.ui.seats = (function () {
   var PREVIEW = 6;
 
   function partyOf(id) {
-    return CMP.getParty(id) || CMP.getParty('oth');
+    return CMP.getParty(id);
   }
 
   var byNumber = null;
@@ -48,14 +48,18 @@ CMP.ui.seats = (function () {
       var def = seatDef(key);
       if (!def) return;
       var ranked = CMP.campaign.standings(game.support[key]);
-      if (!ranked.length) return;
+      // A seat nobody has campaigned in is still on the list — it is one of
+      // the 117 — but it has no leader and no numbers to show.
       rows.push({
         number: def.number,
         name: def.name,
         district: def.district,
-        leader: ranked[0].partyId,
-        share: ranked[0].support,
-        margin: ranked[0].support - (ranked[1] ? ranked[1].support : 0),
+        contested: ranked.length > 0,
+        leader: ranked.length ? ranked[0].partyId : null,
+        share: ranked.length ? ranked[0].support : 0,
+        margin: ranked.length
+          ? ranked[0].support - (ranked[1] ? ranked[1].support : 0)
+          : 0,
       });
     });
     rows.sort(function (a, b) {
@@ -80,15 +84,18 @@ CMP.ui.seats = (function () {
    * on in the full list, where each row can be led by anybody.
    */
   function seatRow(row, roster, onOpen, showCandidate) {
-    var party = partyOf(row.leader);
-    var sub = showCandidate
+    // An uncontested seat has no leader to colour it or to name.
+    var party = row.contested ? partyOf(row.leader) : null;
+    var sub = row.contested && showCandidate
       ? (candidateFor(row.leader, roster) || row.district)
       : row.district;
 
     return el('button', {
-      class: 'seat-row',
+      class: 'seat-row' + (row.contested ? '' : ' is-open'),
       type: 'button',
-      style: { '--party': party.colour, '--party-ink': party.ink || '#fff' },
+      style: party
+        ? { '--party': party.colour, '--party-ink': party.ink || '#fff' }
+        : null,
       onclick: function () {
         onOpen(row.number);
       },
@@ -97,7 +104,10 @@ CMP.ui.seats = (function () {
         el('span', { class: 'seat-row-name', text: row.name }),
         el('span', { class: 'seat-row-sub', text: sub }),
       ]),
-      el('span', { class: 'seat-row-party', text: party.short }),
+      el('span', {
+        class: 'seat-row-party',
+        text: party ? party.short : 'OPEN',
+      }),
       el('span', { class: 'seat-row-chev', 'aria-hidden': 'true', text: '›' }),
     ]);
   }
@@ -113,12 +123,30 @@ CMP.ui.seats = (function () {
     var rows = survey(game);
     var groups = {};
     rows.forEach(function (row) {
+      // Grouped by who leads, so seats nobody leads are not in any group.
+      // Before round one that is the whole board, and the screen says so.
+      if (!row.contested) return;
       (groups[row.leader] = groups[row.leader] || []).push(row);
     });
 
     var order = Object.keys(groups).sort(function (a, b) {
       return groups[b].length - groups[a].length;
     });
+
+    // Before anybody has campaigned there is nothing to group, and the
+    // screen says so rather than showing an empty frame.
+    if (!order.length) {
+      return el('div', { class: 'leading-from' }, [
+        el('div', { class: 'lf-empty' }, [
+          el('strong', { class: 'lf-empty-title', text: 'No seat has a leader yet' }),
+          el('span', {
+            class: 'lf-empty-note',
+            text: 'All ' + rows.length + ' constituencies are uncontested. ' +
+              'Campaign somewhere and this fills in when the round is settled.',
+          }),
+        ]),
+      ]);
+    }
 
     return el('div', { class: 'leading-from' }, order.map(function (partyId) {
       var party = partyOf(partyId);

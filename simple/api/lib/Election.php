@@ -46,19 +46,54 @@ final class Election
         $noise = (float) $this->config['seatNoise'];
 
         $perSeat = [];
+        // The parties in this game, invented by whoever is playing.
+        $partyIds = array_keys($byParty);
+        if ($partyIds === []) {
+            $partyIds = array_map(
+                static fn($p) => (string) ($p['id'] ?? ''),
+                $game['parties'] ?? []
+            );
+        }
+
         $totals = [];
-        foreach (Lobby::GAME_PARTIES as $party) {
+        foreach ($partyIds as $party) {
             $totals[$party] = 0;
         }
 
         foreach ($seatNumbers as $number) {
-            $merged = $board[(string) $number];
+            $merged = (array) $board[(string) $number];
 
-            // A little noise, so a narrow lead is never a certainty.
-            $final = [];
-            foreach ($merged as $party => $value) {
-                $final[$party] = max(0.5, $value + ($rand() - 0.5) * 2 * $noise);
+            /*
+             * Polling day works on shares, not on raw influence: what decides
+             * a seat is how the campaigns stand against each other in it, and
+             * the noise has to be in the same units as the thing it disturbs.
+             *
+             * But part of every seat is still undecided, and that part is
+             * larger the less work has been done there. One rally in an
+             * untouched seat reads as 100% of a seat almost nobody has been
+             * reached in, and without this the whole board could be won by
+             * turning up once everywhere. See campaign-config.json.
+             */
+            $influence = 0.0;
+            foreach ($merged as $v) {
+                $influence += max(0.0, (float) $v);
             }
+            $k = (float) ($this->config['undecidedWeight'] ?? 0);
+            $undecided = $k > 0 ? $k / ($k + $influence) : 0.0;
+
+            $final = [];
+            foreach ($partyIds as $party) {
+                $final[$party] = $undecided * 100 * $rand();
+            }
+            foreach (Campaign::shares($merged) as $party => $share) {
+                $final[$party] = ($final[$party] ?? 0)
+                    + (1 - $undecided) * $share
+                    + ($rand() - 0.5) * 2 * $noise;
+            }
+            foreach ($final as $party => $v) {
+                $final[$party] = max(0.01, $v);
+            }
+
             $final = Campaign::normalise($final);
 
             $winner = null;

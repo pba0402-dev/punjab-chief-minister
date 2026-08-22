@@ -1,17 +1,26 @@
 # Chief Minister of Punjab
 
-Choose a party, name your candidate, and fight a fifteen-round campaign across
-all 117 Punjab assembly constituencies. Each round lasts sixty seconds and
-gives you three moves; when the clock runs out the seats are recounted and an
-election-night scoreboard shows where everyone stands. Spend your grant, borrow
-against it if you dare, and try to be leading 59 seats when the polls close.
+Found a party — name it, badge it, pick its symbol and its colour — and fight a
+twenty-round campaign across all 117 Punjab assembly constituencies. Every seat
+starts empty: no leader, no percentage, nobody's. What a seat is worth is what
+has been spent in it, and the seats are awarded when a round is settled. Spend
+your allowance, borrow against it if you dare, and try to hold 59 when the polls
+close.
 
-Solo or with up to three friends — any party nobody takes is played by an
-opponent, so the scoreboard always has four candidates on it.
+Solo or with up to three friends — every empty chair is filled by an opponent
+that founds a party of its own, so the scoreboard always has four campaigns on
+it.
 
-> A fictional strategy game. Constituency names, numbers and districts are real
-> public information. Everything else is invented. It is not a prediction of any
-> real election.
+> A fictional strategy game.
+>
+> Constituency names, numbers and districts are real public information, and
+> that is the whole of what is real. Every party in it is one a player or the
+> game invented. Every candidate is a drawn character, never a photograph and
+> never a real person. Every percentage and every seat comes from what players
+> actually did in that game.
+>
+> There is no sitting-member data in it, no polling, and no real election result
+> anywhere. It is not a prediction of anything.
 
 ## Running it
 
@@ -25,15 +34,14 @@ From the repository root:
 
 ```
 npm run serve               # php -S on http://127.0.0.1:8080 (multiplayer needs PHP)
-npm run test:all            # all seven suites below
+npm run test:all            # all nine suites below
 npm run test:campaign       # engine parity, rounds, loans, funding, scoreboard
 npm run test:v1             # solo flow, rounds, borrowing and the count
 npm run test:api            # the multiplayer API
-npm run test:systems        # incumbents, elections, coalitions, investigations
+npm run test:systems        # the empty board, elections, coalitions, reports
 npm run test:mp             # four browsers in one lobby, start to result
 npm run test:ai             # two humans, two opponents, portraits, reconnection
 npm run test:rounds         # four browsers through all twenty rounds
-npm run measure:board       # opening-board balance across 60 games
 npm run balance:ai          # are the opponents a real contest?
 npm run shots:portraits     # render a grid of candidate portraits
 node tools/balance-money.mjs 40   # does money decide the game?
@@ -41,7 +49,6 @@ npm run shots:v1            # render at 1400 / 768 / 390 / 360 px
 npm run shots:lobby         # render the multiplayer screens
 npm run data:v1             # regenerate the constituency data file
 npm run data:campaign       # regenerate actions.js from campaign-config.json
-npm run data:incumbents     # regenerate the sitting-MLA data
 npm run data:map            # regenerate the map geometry
 ```
 
@@ -244,18 +251,52 @@ minutes, two being the default and the floor. A round also ends the moment
 every player still in it has pressed END ROUND — waiting out a clock nobody is
 using is the fastest way to make twenty rounds feel like a chore.
 
-### Everybody starts on nothing
+### Everybody starts on nothing, and so does the board
 
-No seats and no money. The board underneath is still dealt from the sitting
-members and still decides who is *ahead* in each constituency — but being ahead
-is not holding it. **Seats are awarded when a round is settled**, so the
-scoreboard opens 0 – 0 – 0 – 0 and round one is the round that decides all 117.
+No seats, no money, and — this is the part that changed most recently — **no
+board**. All 117 constituencies open holding nothing at all: no influence, no
+percentage, no leader, no status. A seat reads *uncontested*, and it stays that
+way until somebody spends money in it.
 
-That is a genuine change from how this used to open, where a player could find
-themselves twenty seats up on a deal they had taken no part in. A short
-**Election started** note says so once, before round one, and takes itself away
-after a few seconds; an announcement that appeared every round would be
-something to dismiss rather than something to read.
+That used to be otherwise. The board was dealt from the real sitting members,
+which had two problems. It handed one side a lead it had not earned, on some
+seeds a very large one. And it made a game nobody had played look like a live
+election tracker: the opening screen showed real parties on real percentages,
+which is exactly what this is not.
+
+So the game now generates all of it. **Seats are awarded when a round is
+settled**, the scoreboard opens 0 – 0 – 0 – 0, and round one decides the seats
+somebody actually contested. A short **Election started** note says so once and
+takes itself away after a few seconds.
+
+### What a percentage actually is
+
+A seat stores **campaign influence**: what has been spent and won there,
+accumulating, never a percentage. The percentages you see are what that
+influence is worth against the rest of the field in that seat, worked out when
+they are needed and never stored.
+
+That matters. If the board stored percentages, a seat somebody had spent a
+crore in and a seat somebody had spent a lakh in would read identically, and
+whoever campaigned first would keep a lead nobody could explain. Storing the
+work instead means a seat is worth exactly what has gone into it.
+
+A seat nobody has touched has no percentages at all — not four zeroes, no
+percentages — which is what *uncontested* means and what all 117 of them are
+before round one.
+
+### Turning up is not winning
+
+Part of every seat stays undecided on polling day, and that part is larger the
+less work has been done there: `undecided = k / (k + influence)`, with k set so
+that a seat with one rally in it is about three-quarters a coin toss.
+
+Without it the whole board could be won by turning up once everywhere — one
+cheap move in an untouched seat reads as a hundred per cent of a seat nobody
+has actually been reached in, and choosing where to campaign would stop
+mattering. The undecided part splits at random on the day, which is what makes
+breadth a gamble and depth a decision, and why a seat left uncontested is a
+lottery rather than a free saving.
 
 ### The allowance is income, not a limit
 
@@ -519,21 +560,27 @@ built from real officeholders.
 ### Are they a real contest?
 
 `npm run balance:ai` plays whole campaigns of one human against three
-opponents, rotating which party the human takes and pairing every board so the
-same map is played from all four seats. Over 48 campaigns:
+opponents, rotating which chair the human sits in and pairing every game so the
+same seed is played from all four. Over 48 campaigns:
 
 | | mean seats | won | heat | defaults |
 | --- | --- | --- | --- | --- |
-| human (safe moves, never borrows) | 31.5 | 12/48 | 5 | 0 |
-| opponents | 28.3 | 36/48 | 87 | 0 |
+| human (safe moves, never borrows) | 33.3 | 20/48 | 13 | 0 |
+| opponents | 27.9 | 28/48 | 94 | 0 |
 
-Same party, human against opponent: the human is ahead by about **3 seats**,
-down from twenty-one before the opponents learned to play for districts. One of
-four players winning 12 games in 48 is exactly their share, so an attentive
-player is slightly better than an opponent and beaten roughly three games in
-four — which is what having three rivals should feel like. The three
-temperaments finish differently (ambitious 41, steady 31, reckless 21), so the
-risk system means something for them too.
+Same party, human against opponent: the human is ahead by about **5 seats**. An
+attentive player is a little better than an opponent and still loses more often
+than they win, because there are three of them — which is what having three
+rivals should feel like. The three temperaments finish differently (steady 31,
+ambitious 28, reckless 25), so the risk system means something for them too.
+
+**Nobody wins a majority in this test, and that is expected.** Four campaigns
+playing the same way with the same money split an empty board roughly evenly,
+around thirty seats each — a majority needs half of Punjab, which takes a real
+difference in play rather than a good roll. A player who plays *differently*
+does reach one: in `balance-money`, which pits distinct approaches against each
+other, majorities are common. Four evenly-matched campaigns hanging the assembly
+is the honest outcome of an evenly-matched election.
 
 Their heat runs high and the human's does not, because the human baseline never
 takes a risky move at all and so never crosses the floor where consequences
@@ -651,79 +698,113 @@ neither describes any real-world method.
 | Community Development | ₹20 lakh | 3 seats | | Underground Deal | ₹60 lakh | 5 seats |
 | Media Campaign | ₹25 lakh | 4 seats | | Last-Minute Push | ₹70 lakh | 6 seats |
 
-Every seat is normalised to 100 across five parties, so a large gain in one seat
-is compressed on the way in: +4 raw lands as roughly +3, while +2 raw lands as
-roughly +1.9. Raw support therefore has sharply diminishing returns, and at
-three moves a round an action costing two and a half times as much bought barely
-a tenth more effect — money was very nearly irrelevant, which is as wrong as
-money deciding everything.
-
-So the dearer actions **reach further** instead of hitting harder. A doorstep
+The dearer actions **reach further** rather than hitting harder. A doorstep
 campaign moves one constituency; media coverage is seen in several. The extra
 seats take a fraction of the effect, and bad outcomes spread the same way — a
 media campaign that goes wrong goes wrong in public.
 
+`node tools/calibrate-actions.mjs` measures what a crore of each action is
+actually worth, in seats expected on polling day, and reports the scaling that
+would flatten them. They currently sit between 0.49 and 0.70 seats a crore — a
+1.4× spread across eleven actions, with the cheap wide ones at the top.
+
 ### Does money decide the game?
 
 The brief says it must not. `node tools/balance-money.mjs` plays whole campaigns
-for four approaches that vary one thing at a time and reports how they finish.
-Over 60 games:
+for six approaches that vary one thing at a time and reports how they finish.
+Over 40 games:
 
-| strategy | | mean seats | games won |
-| --- | --- | --- | --- |
-| careful | cheap moves, aimed at the closest races | 68.6 | 36/60 |
-| bigspender | borrows and spends, same aim | 68.3 | 23/60 |
-| gambler | borrows and spends on risky strategies | 61.3 | 1/60 |
-| scattergun | spends like careful, picks seats at random | 63.5 | 0/60 |
+| strategy | | mean seats | majorities | games won |
+| --- | --- | --- | --- | --- |
+| scattergun | cheap moves, seats picked at random | 69.0 | 31/40 | 21/40 |
+| spreader | cheap moves, whole balance spread thin | 67.7 | 37/40 | 15/40 |
+| careful | cheap moves, aimed where they are worth most | 63.6 | 28/40 | 4/40 |
+| heavyhitter | the maximum behind every move, few seats | 33.6 | 0/40 | 0/40 |
+| bigspender | borrows and buys the dearest safe move | 29.9 | 0/40 | 0/40 |
+| gambler | borrows and lives on risky strategies | 28.2 | 0/40 | 0/40 |
 
-Money edge (bigspender − careful): **−0.3 seats**. Aim edge (careful −
-scattergun): **+5.1 seats**. Spending more buys reach and costs interest, and
-comes out roughly a wash; choosing the right seat is worth five seats a
-campaign. No approach takes more than 60% of games. `npm run test:campaign`
-fails the build if that stops being true.
+No approach takes more than 53% of games, and the money axis behaves: spending
+more per move is worth **−21 seats**, not more. Spreading a balance rather than
+dumping it is worth **34 seats**, which is the spending curve doing its job.
+Living on risky strategies is the worst plan on the board.
 
-## Real MLA data
+### What the empty board changed
 
-Every constituency carries its sitting member: name, party, and the by-election
-that put them there where one applies. Generated by
-`tools/build-incumbents.mjs` from `tools/incumbents.json`, joined onto the
-verified 117 seats **by name** — the widely-mirrored MLA lists number seats
-102-108 differently from the official ECI numbering used elsewhere here, and a
-wrong pairing would put a real person on the wrong seat. The build fails rather
-than emit a partial join.
+When every seat opened at roughly a quarter each, the argument about a seat was
+how to move a percentage: aiming at the closest race was worth about five seats
+a campaign, and spending more was worth almost nothing.
 
-Current as of **August 2026**: the 2022 membership plus seven by-elections
-(Jalandhar West, Dera Baba Nanak, Chabbewal, Gidderbaha, Barnala, Ludhiana West,
-Tarn Taran). That gives AAP 94, INC 16, SAD 3, BJP 2, and one each for BSP and
-an independent — 117.
+On an empty board the first question about a seat is whether anybody has been
+there at all. So breadth is now the dominant idea, and the gap between a
+well-aimed plan and a scattered one is small — about six seats, and in the
+scattered plan's favour. That is a real change in what good play looks like, and
+an honest consequence of the board no longer being dealt.
 
-> The sitting members are **real people**. They are the incumbents this
-> fictional campaign is fought against, and they take no part in it. The players
-> are invented candidates; every support figure, campaign action, investigation
-> and result in this game is fiction, and none of it is a prediction of any real
-> election.
+What has not changed, and what `npm run test:campaign` fails the build over, is
+that money must not buy the election.
 
-The constituency screen keeps the halves apart: real MLA above, fictional game
-race below, with a LEADING indicator and a projected winner that move as players
-campaign.
+## Parties, and where they come from
 
-### The baseline, and why it does not replay the real result
+There is no list of parties in this game. There is a screen that asks you to
+found one.
 
-The party holding a seat starts ahead in it, by an amount rolled per seat. On its
-own that would hand the game to the largest incumbent bloc before anyone
-campaigned, so each game also rolls **one swing per party** across every seat.
+| | |
+| --- | --- |
+| Name | up to 40 characters, anything you like |
+| Short name | up to four letters, suggested from the name and editable |
+| Symbol | one of sixteen — a tree, a lamp, a river, a shield |
+| Colour | one of twelve, chosen to be told apart at the size of a dot |
+| Slogan | optional, and it appears on your card |
 
-Measured over 60 games (`npm run measure:board`): incumbents hold their own seat
-in **74 of 117 on average**, range 22 to 110. Incumbency is a real advantage —
-chance alone would give 23 — but the map differs every game, and the incumbent
-party leads the board in roughly two games in three rather than all of them.
+The abbreviation writes itself from the name — *Punjab Development Party*
+becomes PDP — and stops following the moment you edit it, because then it is
+yours. It is what appears on the scoreboard, the map and every compact card,
+which is why four letters is the limit.
+
+A party's **id is the slot its founder sat in**, not anything they typed. So two
+players can found parties with the same name and nothing collides, and a save
+can be read without knowing who typed what.
+
+Every empty chair is filled by an opponent that founds its own party from three
+pools — a place, a cause, and a kind of body — which is roughly the shape a real
+new party's name takes: *Doaba Farmers Morcha*, *Sutlej Progress Sabha*. Two
+thousand-odd combinations, and no combination of the pools lands on a real
+party's name. An opponent never takes a name, colour, symbol, abbreviation or
+face a player has already used: four campaigns on one scoreboard have to be four
+campaigns at a glance.
+
+> **No real party is in this game** unless a player typed its name in
+> themselves. There is no AAP, INC, BJP or SAD anywhere in the code, the data or
+> the save format.
+
+### Candidates
+
+Twenty-four of them, drawn one at a time rather than generated from a seed — a
+generator gives you unlimited faces and no good ones, because nobody ever looks
+at any single result and decides it is right.
+
+They are invented people: a range of ages, of dress and of bearing, turbaned and
+bare-headed, in a dupatta and in a jacket, thirty and seventy. Every one is
+drawn on the same construction, so a grid of them reads as one cast rather than
+as twenty-four separate drawings.
+
+> Not one is drawn from a photograph, a real candidate or a real officeholder,
+> and the set exists precisely so the game never needs a photograph of anybody.
+
+You pick yours from a grid; opponents are dealt faces nobody else is using. The
+roster exists in three places — the drawings, the data file the engine reads,
+and the server's copy for dealing to opponents — so `npm run test:ai` fails the
+build if they ever stop matching.
 
 ## The map
 
 All 117 seats, coloured by whoever leads them in the game, fading as the lead
 narrows so a toss-up does not read as decided. Click a seat to target it; the
-map repaints after every campaign action. Hovering names the seat, its leader,
-its rating and its real sitting MLA. The legend's party counts always total 117.
+map repaints after every campaign action. Hovering names the seat and either
+its leader and rating or, where nobody has campaigned, that it is uncontested —
+which early on is most of Punjab. Seats nobody has been to are drawn as
+unclaimed ground rather than as somebody's, and the legend counts only what has
+actually been decided.
 
 Two views:
 
@@ -812,8 +893,8 @@ Safe actions vary a little. Risky ones roll on a weighted table that can pay
 big, do nothing, or backfire outright — **the odds are never shown to the
 player**, only a cost, a risk word and an impact word. Anything that spends
 money is confirmed first, stating the cost and what it leaves behind: the round
-is sixty seconds long, and a mis-click should not be the reason a campaign runs
-out of cash.
+is two minutes long by default, and a mis-click should not be the reason a
+campaign runs out of cash.
 
 **Political Heat** runs 0–100 (Low / Moderate / High / Critical). Safe play
 barely moves it; risky play sends it up fast. Heat does not punish on a
@@ -927,11 +1008,12 @@ because four people are on four devices.
   database id, and a mistyped code is rejected rather than quietly corrected
   onto someone else's game.
 - **Join Game** takes that code, case-insensitively, into the same lobby.
-- **One party per player.** Once AAP is taken it is disabled for everyone else,
-  and the server refuses it even if a stale client tries anyway. Unclaimed
-  parties are left free for the AI opponents a later version will add.
-- **Ready system.** You cannot ready up without a party, candidate, slogan and
-  budget; the host cannot start until every *connected* player is ready.
+- **A party each, founded not claimed.** Nothing can be taken and nothing has to
+  be shared out: the id is the slot you are sitting in, so two players may found
+  parties with the same name and nothing collides. Every empty chair is filled by
+  an opponent that founds its own.
+- **Ready system.** You cannot ready up until you have named yourself and named
+  your party; the host cannot start until every *connected* player is ready.
 - **Disconnects.** A quiet player shows as Disconnected but keeps their slot,
   party and details. If the host drops, the role passes to the longest-present
   connected player automatically.
@@ -988,8 +1070,9 @@ in `index.php` that constructs the store.
   returning player is welcomed back by name and offered the election they are
   in the middle of. Underneath, quietly: the live figures, the top players,
   your own record and your recent elections
-- **Setup** — pick AAP, INC, BJP or SAD, then candidate name and slogan. The
-  ₹5 crore is granted, not typed
+- **Setup** — your name and face, then found a party: name, short name, symbol,
+  colour, slogan, with a preview card of what it all adds up to. The ₹5 crore a
+  round is granted, not typed
 - **The game screen** — see above
 - **Round results** — between rounds, an election-night scoreboard: four
   candidates with portraits ranked by projected seats, the seats that changed

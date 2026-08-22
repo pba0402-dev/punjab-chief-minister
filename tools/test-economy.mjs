@@ -53,8 +53,8 @@ const win = dom.window;
 
 for (const file of [
   'js/data/parties.js',
+  'js/data/avatars.js',
   'js/data/constituencies.js',
-  'js/data/incumbents.js',
   'js/data/regions.js',
   'js/data/actions.js',
   'js/engine/rng.js',
@@ -115,10 +115,15 @@ check('the round allowance is ₹5 crore', CMP.CAMPAIGN.income.perRound === 5 * 
 
 section("The brief's worked example, step by step");
 
+// Parties are invented now, so the harness founds one. The player is always
+// slot one, so their id is 'p1' in every game.
+const ME = 'p1';
+
 function newGame(seed) {
   return CMP.state.startElection({
-    partyId: 'aap',
     candidateName: 'Test Candidate',
+    partyName: 'Test Party',
+    partyShort: 'TP',
     slogan: 'Testing',
     seed: seed || 'economy',
   });
@@ -149,6 +154,7 @@ check('N+O+P. the balance is ₹9 crore', engine.remaining(g) === 9 * CR, cr(eng
 // which is the whole point of letting money carry forward.
 const malwa = CMP.DISTRICTS.filter((d) => d.region === 'malwa');
 const bigDistrict = malwa.slice().sort((a, b) => b.seats.length - a.seats.length)[0];
+const before6 = engine.remaining(g) + engine.grantTotal(g);
 const bulk = engine.campaignBulk(g, 'rally', bigDistrict.seats, 6 * CR, () => ROLLS);
 check('30. one allocation can cover a whole district', bulk.ok, bulk.reason);
 check('Q. spending ₹6 crore in one round is allowed',
@@ -158,11 +164,28 @@ check('10. more than the ₹5 crore allowance can go in one round',
 check('   and it landed across the district, not on one seat',
   bulk.ok && bulk.seats === bigDistrict.seats.length,
   (bulk.seats || 0) + ' of ' + bigDistrict.seats.length + ' seats');
-check('R. ₹3 crore remains', engine.remaining(g) === 3 * CR, cr(engine.remaining(g)));
+/*
+ * ₹6 crore left the campaign, but not all of it left the cash pile.
+ *
+ * Nothing is inherited any more, so a district taken in round one starts
+ * paying its grant in round two — and grant money is spent before cash,
+ * because it is locked to its region and holding it back would strand it.
+ * What has to be true is that six crore in total went, not that it all came
+ * out of one pocket.
+ */
+const purseAfter = engine.remaining(g) + engine.grantTotal(g);
+check('R. ₹6 crore left the campaign in total',
+  before6 - purseAfter === 6 * CR,
+  cr(before6) + ' - ' + cr(purseAfter) + ' = ' + cr(before6 - purseAfter));
+check('R. and the grant money went first',
+  engine.remaining(g) >= 3 * CR, cr(engine.remaining(g)));
 
+const beforeRound3 = engine.remaining(g);
 engine.endRound(g);
 engine.startNextRound(g);
-check('T+U. round 3 opens on ₹8 crore', engine.remaining(g) === 8 * CR, cr(engine.remaining(g)));
+check('T+U. the round allowance is added to what survived',
+  engine.remaining(g) === beforeRound3 + 5 * CR,
+  cr(beforeRound3) + ' + ₹5 Cr = ' + cr(engine.remaining(g)));
 
 /* ------------------------------------------------------------- saving up */
 
@@ -254,24 +277,27 @@ const malerkotla = CMP.DISTRICTS.find(
 check('a district the campaign was not handed', !!malerkotla,
   'opening: ' + g.openingDistricts.join('/'));
 
-// Take every seat in it.
+// Take every seat in it. The board is influence rather than percentages now,
+// so this is what campaigning hard everywhere in one district looks like.
 malerkotla.seats.forEach((n) => {
-  Object.keys(g.support[n]).forEach((party) => {
-    g.support[n][party] = party === 'aap' ? 70 : 10;
+  g.support[n] = {};
+  CMP.PARTIES.forEach(function (party) {
+    g.support[n][party.id] = party.id === ME ? 70 : 10;
   });
 });
 
 const region = malerkotla.region;
-const heldNow = engine.districtsHeldBy(g.support, 'aap');
+const heldNow = engine.districtsHeldBy(g.support, ME);
 check('AM. leading every seat is holding the district',
   heldNow.some((d) => d.id === malerkotla.id), heldNow.map((d) => d.id).join('/'));
 
 // Lose one seat and the hold goes with it.
 const dropped = JSON.parse(JSON.stringify(g.support));
-dropped[malerkotla.seats[0]].aap = 5;
-dropped[malerkotla.seats[0]].inc = 60;
+const rival = CMP.PARTIES.find((x) => x.id !== ME).id;
+dropped[malerkotla.seats[0]][ME] = 5;
+dropped[malerkotla.seats[0]][rival] = 60;
 check('   leading all but one is not holding it',
-  !engine.districtsHeldBy(dropped, 'aap').some((d) => d.id === malerkotla.id));
+  !engine.districtsHeldBy(dropped, ME).some((d) => d.id === malerkotla.id));
 
 const cashBefore = engine.remaining(g);
 const grantBefore = engine.grantIn(g, region);

@@ -48,7 +48,11 @@ CMP.ui.areas = (function () {
 
   /**
    * Every seat, from this party's point of view: their share, the best rival,
-   * and which of the four buckets it falls into.
+   * and which bucket it falls into.
+   *
+   * A seat nobody has campaigned in is in none of them. It is not safe, close
+   * or behind — it is open, which is a different kind of fact and the one
+   * every seat starts out being.
    */
   function survey(game, partyId) {
     var rows = [];
@@ -60,13 +64,32 @@ CMP.ui.areas = (function () {
       if (!def) return;
 
       var seat = game.support[key];
-      var mine = seat[partyId] || 0;
+      var ranked = CMP.campaign.standings(seat);
+
+      if (!ranked.length) {
+        rows.push({
+          number: def.number,
+          name: def.name,
+          district: def.district,
+          contested: false,
+          mine: 0,
+          rivalId: null,
+          rival: 0,
+          margin: 0,
+          bucket: 'open',
+          leading: false,
+        });
+        return;
+      }
+
+      var mine = 0;
       var rivalId = null;
       var rival = 0;
-      Object.keys(seat).forEach(function (pid) {
-        if (pid !== partyId && seat[pid] > rival) {
-          rival = seat[pid];
-          rivalId = pid;
+      ranked.forEach(function (row) {
+        if (row.partyId === partyId) mine = row.support;
+        else if (row.support > rival) {
+          rival = row.support;
+          rivalId = row.partyId;
         }
       });
 
@@ -81,6 +104,7 @@ CMP.ui.areas = (function () {
         number: def.number,
         name: def.name,
         district: def.district,
+        contested: true,
         mine: mine,
         rivalId: rivalId,
         rival: rival,
@@ -178,9 +202,10 @@ CMP.ui.areas = (function () {
     var totals = {};
     var seats = Object.keys(game.support || {});
     seats.forEach(function (key) {
-      var seat = game.support[key];
-      Object.keys(seat).forEach(function (pid) {
-        totals[pid] = (totals[pid] || 0) + seat[pid];
+      // Shares, not raw influence: a seat somebody spent a crore in and a
+      // seat somebody spent a lakh in are each one seat's worth of Punjab.
+      CMP.campaign.standings(game.support[key]).forEach(function (row) {
+        totals[row.partyId] = (totals[row.partyId] || 0) + row.support;
       });
     });
 
@@ -205,6 +230,9 @@ CMP.ui.areas = (function () {
   }
 
   function bucketLabel(row) {
+    // Open is not a rung on the ladder between safe and behind. It means
+    // nobody has been here, which before round one is true of all 117.
+    if (row.bucket === 'open') return { text: 'Open', tone: 'is-open' };
     if (row.bucket === 'safe') return { text: 'Safe', tone: 'is-safe' };
     if (row.bucket === 'leading') return { text: 'Leading', tone: 'is-leading' };
     if (row.bucket === 'close') return { text: 'Close', tone: 'is-close' };
@@ -227,12 +255,24 @@ CMP.ui.areas = (function () {
     }, [
       el('span', { class: 'area-main' }, [
         el('span', { class: 'area-name', text: row.name }),
-        el('span', { class: 'area-sub' }, [
-          el('span', { class: 'area-mine', text: party.short + ' ' + row.mine.toFixed(1) + '%' }),
-          rival
-            ? el('span', { class: 'area-rival', text: rival.short + ' ' + row.rival.toFixed(1) + '%' })
-            : null,
-        ]),
+        // A seat nobody has campaigned in has no shares to report, so it
+        // says what it is instead of printing 0.0% against everybody.
+        el('span', { class: 'area-sub' }, row.contested
+          ? [
+              el('span', {
+                class: 'area-mine',
+                text: party.short + ' ' + row.mine.toFixed(1) + '%',
+              }),
+              rival
+                ? el('span', {
+                    class: 'area-rival',
+                    text: rival.short + ' ' + row.rival.toFixed(1) + '%',
+                  })
+                : null,
+            ]
+          : [
+              el('span', { class: 'area-mine is-open', text: 'Nobody has campaigned here' }),
+            ]),
       ]),
       el('span', { class: 'area-status ' + tag.tone, text: tag.text }),
       el('span', { class: 'area-chev', 'aria-hidden': 'true', text: '›' }),
@@ -284,8 +324,8 @@ CMP.ui.areas = (function () {
                 onclick: opts.onBack,
               })
             : null,
-          candidate && candidate.portraitSeed
-            ? CMP.ui.portrait.render(candidate.portraitSeed, 46, candidate.candidateName)
+          candidate && candidate.avatar
+            ? CMP.ui.portrait.render(candidate.avatar, 46, candidate.candidateName)
             : el('span', { class: 'ar-flag', text: party.short }),
           el('div', { class: 'ar-who' }, [
             el('strong', { class: 'ar-name', text: candidate ? candidate.candidateName : party.name }),
@@ -444,6 +484,24 @@ CMP.ui.areas = (function () {
         ]),
 
         isYou ? bulkBlock(rows, closest) : null,
+
+        /*
+         * Seats nobody has been to.
+         *
+         * Before a round has been settled there are no strongest seats and no
+         * close races — there is nothing to be strong in or close to — so the
+         * two blocks below are absent and this is what the screen offers
+         * instead. It is also what a player wants first: an uncontested seat
+         * is the cheapest one to win.
+         */
+        topFive(
+          'Open seats',
+          'Nobody has campaigned in these. A seat with one campaign in it is ' +
+            'led by that campaign.',
+          rows.filter(function (r) {
+            return !r.contested;
+          })
+        ),
 
         topFive('Top 5 strongest seats', null, strongest),
         topFive('Closest 5 races', 'Where one move could change a seat.', closest),

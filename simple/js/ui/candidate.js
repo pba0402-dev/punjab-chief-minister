@@ -44,18 +44,27 @@ CMP.ui.candidate = (function () {
         else if (mine > 0) contested.push(d);
       });
 
-      // Every seat this party leads, strongest first, with the margin over
-      // whoever is second.
+      /*
+       * Every seat somebody has campaigned in, strongest first, with the
+       * margin over whoever is second.
+       *
+       * Uncontested seats are left out entirely. Ranking a seat nobody has
+       * touched as "closest race, margin 0.0" would fill the list with 117
+       * ties before a round had been played.
+       */
       var rows = [];
       Object.keys(game.support).forEach(function (key) {
-        var seat = game.support[key];
-        var mine = seat[partyId] || 0;
+        var ranked = CMP.campaign.standings(game.support[key]);
+        if (!ranked.length) return;
+
+        var mine = 0;
         var best = 0;
         var bestId = null;
-        Object.keys(seat).forEach(function (pid) {
-          if (pid !== partyId && seat[pid] > best) {
-            best = seat[pid];
-            bestId = pid;
+        ranked.forEach(function (row) {
+          if (row.partyId === partyId) mine = row.support;
+          else if (row.support > best) {
+            best = row.support;
+            bestId = row.partyId;
           }
         });
         rows.push({
@@ -171,8 +180,8 @@ CMP.ui.candidate = (function () {
               onclick: opts.onBack,
             })
           : null,
-        who && who.portraitSeed
-          ? CMP.ui.portrait.render(who.portraitSeed, 52, who.candidateName)
+        who && who.avatar
+          ? CMP.ui.portrait.render(who.avatar, 52, who.candidateName)
           : el('span', { class: 'ar-flag', text: party.short }),
         el('div', { class: 'cd-who' }, [
           el('strong', {

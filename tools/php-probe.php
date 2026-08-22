@@ -145,7 +145,6 @@ switch ($cmd) {
         // are pinned to the seed. Otherwise every run samples a different set
         // of outcomes and the assertions below drift.
         $accused['id'] = 'accused';
-        $accused['partyId'] = 'aap';
         $accused['cash'] = (int) $payload['cash'];
         $accused['heat'] = (float) ($payload['heat'] ?? 90);
         $accused['record']['reportsAgainst'] = ['r1' => true, 'r2' => true];
@@ -161,7 +160,12 @@ switch ($cmd) {
         $game['phase'] = 'election';
         $game['turn'] = 1;
         $game['players'][$accused['id']] = $accused;
-        [$board] = $engine->seedSupport(range(1, 117), Lobby::GAME_PARTIES, 'board', []);
+        // The board an investigation lands on has to have something in it, so
+        // the accused is given ground to lose. A game starts empty.
+        $board = $engine->emptyBoard(range(1, 117));
+        foreach (array_keys($board) as $key) {
+            $board[$key] = [$accused['partyId'] => 30.0];
+        }
         $game['board'] = $board;
 
         [$game, $record] = $inv->open($game, $accused['id']);

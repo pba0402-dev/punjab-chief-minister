@@ -27,21 +27,33 @@ declare(strict_types=1);
 final class AI
 {
     /**
-     * Build an opponent for one party. Everything is derived from the seed, so
-     * the same game always produces the same rival with the same name, the
-     * same face and the same temperament.
+     * Build an opponent for one empty seat at the table.
+     *
+     * Everything is derived from the seed, so the same game always produces
+     * the same rival with the same name, the same party, the same face and the
+     * same temperament. What is already claimed is passed in, so an opponent
+     * never turns up in somebody else's colour or under their symbol — four
+     * candidates on a scoreboard have to be four people at a glance.
      */
     public static function newPlayer(
         int $slot,
-        string $partyId,
         string $seed,
-        Campaign $engine
+        Campaign $engine,
+        array $claimed = []
     ): array {
         $cfg = $engine->config()['ai'];
+        $partyId = Lobby::partyIdForSlot($slot);
         $rand = Campaign::seededSequence($seed . ':ai:' . $partyId);
 
         $pick = static function (array $list) use ($rand) {
             return $list[(int) floor($rand() * count($list)) % count($list)];
+        };
+        $free = static function (array $list, array $used) use ($pick) {
+            $open = array_values(array_filter(
+                $list,
+                static fn($x) => !in_array(is_array($x) ? $x['id'] : $x, $used, true)
+            ));
+            return $pick($open !== [] ? $open : $list);
         };
 
         $profile = $pick($cfg['profiles']);
@@ -49,19 +61,76 @@ final class AI
         $surname = $pick($cfg['surnames']);
         $slogan = $pick($cfg['slogans']);
 
+        /*
+         * A party nobody typed in.
+         *
+         * Built from the same three-part pattern a real new party's name tends
+         * to follow — a place, a cause, a kind of body — so four names on a
+         * scoreboard sound like they belong to the same election without any
+         * two of them being the same.
+         */
+        $name = '';
+        $takenNames = $claimed['names'] ?? [];
+        for ($tries = 0; $tries < 12; $tries++) {
+            $name = $pick($cfg['partyPrefixes']) . ' ' . $pick($cfg['partyThemes'])
+                . ' ' . $pick($cfg['partyBodies']);
+            if (!in_array(mb_strtolower($name), $takenNames, true)) {
+                break;
+            }
+        }
+
+        $colourIds = array_keys(Lobby::COLOURS);
+        $colourId = $free($colourIds, $claimed['colours'] ?? []);
+        $symbol = $free(Lobby::SYMBOLS, $claimed['symbols'] ?? []);
+
+        $short = Lobby::suggestShort($name);
+        if (in_array($short, $claimed['shorts'] ?? [], true)) {
+            $short .= (string) ($slot + 1);
+        }
+
         $player = Lobby::newPlayer($slot, $engine->startingBudget());
         $player['id'] = 'ai-' . $partyId;
         $player['token'] = '';           // nothing can authenticate as an opponent
         $player['isAI'] = true;
         $player['profileId'] = $profile['id'];
         $player['partyId'] = $partyId;
+        $player['party'] = Lobby::makeParty($slot, [
+            'name' => $name,
+            'short' => $short,
+            'symbol' => $symbol,
+            'colourId' => $colourId,
+            'slogan' => $slogan,
+        ]);
         $player['candidateName'] = $given . ' ' . $surname;
         $player['slogan'] = $slogan;
-        $player['portraitSeed'] = $seed . ':' . $partyId;
+        $player['avatar'] = self::pickAvatar($rand, $claimed['avatars'] ?? []);
         $player['ready'] = true;
         $player['lastSeen'] = time();
 
         return $player;
+    }
+
+    /**
+     * A face nobody in this game is using.
+     *
+     * The roster is the client's — it draws them — so the server knows only
+     * how many there are and what they are called. Keeping the two in step is
+     * what `test-ai` checks.
+     */
+    public const AVATARS = [
+        'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8',
+        'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16',
+        'a17', 'a18', 'a19', 'a20', 'a21', 'a22', 'a23', 'a24',
+    ];
+
+    private static function pickAvatar(callable $rand, array $taken): string
+    {
+        $free = array_values(array_filter(
+            self::AVATARS,
+            static fn($id) => !in_array($id, $taken, true)
+        ));
+        $pool = $free !== [] ? $free : self::AVATARS;
+        return $pool[(int) floor($rand() * count($pool)) % count($pool)];
     }
 
     /** The profile this opponent plays to. */
@@ -453,10 +522,9 @@ final class AI
         $closest = static function (array $keys) use ($board, $partyId): array {
             $margins = [];
             foreach ($keys as $key) {
-                $seat = $board[(string) $key] ?? null;
-                if ($seat === null) {
-                    continue;
-                }
+                // An untouched seat is stored as {} so it survives JSON as an
+                // object rather than an empty list.
+                $seat = (array) ($board[(string) $key] ?? []);
                 $mine = (float) ($seat[$partyId] ?? 0);
                 $best = 0.0;
                 foreach ($seat as $pid => $value) {

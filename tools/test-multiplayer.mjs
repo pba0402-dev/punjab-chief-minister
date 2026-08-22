@@ -225,40 +225,97 @@ check('joiners have no host block', !players[1].q('.host-block'));
 
 /* ---------------------------------------------------------------- parties */
 
-section('Party selection is exclusive');
-function partyCard(client, short) {
-  return client.qq('.party-card').find((c) => {
-    const el = c.querySelector('.party-short');
-    return el && el.textContent === short;
-  });
+/*
+ * Everybody founds their own.
+ *
+ * There is no list of four to claim any more, so nothing can be taken and
+ * nothing has to be shared out. What matters instead is that four people
+ * typing at once each end up with the party they typed, and that the id each
+ * one gets is their slot rather than anything they sent.
+ */
+section('Every player founds a party');
+
+/** The player's own row, asked of the server directly. */
+async function mineOf(c) {
+  const res = await c.dom.window.CMP.net.state();
+  const v = res && res.game;
+  if (!v) return null;
+  return (v.players || []).find((x) => x.isYou) || null;
 }
 
-host.click(partyCard(host, 'AAP'));
-await host.until('aap', () => !!host.q('.party-card.is-selected'));
-check('host takes AAP', partyCard(host, 'AAP').classList.contains('is-selected'));
+/** Every player's row, for the checks that compare the four of them. */
+async function rowsOf(clients) {
+  const out = [];
+  for (const c of clients) out.push(await mineOf(c));
+  return out;
+}
 
-const p2SeesTaken = await players[1].until(
-  'aap taken',
-  () => partyCard(players[1], 'AAP') && partyCard(players[1], 'AAP').classList.contains('is-taken')
-);
-check('AAP shows as taken for everyone else', p2SeesTaken);
-check('the taken card is disabled', partyCard(players[1], 'AAP').disabled === true);
+const PARTY_NAMES = [
+  'Punjab Development Party',
+  'Unity Punjab Front',
+  'Pind Vikas Manch',
+  'Sanjha Workers Alliance',
+];
+const PARTY_SYMBOLS = ['tree', 'lamp', 'river', 'wheat'];
+const PARTY_COLOURS = ['emerald', 'indigo', 'crimson', 'gold'];
 
-// Clicking it anyway must change nothing.
-players[1].click(partyCard(players[1], 'AAP'));
-await sleep(600);
-check(
-  'clicking a taken party does not steal it',
-  !partyCard(players[1], 'AAP').classList.contains('is-selected')
-);
+for (let i = 0; i < players.length; i++) {
+  const c = players[i];
+  await c.until('party editor', () => !!c.q('.js-party-name'));
+  c.type(c.q('.js-party-name'), PARTY_NAMES[i]);
+  c.click(c.qq('.sym-option')[CMP_SYM_INDEX(PARTY_SYMBOLS[i], c)]);
+  c.click(c.qq('.col-option')[CMP_COL_INDEX(PARTY_COLOURS[i], c)]);
+}
 
-players[1].click(partyCard(players[1], 'INC'));
-players[2].click(partyCard(players[2], 'BJP'));
-players[3].click(partyCard(players[3], 'SAD'));
-const allPicked = await host.until('all parties', () =>
-  host.qq('.roster-flag').filter((f) => !f.classList.contains('is-none')).length === 4
+function CMP_SYM_INDEX(id, c) {
+  return c.dom.window.CMP.PARTY_SYMBOLS.findIndex((x) => x.id === id);
+}
+function CMP_COL_INDEX(id, c) {
+  return c.dom.window.CMP.PARTY_COLOURS.findIndex((x) => x.id === id);
+}
+
+const allFounded = await host.until('all parties', () =>
+  host.qq('.roster-partyname').filter((f) => !f.classList.contains('is-none')).length === 4
 );
-check('all four parties are claimed', allPicked);
+check('5. all four players founded a party', allFounded,
+  host.qq('.roster-partyname').map((n) => n.textContent).join(' | '));
+
+const rows = await rowsOf(players);
+
+check('6. each player got the party they typed',
+  rows.every((mine, i) => mine && mine.party && mine.party.name === PARTY_NAMES[i]),
+  JSON.stringify(rows.map((mine) => mine && mine.party && mine.party.name)));
+
+check('and the id is the slot, not anything the client sent',
+  rows.every((mine) => mine && mine.partyId === 'p' + mine.slot),
+  JSON.stringify(rows.map((mine) => mine && mine.partyId)));
+
+// 29. The abbreviation writes itself, and every player can see everybody's.
+check('29. a short name was worked out for each',
+  rows.every((mine) => mine && mine.party.short && mine.party.short.length <= 4),
+  JSON.stringify(rows.map((mine) => mine && mine.party.short)));
+
+// 30. Two campaigns must never wear the same colour or symbol.
+check('30. no two parties share a colour',
+  new Set(rows.map((mine) => mine.party.colourId)).size === 4,
+  rows.map((mine) => mine.party.colourId).join(','));
+check('30. or a symbol',
+  new Set(rows.map((mine) => mine.party.symbol)).size === 4,
+  rows.map((mine) => mine.party.symbol).join(','));
+
+check('25. and the lobby shows every player with their party',
+  host.qq('.roster-partyname').length === 4 &&
+  PARTY_NAMES.every((n) => host.q('.roster').textContent.includes(n)),
+  host.q('.roster').textContent.replace(/\s+/g, ' ').slice(0, 160));
+
+check('25. with a face apiece', host.qq('.roster-row .portrait').length >= 1,
+  host.qq('.roster-row .portrait').length + ' faces');
+
+// 11. The preview card shows what the player is about to become.
+check('11. the party preview shows the name and badge',
+  /PUNJAB DEVELOPMENT PARTY/.test(host.q('.pv-party').textContent) &&
+  !!host.q('.pv-badge svg'),
+  host.q('.pv-party').textContent);
 
 /* ---------------------------------------------------------------- details */
 
@@ -271,13 +328,16 @@ const CANDIDATES = [
 ];
 
 players.forEach((c, i) => {
-  const fields = c.qq('.screen-lobby .field-input');
-  c.type(fields[0], CANDIDATES[i][0]);
+  c.type(c.q('.js-candidate-name'), CANDIDATES[i][0]);
 });
 check('the lobby asks for no budget', !host.q('.screen-lobby .field-money'));
-check('1. and no slogan',
-  host.qq('.screen-lobby .field-input').length === 1,
+// 8. Name, then party, then a badge, then a line to run on — and nothing
+// else. The budget is granted; it has never been typed in.
+check('8. the lobby asks for a name, a party, a short name and a slogan',
+  host.qq('.screen-lobby .field-input').length === 4,
   host.qq('.screen-lobby .field-input').length + ' fields');
+check('8. and the name comes first',
+  host.qq('.screen-lobby .field-input')[0].classList.contains('js-candidate-name'));
 check('7. the round allowance is stated in the lobby',
   /5 crore a round/i.test(host.text()), host.text().slice(0, 200));
 check('4. the host picks the round length',
@@ -321,7 +381,9 @@ host.click(startBtn());
 const hostStarted = await host.until('election', () => !!host.q('.screen-election'));
 check('the host moves to the election screen', hostStarted);
 const onElection = (c) => (c.q('.screen-election') ? c.q('.screen-election').textContent : '');
-check("the host's own party is shown", /AAP/.test(host.q('.g-who-party').textContent));
+// 28. The party they founded, not a code from a list nobody chose.
+check("28. the host's own party is shown", /PDP/.test(host.q('.g-who-party').textContent),
+  host.q('.g-who-party').textContent);
 check('4. the host sees their money, not a card about themselves',
   /Available/.test(host.q('.g-player').textContent) &&
   !/Simran Kaur Gill/.test(host.q('.g-player').textContent),
@@ -342,14 +404,15 @@ check('the round clock is showing', !!host.q('.round-clock'));
 check('it opens on round 1 of 20', /Round\s*1\s*\/\s*20/.test(host.q('.round-bar').textContent),
   host.q('.round-bar').textContent.slice(0, 40));
 check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
-check('and the majority line says how many more are needed',
-  /needs \d+ more|past the majority/.test(host.q('.g-majority-text').textContent),
+check('and the majority line says how many more are needed, or that none are decided',
+  /needs \d+ more|past the majority|none decided yet/.test(host.q('.g-majority-text').textContent),
   host.q('.g-majority-text').textContent.slice(0, 60));
 
 const p2Started = await players[1].until('election', () => !!players[1].q('.screen-election'));
 check('player 2 is taken along automatically', p2Started);
-check('player 2 sees their own party',
-  /INC/.test(players[1].q('.g-who-party').textContent));
+check('28. player 2 sees their own party',
+  /UPF/.test(players[1].q('.g-who-party').textContent),
+  players[1].q('.g-who-party').textContent);
 check('player 2 sees their own money',
   /Available/.test(players[1].q('.g-player').textContent));
 check(
@@ -359,8 +422,9 @@ check(
 
 const p4Started = await players[3].until('election', () => !!players[3].q('.screen-election'));
 check('player 4 is taken along too', p4Started);
-check('player 4 sees their own party',
-  /SAD/.test(players[3].q('.g-who-party').textContent));
+check('28. player 4 sees their own party',
+  /SWA/.test(players[3].q('.g-who-party').textContent),
+  players[3].q('.g-who-party').textContent);
 
 /* ------------------------------------------------- independent budgets */
 
@@ -542,18 +606,26 @@ await host.until('seat detail', () => !!host.q('.seat-detail'));
 check('a constituency opens from the list', !!host.q('.seat-detail'));
 check('it names the seat and its AC number', /AC \d+/.test(host.q('.sd-where').textContent),
   host.q('.sd-where').textContent);
-check('the sitting MLA is shown', !!host.q('.sd-mla-name') && host.q('.sd-mla-name').textContent.length > 2,
-  host.q('.sd-mla-name') ? host.q('.sd-mla-name').textContent : 'missing');
-check('their party is shown', !!host.q('.sd-mla-party'));
-check('it is labelled as real reference data',
-  /takes no part in the game/i.test(host.q('.sd-mla').textContent));
-check('the fictional race is shown separately', !!host.q('.sd-leader'));
-check('the game leader is named', host.q('.sd-leader-name').textContent.length > 2,
+// 4. No sitting member anywhere: the seat and its district are real Punjab
+// geography, and every person and party on the screen is the game's own.
+check('4. no sitting member is shown', !host.q('.sd-mla'));
+check('4. and no real party appears on the seat',
+  !/(AAP|INC|BJP|SAD|BSP)/.test(host.q('.seat-detail').textContent),
+  host.q('.seat-detail').textContent.replace(/\s+/g, ' ').slice(0, 120));
+check('the race is the whole screen', !!host.q('.sd-leader'));
+check('3. the leader is named, or the seat says it has none',
+  host.q('.sd-leader-name').textContent.length > 2,
   host.q('.sd-leader-name').textContent);
-check('with their share', /%$/.test(host.q('.sd-leader-share').textContent),
-  host.q('.sd-leader-share').textContent);
-check('every party has a bar', host.qq('.sd-bar').length >= 4, String(host.qq('.sd-bar').length));
-check('one bar is marked as leading', host.qq('.sd-bar.is-leading').length === 1);
+check('3. with their share where there is a leader',
+  host.q('.sd-leader-share')
+    ? /%$/.test(host.q('.sd-leader-share').textContent)
+    : /No leader/i.test(host.q('.sd-leader-name').textContent),
+  host.q('.sd-leader').textContent.replace(/\s+/g, ' ').slice(0, 60));
+check('2. every party in the game has a bar', host.qq('.sd-bar').length === 4,
+  String(host.qq('.sd-bar').length));
+check('one bar is marked as leading, unless nobody leads',
+  host.qq('.sd-bar.is-leading').length === (host.q('.sd-leader-share') ? 1 : 0),
+  String(host.qq('.sd-bar.is-leading').length));
 
 section('Reporting a rival');
 // Rivals sit with the high-risk play they exist to police.
@@ -680,8 +752,16 @@ check('a verdict is declared',
 
 if (/Hung Assembly/.test(verdict)) {
   check('coalition talks are offered', /Government Formation/.test(host.text()));
+  /*
+   * Four campaigns can finish close enough together that no two of them reach
+   * 59 between them. That is a real outcome, so what is checked is that the
+   * screen says which it is rather than showing an empty list.
+   */
   const pairs = host.qq('.pair-row');
-  check('possible pairings are listed', pairs.length > 0, String(pairs.length));
+  check('a hung assembly either offers pairings or says none reach a majority',
+    pairs.length > 0 || /stays hung|reaches \d+ seats/.test(host.q('.coalition-block').textContent),
+    pairs.length + ' pairings — ' +
+    host.q('.coalition-block').textContent.replace(/\s+/g, ' ').slice(0, 100));
   if (pairs.length) {
     host.click(pairs[0]);
     await host.until('terms', () => !!host.q('.terms-form'));
@@ -741,10 +821,11 @@ check('and they see the declared result', !!returning.q('.screen-result'));
 const returningText = () =>
   (returning.q('.screen-election') || returning.q('.screen-result') ||
     returning.q('.screen-lobby') || { textContent: '' }).textContent;
-// The result screen shows party codes and candidate names rather than full
-// party names, so check the restored state directly.
-check('their party is still INC',
-  returning.dom.window.CMP.app.getGame().partyId === 'inc',
+// The result screen shows abbreviations and candidate names rather than full
+// party names, so check the restored state directly. A party id is the slot
+// its founder sat in, and it survives a reconnection with everything else.
+check('their party is still the one they founded',
+  returning.dom.window.CMP.app.getGame().partyId === 'p2',
   returning.dom.window.CMP.app.getGame().partyId);
 // They arrive with the count still running, exactly as a late joiner would.
 skipCount(returning);
@@ -809,7 +890,7 @@ check('33. no private detail is published',
 // leaderboard, so they must never match.
 const myId = host.dom.window.CMP.profile.get().id;
 check('33. and the published portrait seed is not the private profile id',
-  afterStats.leaderboard.every((r) => r.portraitSeed !== myId) &&
+  afterStats.leaderboard.every((r) => r.avatar !== myId) &&
   !JSON.stringify(afterStats.leaderboard).includes(myId));
 
 const hostProfile = await host.dom.window.CMP.profile.refresh();
@@ -818,7 +899,8 @@ check('5. the host has a profile with a record on it',
 check('5. it carries their chosen game name, not an account',
   hostProfile.name === 'Simran Kaur Gill', String(hostProfile && hostProfile.name));
 check('5. their seats are recorded', hostProfile.seatsTotal > 0, String(hostProfile.seatsTotal));
-check('5. and the party they played', !!hostProfile.byParty.aap);
+check('5. and the party they played', !!hostProfile.byParty.p1,
+  JSON.stringify(Object.keys(hostProfile.byParty)));
 
 // 55. Ground held and what it paid. Seats say who won; these say how the
 // campaign was funded, which is the other half of the record.
@@ -885,9 +967,9 @@ solo.click(solo.qq('.h-play-btn')[0]);
 await solo.dom.window.CMP.data.ensure();
 await sleep(60);
 check('solo setup opens', !!solo.q('.screen-setup'));
-solo.click(solo.qq('.party-card').find((c) => c.textContent.includes('BJP')));
 const soloFields = solo.qq('.field-input');
 solo.type(soloFields[0], 'Solo Candidate');
+solo.type(solo.qq('.field-input')[1], 'Solo Party');
 check('solo asks for no budget either', !solo.q('.field-money'));
 solo.click(solo.q('.btn-start'));
 check('solo election starts', !!solo.q('.screen-election'));

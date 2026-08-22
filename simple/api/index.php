@@ -123,26 +123,6 @@ $constituencyNumbers = (function (): array {
     return range(1, 117);
 })();
 
-/* Sitting MLAs, read from the generated data file so the server and browser
-   always agree on who holds which seat. */
-$incumbentParties = (function (): array {
-    $js = @file_get_contents(__DIR__ . '/../js/data/incumbents.js');
-    if ($js === false) {
-        return [];
-    }
-    if (preg_match('/CMP\.INCUMBENTS = (\[.*?\]);/s', $js, $m)) {
-        $list = json_decode($m[1], true);
-        if (is_array($list)) {
-            $map = [];
-            foreach ($list as $row) {
-                $map[(string) $row['number']] = $row['party'];
-            }
-            return $map;
-        }
-    }
-    return [];
-})();
-
 /* ---------------------------------------------------------------- errors */
 
 /** Thrown by a mutator to refuse a change and explain why to the player. */
@@ -308,7 +288,7 @@ function attachProfile(array $player, Profiles $profiles): array
         return $player;
     }
     $name = Profiles::cleanName((string) input('profileName', ''));
-    $profile = $profiles->ensure($id, $name, (string) $player['portraitSeed']);
+    $profile = $profiles->ensure($id, $name, (string) $player['avatar']);
     if (!$profile) {
         return $player;
     }
@@ -511,21 +491,28 @@ switch (route()) {
 
     /* ------------------------------------------------------------- party */
     case 'party': {
+        // Founding a party rather than claiming one. The id is the slot the
+        // player is sitting in, so it is not theirs to send; everything else
+        // about it is.
         [$game, $playerId] = authenticate($store);
-        $partyId = strtolower((string) input('partyId', ''));
-        if ($partyId !== '' && !in_array($partyId, Lobby::PARTIES, true)) {
-            fail('Unknown party.', 400, 'bad_party');
-        }
+        $in = [
+            'name' => (string) input('name', ''),
+            'short' => (string) input('short', ''),
+            'symbol' => (string) input('symbol', ''),
+            'colourId' => (string) input('colourId', ''),
+            'slogan' => (string) input('slogan', ''),
+        ];
 
-        mutate($store, $game, $playerId, static function (array $g) use ($partyId, $playerId) {
+        mutate($store, $game, $playerId, static function (array $g) use ($in, $playerId) {
             if ($g['phase'] !== 'lobby') {
                 throw new LobbyError('The election has already started.');
             }
-            if ($partyId !== '' && !Lobby::partyIsFree($g, $partyId, $playerId)) {
-                throw new LobbyError('Another player has already taken that party.', 'party_taken');
-            }
-            $g['players'][$playerId]['partyId'] = $partyId === '' ? null : $partyId;
-            // Changing party un-readies you, so nobody starts on a stale choice.
+            $slot = (int) $g['players'][$playerId]['slot'];
+            $g['players'][$playerId]['party'] = Lobby::makeParty($slot, $in);
+            $g['players'][$playerId]['partyId'] = Lobby::partyIdForSlot($slot);
+            $g['players'][$playerId]['slogan'] = $g['players'][$playerId]['party']['slogan'];
+            // Changing the party un-readies you, so nobody starts on a stale
+            // choice somebody else has already read.
             $g['players'][$playerId]['ready'] = false;
             return $g;
         });
@@ -564,7 +551,7 @@ switch (route()) {
             }
             if ($ready && !Lobby::playerIsComplete($g['players'][$playerId])) {
                 throw new LobbyError(
-                    'Pick a party and fill in your candidate, slogan and budget first.',
+                    'Enter your name and found your party first.',
                     'incomplete'
                 );
             }
@@ -778,42 +765,31 @@ switch (route()) {
                 'party' => (string) ($g['players'][$playerId]['partyId'] ?? ''),
             ]);
 
-            // Deal the opening map once. Everyone campaigns on this same
-            // board, so a rally in Moga shows up on all four screens rather
-            // than only in the results.
+            /*
+             * One board, empty.
+             *
+             * Every one of the 117 starts with nothing in it: no influence, no
+             * leader, no percentage, no status. Everyone campaigns on this
+             * same map, so a rally in Moga shows up on all four screens rather
+             * than only in the results.
+             */
             $engine = $GLOBALS['campaign'];
-            [$board, $incumbency] = $engine->seedSupport(
-                $GLOBALS['constituencyNumbers'],
-                Lobby::GAME_PARTIES,
-                $g['id'],
-                $GLOBALS['incumbentParties']
-            );
-            $g['board'] = $board;
-            $g['incumbency'] = $incumbency;
+            $g['board'] = $engine->emptyBoard($GLOBALS['constituencyNumbers']);
 
-            // What the deal handed each party. Recorded once, so a grant can
-            // only ever be paid for a district somebody actually took.
-            $terr = $GLOBALS['territory'];
-            $openingLeaders = Territory::leadersOf($board);
+            // Nobody holds anything, so no district is anybody's and none of
+            // them pays. Every district in this game is one somebody took.
             foreach ($g['players'] as $pid => $pl) {
-                $party = (string) ($pl['partyId'] ?? '');
-                $g['players'][$pid]['openingDistricts'] = $party === ''
-                    ? []
-                    : array_map(
-                        static fn($d) => (string) $d['id'],
-                        $terr->heldBy($openingLeaders, $party)
-                    );
+                $g['players'][$pid]['openingDistricts'] = [];
             }
             $g['history'] = [];
             $g['roundLog'] = [];
 
-            // Any party nobody claimed gets an opponent, so the scoreboard
-            // always has four competitors and a game with two people at the
-            // table is still an election rather than a two-horse race.
+            // Every empty seat at the table gets an opponent, so the
+            // scoreboard always has four competitors and a game with two
+            // people at it is still an election rather than a two-horse race.
             if (!empty($engine->config()['ai']['enabled'])) {
-                $slot = Lobby::MAX_PLAYERS;
-                foreach (Lobby::unclaimedParties($g) as $partyId) {
-                    $opponent = AI::newPlayer($slot--, $partyId, $g['id'], $engine);
+                foreach (Lobby::freeSlots($g) as $slot) {
+                    $opponent = AI::newPlayer($slot, $g['id'], $engine, Lobby::claimed($g));
                     $g['players'][$opponent['id']] = $opponent;
                 }
             }
@@ -903,7 +879,7 @@ switch (route()) {
             [$player, $board, $report] = $engine->play($player, $board, $actionId, $target, $rolls, $amount);
 
             $g['board'] = $board;
-            $counts = $engine->seatCounts($board);
+            $counts = $engine->seatCounts($board, Lobby::partyIdsOf($g));
             foreach ($g['players'] as $otherId => $other) {
                 $pid = (string) ($other['partyId'] ?? '');
                 $g['players'][$otherId]['seatsLed'] = $pid === '' ? 0 : (int) ($counts[$pid] ?? 0);
@@ -1226,7 +1202,7 @@ switch (route()) {
         $profile = $profiles->ensure(
             $id,
             (string) input('name', ''),
-            (string) input('portraitSeed', '')
+            (string) input('avatar', '')
         );
         if (!$profile) {
             fail('That profile could not be read.', 400, 'bad_profile');
@@ -1246,10 +1222,12 @@ switch (route()) {
         if ($id === '') {
             fail('No profile id.', 400, 'bad_profile');
         }
-        $profiles->ensure($id, (string) input('name', ''), (string) input('portraitSeed', ''));
+        $profiles->ensure($id, (string) input('name', ''), (string) input('avatar', ''));
 
         $party = preg_replace('/[^a-z]/', '', strtolower((string) input('party', '')));
-        if (!in_array($party, Lobby::PARTIES, true)) {
+        // A solo party is whatever the player invented, so there is no list
+        // to check it against — only a shape.
+        if ($party === '' || strlen($party) > 8) {
             fail('Unknown party.', 400, 'bad_party');
         }
 

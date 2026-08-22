@@ -19,7 +19,7 @@ CMP.profile = (function () {
   'use strict';
 
   var KEY = 'cmp.punjab.profile.v1';
-  var local = null;   // { id, name, portraitSeed }
+  var local = null;   // { id, name, avatar }
   var remote = null;  // the server's view, once fetched
   var listeners = [];
 
@@ -63,33 +63,33 @@ CMP.profile = (function () {
   /**
    * Start a profile under a chosen name.
    *
-   * The portrait seed is generated separately from the id and never derived
-   * from it. The seed is published — it is on every leaderboard row, because
-   * that is how the face gets drawn — and the id is what proves a request is
-   * yours. Making one from the other would put every player's id on the
-   * leaderboard for anybody to read.
+   * The avatar is chosen, never derived from the id. It is published — it is
+   * on every leaderboard row, because that is how the face gets drawn — and
+   * the id is what proves a request is yours. Deriving one from the other
+   * would put every player's id on the leaderboard for anybody to read.
    */
-  function create(name, portraitSeed) {
+  function create(name, avatar) {
+    var id = newId();
     write({
-      id: newId(),
+      id: id,
       name: String(name || '').trim().slice(0, 32) || 'Player',
-      portraitSeed: portraitSeed || newId(),
+      avatar: avatar || CMP.avatarFor(id),
     });
     return local;
   }
 
   /** Change the face, keeping everything else. */
-  function setAvatar(seed) {
+  function setAvatar(avatar) {
     var p = read();
-    if (!p || !seed) return p;
-    write({ id: p.id, name: p.name, portraitSeed: String(seed) });
+    if (!p || !avatar) return p;
+    write({ id: p.id, name: p.name, avatar: String(avatar) });
     return local;
   }
 
   function rename(name) {
     var p = read();
     if (!p) return create(name);
-    write({ id: p.id, name: String(name || '').trim().slice(0, 32) || p.name, portraitSeed: p.portraitSeed });
+    write({ id: p.id, name: String(name || '').trim().slice(0, 32) || p.name, avatar: p.avatar });
     return local;
   }
 
@@ -119,7 +119,7 @@ CMP.profile = (function () {
   function refresh() {
     var p = read();
     if (!p) return Promise.resolve(null);
-    return CMP.net.profile(p.id, p.name, p.portraitSeed).then(function (res) {
+    return CMP.net.profile(p.id, p.name, p.avatar).then(function (res) {
       if (res && res.ok) {
         remote = res.profile;
         emit();
@@ -161,7 +161,7 @@ CMP.profile = (function () {
       .recordSolo({
         profileId: p.id,
         name: p.name,
-        portraitSeed: p.portraitSeed,
+        avatar: p.avatar,
         party: game.partyId,
         seats: mine.seats,
         won: !!(result.winner && result.winner.party === game.partyId),

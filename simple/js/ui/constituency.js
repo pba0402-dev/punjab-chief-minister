@@ -1,14 +1,14 @@
 /**
  * One constituency, compactly.
  * ------------------------------------------------------------------
- * Who is leading here, by how much, against whom — and, kept firmly separate
- * below it, who the real sitting MLA is.
+ * Who is leading here, by how much, and against whom — or nobody at all,
+ * which is where every one of the 117 starts and stays until somebody spends
+ * money in it.
  *
- * That separation is the only thing on this screen that is not negotiable. The
- * sitting member is a real person and appears as reference only: they take no
- * part in the game, and nothing a player does is attributed to them. The
- * candidates above them are invented, and are the ones actually contesting the
- * fictional election.
+ * There is no sitting member on this screen and no real candidate anywhere in
+ * it. The seat, its number and its district are real Punjab geography; every
+ * person, party and percentage is the game's own, generated from what players
+ * have actually done. Nothing here is a claim about any real election.
  *
  * Everything else here is deliberately small. A player opening a seat wants
  * four numbers and a name, not a page of analysis.
@@ -33,7 +33,14 @@ CMP.ui.constituency = (function () {
     };
   }
 
-  /** "AAP — LEADING" for a seat, as a small element. */
+  /** Every party in the game, on nothing. What an uncontested seat holds. */
+  function openField() {
+    return CMP.getParties().map(function (p) {
+      return { partyId: p.id, support: 0 };
+    });
+  }
+
+  /** "PDP — LEADING" for a seat, as a small element. */
   function leadingBadge(support, extraClass) {
     var lead = leaderOf(support);
     if (!lead) return null;
@@ -87,11 +94,22 @@ CMP.ui.constituency = (function () {
     // Scale to the range the data occupies, not to zero: five parties in a
     // close seat all sit between 15 and 30 per cent, and a zero-based axis
     // would draw that as five flat lines in a heap.
+    // Plotted as shares, which is what the seat is actually read in — the
+    // stored numbers are raw influence and would climb off the top of any
+    // axis as the campaign wore on.
+    var shareAt = {};
+    points.forEach(function (p, i) {
+      shareAt[i] = {};
+      CMP.campaign.standings(p.support).forEach(function (row) {
+        shareAt[i][row.partyId] = row.support;
+      });
+    });
+
     var lo = Infinity;
     var hi = -Infinity;
-    points.forEach(function (p) {
+    points.forEach(function (p, i) {
       CMP.PARTIES.forEach(function (party) {
-        var v = p.support[party.id] || 0;
+        var v = shareAt[i][party.id] || 0;
         lo = Math.min(lo, v);
         hi = Math.max(hi, v);
       });
@@ -129,7 +147,8 @@ CMP.ui.constituency = (function () {
     add('line', { x1: padL, y1: h - padB, x2: w - padL, y2: h - padB, class: 'history-axis' });
     CMP.PARTIES.forEach(function (party) {
       var d = points.map(function (p, i) {
-        return (i ? 'L' : 'M') + x(p.round).toFixed(1) + ' ' + y(p.support[party.id] || 0).toFixed(1);
+        return (i ? 'L' : 'M') + x(p.round).toFixed(1) + ' ' +
+          y(shareAt[i][party.id] || 0).toFixed(1);
       }).join(' ');
       add('path', {
         d: d,
@@ -162,11 +181,10 @@ CMP.ui.constituency = (function () {
     var support = game.support[number];
     if (!def || !support) return el('p', { class: 'muted', text: 'Unknown constituency.' });
 
-    var sitting = CMP.getIncumbent(def.number);
     var lead = leaderOf(support);
-    var rating = CMP.campaign.ratingFor(lead.margin);
-    var leadParty = CMP.getParty(lead.partyId);
-    var leadCandidate = candidateFor(lead.partyId, opts.players);
+    var rating = lead ? CMP.campaign.ratingFor(lead.margin) : null;
+    var leadParty = lead ? CMP.getParty(lead.partyId) : null;
+    var leadCandidate = lead ? candidateFor(lead.partyId, opts.players) : null;
     var previous = (game.leaders || {})[String(number)];
     var showHistory = false;
 
@@ -208,13 +226,30 @@ CMP.ui.constituency = (function () {
         ]),
       ]),
 
-      /* ---- who is winning it ---- */
-      el('div', {
-        class: 'sd-leader',
-        style: { '--party': leadParty.colour, '--party-ink': leadParty.ink || '#fff' },
-      }, [
-        leadCandidate && leadCandidate.portraitSeed
-          ? CMP.ui.portrait.render(leadCandidate.portraitSeed, 44, leadCandidate.candidateName)
+      /*
+       * Who is winning it — or nobody, which is where every seat starts.
+       *
+       * An uncontested seat has no leader, no percentage and no rating.
+       * Printing "0.0%" against four parties and calling one of them safe
+       * would be reading numbers that do not exist yet.
+       */
+      !lead
+        ? el('div', { class: 'sd-leader is-open' }, [
+            el('div', { class: 'sd-leader-body' }, [
+              el('span', { class: 'sd-leader-kicker', text: 'Uncontested' }),
+              el('strong', { class: 'sd-leader-name', text: 'No leader' }),
+              el('span', {
+                class: 'sd-leader-party',
+                text: 'Nobody has campaigned here yet.',
+              }),
+            ]),
+          ])
+        : el('div', {
+            class: 'sd-leader',
+            style: { '--party': leadParty.colour, '--party-ink': leadParty.ink || '#fff' },
+          }, [
+        leadCandidate && leadCandidate.avatar
+          ? CMP.ui.portrait.render(leadCandidate.avatar, 44, leadCandidate.candidateName)
           : el('span', { class: 'sd-leader-flag', text: leadParty.short }),
         el('div', { class: 'sd-leader-body' }, [
           el('span', { class: 'sd-leader-kicker', text: 'Leading' }),
@@ -224,18 +259,24 @@ CMP.ui.constituency = (function () {
           }),
           el('span', { class: 'sd-leader-party', text: leadParty.short }),
         ]),
-        el('div', { class: 'sd-leader-figures' }, [
-          el('strong', { class: 'sd-leader-share', text: lead.share.toFixed(1) + '%' }),
-          el('span', { class: 'sd-rating rating-' + rating.id, text: rating.label }),
-        ]),
-      ]),
+            el('div', { class: 'sd-leader-figures' }, [
+              el('strong', { class: 'sd-leader-share', text: lead.share.toFixed(1) + '%' }),
+              el('span', { class: 'sd-rating rating-' + rating.id, text: rating.label }),
+            ]),
+          ]),
 
-      /* ---- the rest of the field ---- */
-      el('div', { class: 'sd-bars' }, lead.ranked.map(function (row, i) {
+      /*
+       * The field.
+       *
+       * Before anybody has campaigned this is every party in the game on
+       * nothing — which is the true state of the seat, and reads as an
+       * invitation rather than as a result.
+       */
+      el('div', { class: 'sd-bars' }, (lead ? lead.ranked : openField()).map(function (row, i) {
         var party = CMP.getParty(row.partyId);
         var who = candidateFor(row.partyId, opts.players);
         return el('div', {
-          class: 'sd-bar' + (i === 0 ? ' is-leading' : '') +
+          class: 'sd-bar' + (lead && i === 0 ? ' is-leading' : '') +
             (row.partyId === game.partyId ? ' is-you' : ''),
           style: { '--party': party.colour },
         }, [
@@ -249,24 +290,10 @@ CMP.ui.constituency = (function () {
       })),
 
       /* ---- did it change hands ---- */
-      previous && previous !== lead.partyId
+      lead && previous && previous !== lead.partyId
         ? el('p', { class: 'sd-change' }, [
             el('span', { class: 'sd-change-kicker', text: 'Changed hands' }),
             CMP.getParty(previous).short + ' → ' + leadParty.short,
-          ])
-        : null,
-
-      /* ---- the real sitting member, kept apart ---- */
-      sitting
-        ? el('div', { class: 'sd-mla' }, [
-            el('span', { class: 'sd-mla-kicker', text: 'Current MLA' }),
-            el('strong', { class: 'sd-mla-name', text: sitting.mla }),
-            el('span', {
-              class: 'sd-mla-party',
-              style: { color: partyColourFor(sitting.party) },
-              text: sitting.party,
-            }),
-            el('span', { class: 'sd-mla-note', text: 'Real reference. Takes no part in the game.' }),
           ])
         : null,
 

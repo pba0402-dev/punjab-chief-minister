@@ -20,7 +20,10 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 
-const portraitJs = fs.readFileSync(path.join(ROOT, 'js/ui/portrait.js'), 'utf8');
+// portrait.js draws with the shared svg helper, so dom.js comes with it.
+const portraitJs = ['js/ui/dom.js', 'js/ui/portrait.js']
+  .map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8'))
+  .join(String.fromCharCode(10));
 
 const page = `<!doctype html>
 <html><head><meta charset="utf-8"><style>
@@ -37,18 +40,17 @@ const page = `<!doctype html>
 <script>${portraitJs}</script>
 <script>
   var grid = document.getElementById('grid');
-  for (var i = 0; i < 40; i++) {
-    var seed = 'seed-' + i;
+  CMP.ui.portrait.ids().forEach(function (id, i) {
     var cell = document.createElement('div');
     cell.className = 'cell';
-    cell.appendChild(CMP.ui.portrait.render(seed, 84, 'Candidate ' + i));
+    cell.appendChild(CMP.ui.portrait.render(id, 110, 'candidate ' + (i + 1)));
     var who = document.createElement('div');
     who.className = 'who';
-    var d = CMP.ui.portrait.describe(seed);
-    who.textContent = (d.turban ? 'turban' : 'hair') + ' / ' + d.beard + (d.glasses ? ' / specs' : '');
+    var d = CMP.ui.portrait.describe(id);
+    who.textContent = d.hair + ' / ' + d.beard + ' / ' + d.dress;
     cell.appendChild(who);
     grid.appendChild(cell);
-  }
+  });
 </script>
 </body></html>`;
 

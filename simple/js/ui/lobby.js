@@ -35,11 +35,31 @@ CMP.ui.lobby = (function () {
 
     var countText = el('span', { class: 'lobby-count', text: '0 / 4' });
     var rosterNode = el('div', { class: 'roster' });
-    var partyNode = el('div', { class: 'party-grid party-grid-compact' });
+    var partyNode = el('div', { class: 'party-editor' });
+    var previewNode = el('div', { class: 'party-preview' });
     var noticeNode = el('div', { class: 'notice-slot' });
 
+    /*
+     * The party this player is founding.
+     *
+     * Held here rather than read back off the server on every poll: somebody
+     * halfway through typing a name should not have it replaced by what the
+     * server last heard. It is pushed up on a debounce and only pulled down
+     * when they are not in the middle of it — see paintOwnFields.
+     */
+    var party = {
+      name: '',
+      short: '',
+      shortEdited: false,
+      symbol: CMP.PARTY_SYMBOLS[0].id,
+      colourId: CMP.PARTY_COLOURS[0].id,
+      slogan: '',
+    };
+    var partyTimer = null;
+    var partyTouched = false;
+
     var nameInput = el('input', {
-      class: 'field-input',
+      class: 'field-input js-candidate-name',
       type: 'text',
       maxlength: '60',
       autocomplete: 'off',
@@ -100,11 +120,6 @@ CMP.ui.lobby = (function () {
         ]),
 
         el('div', { class: 'lobby-section' }, [
-          el('h2', { class: 'block-title', text: 'Your Party' }),
-          partyNode,
-        ]),
-
-        el('div', { class: 'lobby-section' }, [
           el('h2', { class: 'block-title', text: 'Your Candidate' }),
           el('label', { class: 'field' }, [
             el('span', { class: 'field-label', text: 'Playing as' }),
@@ -116,6 +131,11 @@ CMP.ui.lobby = (function () {
             ' a round over ' + CMP.ROUNDS.total + ' rounds. Whatever you do not ',
             'spend, you keep.',
           ]),
+
+        el('div', { class: 'lobby-section' }, [
+          el('h2', { class: 'block-title', text: 'Your Party' }),
+          partyNode,
+        ]),
         ]),
 
         clockNode,
@@ -192,16 +212,19 @@ CMP.ui.lobby = (function () {
       }
     }
 
-    function pickParty(partyId) {
-      if (busy) return;
-      var mine = me();
-      var next = mine && mine.partyId === partyId ? '' : partyId;
-      busy = true;
-      CMP.net.setParty(next).then(function (res) {
-        busy = false;
+    /** Push the party up, debounced, so typing is not a request a keystroke. */
+    function queueParty() {
+      partyTouched = true;
+      if (partyTimer) window.clearTimeout(partyTimer);
+      partyTimer = window.setTimeout(sendParty, 600);
+    }
+
+    function sendParty() {
+      partyTimer = null;
+      if (!party.short) party.short = CMP.suggestShort(party.name);
+      CMP.net.setParty(party).then(function (res) {
         setNotice(res.ok ? null : res.error);
         if (res.game) update(res.game);
-        CMP.net.refresh();
       });
     }
 
@@ -324,7 +347,12 @@ CMP.ui.lobby = (function () {
             ]);
           }
 
-          var party = slot.partyId ? CMP.getParty(slot.partyId) : null;
+          // The party each player founded, straight off their own row —
+          // the registry is not pointed at this game until it starts.
+          var party = slot.party && slot.party.name
+            ? CMP.normalisePartyDef(slot.party)
+            : null;
+          var named = party && party.name !== 'Unnamed Party';
           var status = !slot.connected
             ? { label: 'Disconnected', cls: 'off' }
             : slot.ready
@@ -344,14 +372,20 @@ CMP.ui.lobby = (function () {
                 slot.isHost ? el('span', { class: 'roster-host', text: 'Host' }) : null,
                 slot.isYou ? el('span', { class: 'roster-you', text: 'You' }) : null,
               ]),
+              slot.avatar
+                ? CMP.ui.portrait.render(slot.avatar, 32, slot.candidateName || 'a candidate')
+                : null,
               el('span', { class: 'roster-party' }, [
-                party
-                  ? el('span', { class: 'roster-flag', text: party.short })
-                  : el('span', { class: 'roster-flag is-none', text: '—' }),
                 el('span', {
                   class: 'roster-candidate',
-                  text: slot.candidateName || (party ? party.name : 'Choosing…'),
+                  text: slot.candidateName || 'Choosing…',
                 }),
+                named
+                  ? el('span', { class: 'roster-partyname' }, [
+                      CMP.ui.symbol.render(party.symbol, 14),
+                      party.name,
+                    ])
+                  : el('span', { class: 'roster-partyname is-none', text: 'No party yet' }),
               ]),
               el('span', { class: 'roster-status status-' + status.cls, text: status.label }),
             ]
@@ -360,45 +394,175 @@ CMP.ui.lobby = (function () {
       );
     }
 
+    /**
+     * Founding a party, in the lobby.
+     *
+     * The same six decisions the solo screen asks for, laid out to be filled
+     * in while other people are still joining. The preview underneath is the
+     * point: six choices made in isolation produce a party nobody has
+     * actually looked at.
+     */
     function paintParties() {
-      var mine = me();
-      mount(
-        partyNode,
-        CMP.PLAYABLE_PARTIES.map(function (party) {
-          var takenByOther =
-            view.takenParties.indexOf(party.id) !== -1 &&
-            !(mine && mine.partyId === party.id);
-          var isMine = !!(mine && mine.partyId === party.id);
+      var locked = view.phase !== 'lobby';
+      var current = CMP.normalisePartyDef({
+        id: 'preview',
+        name: party.name || 'Your party',
+        short: party.short,
+        slogan: party.slogan,
+        symbol: party.symbol,
+        colourId: party.colourId,
+      });
 
-          return el(
-            'button',
-            {
-              class:
-                'party-card party-card-compact' +
-                (isMine ? ' is-selected' : '') +
-                (takenByOther ? ' is-taken' : ''),
-              type: 'button',
-              disabled: takenByOther || view.phase !== 'lobby',
-              'aria-pressed': isMine ? 'true' : 'false',
-              style: { '--party': party.colour, '--party-ink': party.ink },
-              onclick: function () {
-                pickParty(party.id);
-              },
+      mount(partyNode, [
+        el('label', { class: 'field' }, [
+          el('span', { class: 'field-label', text: 'Party name' }),
+          el('input', {
+            class: 'field-input js-party-name',
+            type: 'text',
+            maxlength: '40',
+            autocomplete: 'off',
+            value: party.name,
+            disabled: locked,
+            placeholder: 'Punjab Development Party',
+            oninput: function (e) {
+              party.name = e.target.value;
+              if (!party.shortEdited) {
+                party.short = CMP.suggestShort(party.name);
+                var badge = partyNode.querySelector('.js-party-short');
+                if (badge) badge.value = party.short;
+              }
+              queueParty();
+              paintPreview();
             },
-            [
-              el('span', { class: 'party-flag', text: party.short }),
-              el('span', { class: 'party-text' }, [
-                el('strong', { class: 'party-short', text: party.short }),
-                el('span', {
-                  class: 'party-name',
-                  text: takenByOther ? 'Taken' : party.name,
-                }),
-              ]),
-              isMine ? el('span', { class: 'party-tick', text: '✓' }) : null,
-            ]
-          );
-        })
-      );
+          }),
+        ]),
+
+        el('label', { class: 'field' }, [
+          el('span', { class: 'field-label', text: 'Short name' }),
+          el('input', {
+            class: 'field-input js-party-short is-short',
+            type: 'text',
+            maxlength: '4',
+            autocomplete: 'off',
+            value: party.short,
+            disabled: locked,
+            placeholder: 'PDP',
+            oninput: function (e) {
+              party.shortEdited = true;
+              party.short = e.target.value.toUpperCase();
+              e.target.value = party.short;
+              queueParty();
+              paintPreview();
+            },
+          }),
+        ]),
+
+        el('div', { class: 'field' }, [
+          el('span', { class: 'field-label', text: 'Symbol' }),
+          el('div', { class: 'sym-grid' }, CMP.PARTY_SYMBOLS.map(function (sym) {
+            var on = party.symbol === sym.id;
+            return el('button', {
+              class: 'sym-option' + (on ? ' is-on' : ''),
+              type: 'button',
+              title: sym.name,
+              'aria-label': sym.name,
+              'aria-pressed': on ? 'true' : 'false',
+              disabled: locked,
+              style: { color: on ? current.colour : 'var(--muted)' },
+              onclick: function () {
+                party.symbol = sym.id;
+                queueParty();
+                paintParties();
+              },
+            }, [CMP.ui.symbol.render(sym.id, 26)]);
+          })),
+        ]),
+
+        el('div', { class: 'field' }, [
+          el('span', { class: 'field-label', text: 'Colour' }),
+          el('div', { class: 'col-grid' }, CMP.PARTY_COLOURS.map(function (swatch) {
+            var on = party.colourId === swatch.id;
+            return el('button', {
+              class: 'col-option' + (on ? ' is-on' : ''),
+              type: 'button',
+              title: swatch.name,
+              'aria-label': swatch.name,
+              'aria-pressed': on ? 'true' : 'false',
+              disabled: locked,
+              style: { '--swatch': swatch.colour },
+              onclick: function () {
+                party.colourId = swatch.id;
+                queueParty();
+                paintParties();
+              },
+            });
+          })),
+        ]),
+
+        el('label', { class: 'field' }, [
+          el('span', { class: 'field-label', text: 'Slogan (optional)' }),
+          el('input', {
+            class: 'field-input',
+            type: 'text',
+            maxlength: '60',
+            autocomplete: 'off',
+            value: party.slogan,
+            disabled: locked,
+            placeholder: 'Progress for every village',
+            oninput: function (e) {
+              party.slogan = e.target.value;
+              queueParty();
+              paintPreview();
+            },
+          }),
+        ]),
+
+        previewNode,
+      ]);
+
+      paintPreview();
+    }
+
+    /** The card, as it currently stands. Repainted without losing focus. */
+    function paintPreview() {
+      var current = CMP.normalisePartyDef({
+        id: 'preview',
+        name: party.name || 'Your party',
+        short: party.short,
+        slogan: party.slogan,
+        symbol: party.symbol,
+        colourId: party.colourId,
+      });
+      var mine = me();
+
+      mount(previewNode, [
+        el('div', {
+          class: 'pv-card',
+          style: { '--party': current.colour, '--party-ink': current.ink },
+        }, [
+          el('div', { class: 'pv-face' }, [
+            CMP.ui.portrait.render(
+              (mine && mine.avatar) || CMP.AVATARS[0],
+              56,
+              (mine && mine.candidateName) || 'your candidate'
+            ),
+          ]),
+          el('div', { class: 'pv-who' }, [
+            el('strong', {
+              class: 'pv-name',
+              text: ((mine && mine.candidateName) || 'Your name').toUpperCase(),
+            }),
+            el('span', { class: 'pv-party', text: current.name.toUpperCase() }),
+            current.slogan
+              ? el('span', { class: 'pv-slogan', text: '\u201c' + current.slogan + '\u201d' })
+              : el('span', { class: 'pv-slogan is-empty', text: 'No slogan' }),
+          ]),
+          el('div', { class: 'pv-badge' }, [
+            CMP.ui.symbol.render(current.symbol, 26),
+            el('span', { class: 'pv-short', text: current.short }),
+          ]),
+        ]),
+      ]);
     }
 
     /**
@@ -414,6 +578,21 @@ CMP.ui.lobby = (function () {
 
       if (document.activeElement !== nameInput && nameInput.value !== mine.candidateName) {
         nameInput.value = mine.candidateName;
+      }
+
+      /*
+       * The party, the same way.
+       *
+       * Only ever pulled down before this player has touched it — after that
+       * their draft is the truth and the server is following, not leading.
+       */
+      if (!partyTouched && !partyTimer && mine.party && mine.party.name) {
+        party.name = mine.party.name;
+        party.short = mine.party.short;
+        party.symbol = mine.party.symbol;
+        party.colourId = mine.party.colourId;
+        party.slogan = mine.party.slogan || '';
+        paintParties();
       }
     }
 

@@ -163,6 +163,15 @@ async function openClient(label, seedSession) {
 
 /* ------------------------------------------------------------ two humans */
 
+// The server keeps its own copy of the cast list so it can deal a face to an
+// opponent without knowing how one is drawn. Three copies of one list is two
+// too many to trust, so this run checks they match.
+const serverAvatars = (function () {
+  const php = fs.readFileSync(path.join(ROOT, 'api/lib/AI.php'), 'utf8');
+  const block = php.match(/public const AVATARS = \[([\s\S]*?)\];/);
+  return block ? (block[1].match(/'([^']+)'/g) || []).map((x) => x.slice(1, -1)) : [];
+})();
+
 section('Two people sit down');
 
 const host = await openClient('host');
@@ -183,15 +192,15 @@ check('a second player joined', await guest.until('lobby', () => !!guest.q('.scr
 
 const humans = [host, guest];
 const NAMES = ['Simran Kaur Gill', 'Ravinder Singh Bajwa'];
-const PARTIES = ['Aam Aadmi Party', 'Indian National Congress'];
+const PARTIES = ['Punjab Development Party', 'Unity Punjab Front'];
 
 for (let i = 0; i < humans.length; i++) {
   const c = humans[i];
-  await c.until('parties', () => c.qq('.party-card').length >= 4);
-  c.click(c.qq('.party-card').find((b) => b.textContent.indexOf(PARTIES[i]) !== -1));
+  // Every player founds their own party: there is no list to claim from.
+  await c.until('party editor', () => !!c.q('.js-party-name'));
+  c.type(c.q('.js-party-name'), PARTIES[i]);
   await sleep(250);
-  const inputs = c.qq('.field-input');
-  c.type(inputs[0], NAMES[i]);
+  c.type(c.q('.js-candidate-name'), NAMES[i]);
   await sleep(900);
   c.click(c.button('READY'));
   await sleep(250);
@@ -255,7 +264,7 @@ for (let round = 1; round <= ROUNDS_TO_PLAY; round++) {
   if (!firstSeeds) {
     firstSeeds = {};
     boards[0].standings.forEach((x) => {
-      firstSeeds[x.party] = x.portraitSeed;
+      firstSeeds[x.party] = x.avatar;
     });
   }
   roundsPlayed++;
@@ -273,16 +282,38 @@ check('the scoreboard shows four candidates',
   host.game().lastResult.standings.length === 4);
 check('two of them are opponents', opponentsSeen && opponentsSeen.length === 2,
   opponentsSeen ? opponentsSeen.length + ' AI' : 'none');
-check('the opponents took the parties nobody claimed',
-  opponentsSeen && opponentsSeen.every((x) => x.party === 'bjp' || x.party === 'sad'),
+// 7 + 32. An opponent fills an empty chair and founds its own party, the
+// same way a person would. Slots three and four are the ones nobody sat in.
+check('7. the opponents filled the empty chairs',
+  opponentsSeen && opponentsSeen.every((x) => x.party === 'p3' || x.party === 'p4'),
   opponentsSeen ? opponentsSeen.map((x) => x.party).join(',') : '');
+
+const aiParties = host.game().parties.filter((x) => x.id === 'p3' || x.id === 'p4');
+check('32. each invented a party of its own',
+  aiParties.length === 2 && aiParties.every((x) => x.name && x.name !== 'Unnamed Party'),
+  JSON.stringify(aiParties.map((x) => x.name)));
+check('32. with a badge, a symbol and a colour',
+  aiParties.every((x) => x.short && x.symbol && x.colour),
+  JSON.stringify(aiParties.map((x) => x.short + '/' + x.symbol)));
+check('32. and none of them is a real party',
+  aiParties.every((x) => !/^(AAP|INC|BJP|SAD|BSP)$/i.test(x.short)),
+  aiParties.map((x) => x.short).join(','));
+
+// 30. Four campaigns on one scoreboard have to be four campaigns at a glance.
+const allParties = host.game().parties;
+check('30. no two parties in the game share a colour',
+  new Set(allParties.map((x) => x.colour)).size === allParties.length,
+  allParties.map((x) => x.colour).join(','));
+check('30. or a symbol',
+  new Set(allParties.map((x) => x.symbol)).size === allParties.length,
+  allParties.map((x) => x.symbol).join(','));
 check('each opponent has a candidate name',
   opponentsSeen && opponentsSeen.every((x) => /\S+\s+\S+/.test(x.candidateName || '')),
   opponentsSeen ? opponentsSeen.map((x) => x.candidateName).join(' / ') : '');
 check('and the two are not the same person',
   opponentsSeen && opponentsSeen[0].candidateName !== opponentsSeen[1].candidateName);
 check('each opponent has a portrait',
-  opponentsSeen && opponentsSeen.every((x) => !!x.portraitSeed));
+  opponentsSeen && opponentsSeen.every((x) => !!x.avatar));
 console.log('     opponents: ' +
   (opponentsSeen || []).map((x) => x.party.toUpperCase() + ' ' + x.candidateName).join(', '));
 
@@ -337,7 +368,7 @@ const seedsAfter = {};
 ((rejoined.game() && rejoined.game().lastResult
   ? rejoined.game().lastResult.standings
   : [])).forEach((x) => {
-  seedsAfter[x.party] = x.portraitSeed;
+  seedsAfter[x.party] = x.avatar;
 });
 check('the returning player sees the scoreboard again',
   Object.keys(seedsAfter).length === 4, Object.keys(seedsAfter).length + ' candidates');
@@ -345,13 +376,48 @@ check('every portrait survived the reconnection',
   Object.keys(firstSeeds).every((p) => seedsAfter[p] === firstSeeds[p]),
   JSON.stringify(seedsAfter) + ' vs ' + JSON.stringify(firstSeeds));
 
-/* Portraits are drawn from the seed, so the same seed must draw the same face. */
-const drawA = host.dom.window.CMP.ui.portrait.describe('seed-abc');
-const drawB = rejoined.dom.window.CMP.ui.portrait.describe('seed-abc');
-check('the same seed draws the same face in any window',
+/*
+ * 12-16. The cast.
+ *
+ * Faces are drawn here, one at a time, rather than generated from a seed — a
+ * generator gives you unlimited faces and no good ones. So what has to hold is
+ * that an id always draws the same person in every window, that the people are
+ * actually different from each other, and that the three lists which have to
+ * agree about who exists still do.
+ */
+const portrait = host.dom.window.CMP.ui.portrait;
+const roster = host.dom.window.CMP.AVATARS;
+
+check('12. there are enough faces to choose between', roster.length >= 20,
+  roster.length + ' faces');
+check('12. the cast list and the drawings agree',
+  JSON.stringify(roster) === JSON.stringify(portrait.ids()),
+  roster.length + ' listed, ' + portrait.ids().length + ' drawn');
+check('12. and the server deals from the same list',
+  JSON.stringify(roster) === JSON.stringify(serverAvatars),
+  serverAvatars.length + ' on the server');
+
+const drawA = portrait.describe(roster[0]);
+const drawB = rejoined.dom.window.CMP.ui.portrait.describe(roster[0]);
+check('13. the same face is the same person in any window',
   JSON.stringify(drawA) === JSON.stringify(drawB));
-check('different seeds draw different faces',
-  JSON.stringify(drawA) !== JSON.stringify(host.dom.window.CMP.ui.portrait.describe('seed-xyz')));
+check('13. and no two of them are the same person',
+  new Set(roster.map((id) => JSON.stringify(portrait.describe(id)))).size === roster.length,
+  new Set(roster.map((id) => JSON.stringify(portrait.describe(id)))).size + ' distinct');
+
+// 13. The cast has to span the people who would actually be standing.
+const cast = roster.map((id) => portrait.describe(id));
+check('13. it spans turbaned and bare-headed',
+  cast.some((f) => f.hair === 'turban') && cast.some((f) => f.hair !== 'turban'),
+  cast.filter((f) => f.hair === 'turban').length + ' turbaned');
+check('13. bearded and clean-shaven',
+  cast.some((f) => f.beard !== 'none') && cast.some((f) => f.beard === 'none'));
+check('13. young, middle-aged and older',
+  new Set(cast.map((f) => f.age)).size === 3,
+  JSON.stringify([0, 1, 2].map((a) => cast.filter((f) => f.age === a).length)));
+check('13. and a range of skin tones',
+  new Set(cast.map((f) => f.skin)).size >= 4,
+  new Set(cast.map((f) => f.skin)).size + ' tones');
 
 // Round results now open on what changed; the standings, with faces, are one
 // tap further in. Walk there the way a player does.

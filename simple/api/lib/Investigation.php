@@ -199,7 +199,7 @@ final class Investigation
         $game['lastInvestigation'] = $record;
 
         // Leaders moved, so everyone's projected seats moved with them.
-        $counts = $this->campaign->seatCounts($board);
+        $counts = $this->campaign->seatCounts($board, Lobby::partyIdsOf($game));
         foreach ($game['players'] as $pid => $p) {
             $party = (string) ($p['partyId'] ?? '');
             $game['players'][$pid]['seatsLed'] = $party === '' ? 0 : (int) ($counts[$party] ?? 0);

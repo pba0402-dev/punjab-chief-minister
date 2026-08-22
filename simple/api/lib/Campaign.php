@@ -218,68 +218,56 @@ final class Campaign
     /* ------------------------------------------------------------ support */
 
     /**
-     * Opening political map, built from the real sitting MLAs.
+     * An empty board.
      *
-     * The party holding a seat starts ahead in it by an amount rolled per seat
-     * from the game seed. Incumbents outside the four playable parties sit
-     * under "oth". This is a starting position, not a prediction.
+     * Every one of the 117 constituencies starts with nothing in it: no
+     * influence, no leader, no percentage, no status. That is the whole
+     * starting position, and it is deliberately not built from anything.
      *
-     * $incumbents maps constituency number => real party code.
-     * Returns [support, incumbency].
+     * This used to deal the board from the real sitting members, which made a
+     * game nobody had played look like a live election tracker — and handed
+     * one side a lead it had not earned. A seat is now worth exactly what has
+     * been spent in it.
      */
-    public function seedSupport(array $constituencies, array $partyIds, string $seed, array $incumbents): array
+    public function emptyBoard(array $constituencies): array
     {
-        $rand = self::seededSequence($seed . ':support');
-        $cfg = $this->config['incumbency'];
-
-        // One swing per party per game, applied to every seat — see the note in
-        // campaign-config.json. Without it the real membership would replay
-        // itself and the largest incumbent bloc would start past the majority.
-        $swing = [];
-        foreach ($partyIds as $id) {
-            // Others never gets a statewide swing — small parties and
-            // independents hold seats one at a time, they do not surge.
-            $swing[$id] = $id === 'oth'
-                ? (float) $cfg['othersHandicap']
-                : ($rand() - 0.5) * (float) $cfg['partySwingSpread'];
-        }
-
         $support = [];
-        $incumbency = [];
-
         foreach ($constituencies as $number) {
-            $key = (string) $number;
-            $holder = self::gamePartyFor($incumbents[$key] ?? null, $partyIds);
-            $level = self::weightedPick($cfg['levels'], $rand());
-
-            $seat = [];
-            foreach ($partyIds as $id) {
-                $seat[$id] = max(2.0, $cfg['baseSupport'] + $swing[$id] + ($rand() - 0.5) * $cfg['spread']);
-            }
-            $seat[$holder] += (float) $level['advantage'];
-
-            $support[$key] = self::normalise($seat);
-            $incumbency[$key] = [
-                'party' => $holder,
-                'level' => $level['id'],
-                'label' => $level['label'],
-            ];
+            $support[(string) $number] = [];
         }
-        return [$support, $incumbency];
+        return $support;
     }
 
-    /** Real party code -> game party. Anything unplayable becomes "oth". */
-    public static function gamePartyFor(?string $realCode, array $playable): string
+    /**
+     * The board, ready for the wire.
+     *
+     * An untouched seat is an empty array inside the engine, which JSON would
+     * encode as `[]` — a list, not a map. Every client reads a seat as an
+     * object, so the empty ones are handed over as `{}`.
+     */
+    public static function boardForWire(array $board): array
     {
-        $id = strtolower((string) $realCode);
-        return in_array($id, $playable, true) ? $id : 'oth';
+        foreach ($board as $key => $seat) {
+            if ($seat === [] || $seat === null) {
+                $board[$key] = (object) [];
+            }
+        }
+        return $board;
     }
 
-    public static function normalise(array $seat): array
+    /**
+     * Scale a share map so it sums to 100.
+     *
+     * Only election day needs this: it rolls noise over the final shares and
+     * then has to hand back something that reads as a result. The live board
+     * is never normalised — see `shares`.
+     */
+    public static function normalise($seat): array
     {
+        $seat = (array) $seat;
         $total = 0.0;
         foreach ($seat as $id => $v) {
-            $seat[$id] = max(0.5, (float) $v);
+            $seat[$id] = max(0.0, (float) $v);
             $total += $seat[$id];
         }
         if ($total <= 0) {
@@ -291,11 +279,65 @@ final class Campaign
         return $seat;
     }
 
-    /** Sorted [partyId => support] descending. */
-    public static function standings(array $seat): array
+    /**
+     * What a seat holds, as shares.
+     *
+     * A seat stores raw campaign influence — what has been spent and won
+     * there, accumulating — and never a percentage. A percentage is what that
+     * influence is worth against the rest, so it is worked out here and never
+     * stored: normalising into the board would mean a seat somebody had spent
+     * a crore in and a seat somebody had spent a lakh in read identically,
+     * and whoever campaigned first would keep a lead nobody could explain.
+     *
+     * A seat nobody has campaigned in has no shares at all, which is what
+     * "uncontested" means. It is the state every one of the 117 starts in.
+     *
+     * @return array<string,float> descending; empty for an untouched seat
+     */
+    public static function shares($seat): array
     {
-        arsort($seat);
-        return $seat;
+        $seat = (array) $seat;
+        $total = 0.0;
+        foreach ($seat as $v) {
+            $total += max(0.0, (float) $v);
+        }
+        if ($total <= 0) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($seat as $id => $v) {
+            if ((float) $v > 0) {
+                $out[(string) $id] = round(((float) $v / $total) * 1000) / 10;
+            }
+        }
+        arsort($out);
+        return $out;
+    }
+
+    /** True once anybody has campaigned in a seat. */
+    public static function isContested($seat): bool
+    {
+        $seat = (array) $seat;
+        foreach ($seat as $v) {
+            if ((float) $v > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** One party's share of a seat, as a percentage. Zero if untouched. */
+    public static function shareOf($seat, string $partyId): float
+    {
+        $shares = self::shares($seat);
+        return (float) ($shares[$partyId] ?? 0);
+    }
+
+    /** Sorted [partyId => share] descending. Empty for an untouched seat. */
+    public static function standings($seat): array
+    {
+        return self::shares($seat);
     }
 
     /* ------------------------------------------------------------ playing */
@@ -901,25 +943,35 @@ final class Campaign
 
         $applied = ['player' => 0.0, 'opponent' => 0.0, 'reach' => []];
         if ($key !== null && isset($board[$key])) {
-            $seat = $board[$key];
+            // An untouched seat is stored as {} so it survives JSON as an
+            // object rather than an empty list. Writers work on arrays.
+            $seat = (array) $board[$key];
 
+            /*
+             * Influence is raw and cumulative.
+             *
+             * Campaigning builds influence rather than taking a percentage off
+             * somebody, because there is no percentage to take until at least
+             * one campaign has been somewhere. It floors at zero and has no
+             * ceiling — outspending everybody in one seat is a real and
+             * expensive thing to do.
+             */
             if (!empty($outcome['support'])) {
-                $before = $seat[$player['partyId']] ?? 0;
-                $seat[$player['partyId']] = self::clamp($before + (float) $outcome['support'], 1, 95);
-                $applied['player'] = $seat[$player['partyId']] - $before;
+                $before = (float) ($seat[$player['partyId']] ?? 0);
+                $seat[$player['partyId']] = max(0.0, round($before + (float) $outcome['support'], 1));
+                $applied['player'] = round($seat[$player['partyId']] - $before, 1);
             }
             if (!empty($outcome['opponentSupport'])) {
-                $ranked = self::standings($seat);
-                foreach ($ranked as $pid => $val) {
+                foreach (array_keys(self::shares($seat)) as $pid) {
                     if ($pid !== $player['partyId']) {
-                        $before = $val;
-                        $seat[$pid] = self::clamp($before + (float) $outcome['opponentSupport'], 1, 95);
-                        $applied['opponent'] = $seat[$pid] - $before;
+                        $before = (float) $seat[$pid];
+                        $seat[$pid] = max(0.0, round($before + (float) $outcome['opponentSupport'], 1));
+                        $applied['opponent'] = round($seat[$pid] - $before, 1);
                         break;
                     }
                 }
             }
-            $board[$key] = self::normalise($seat);
+            $board[$key] = $seat;
 
             // Dearer actions are seen beyond the seat they are aimed at. The
             // spill is a fraction of whatever actually happened, so a costly
@@ -1027,9 +1079,9 @@ final class Campaign
         $count = min(max(1, $count), count($numbers));
         for ($i = 0; $i < $count; $i++) {
             $k = $numbers[$i];
-            $seat = $board[$k];
-            $seat[$partyId] = self::clamp(($seat[$partyId] ?? 0) + $delta, 1, 95);
-            $board[$k] = self::normalise($seat);
+            $seat = (array) $board[$k];
+            $seat[$partyId] = max(0.0, round((float) ($seat[$partyId] ?? 0) + $delta, 1));
+            $board[$k] = $seat;
             $hit[] = (int) $k;
         }
         return [$board, $hit];
@@ -1138,28 +1190,41 @@ final class Campaign
     /* ------------------------------------------------------------ counting */
 
     /** Which party leads a seat. */
-    public static function leaderOf(array $seat): ?string
+    /**
+     * Who leads a seat, or null where nobody has campaigned.
+     *
+     * An uncontested seat has no leader. Saying it is led by whoever sorts
+     * first would put a name against 117 seats before a round was played.
+     */
+    public static function leaderOf($seat): ?string
     {
-        $best = null;
+        $seat = (array) $seat;
+        $best = 0.0;
         $bestId = null;
         foreach ($seat as $pid => $v) {
-            if ($best === null || $v > $best) {
-                $best = $v;
-                $bestId = $pid;
+            if ((float) $v > $best) {
+                $best = (float) $v;
+                $bestId = (string) $pid;
             }
         }
         return $bestId;
     }
 
-    /** Seats currently led, per party. Every party gets a key, including zero. */
-    public function seatCounts(array $board): array
+    /**
+     * Seats currently led, per party.
+     *
+     * Every party named gets a key, including zero, so a scoreboard has a row
+     * for a campaign that has taken nothing. Uncontested seats are counted for
+     * nobody — that is what makes the opening total 0 rather than 117.
+     */
+    public function seatCounts(array $board, array $partyIds = []): array
     {
         $counts = [];
-        foreach (Lobby::GAME_PARTIES as $id) {
-            $counts[$id] = 0;
+        foreach ($partyIds as $id) {
+            $counts[(string) $id] = 0;
         }
         foreach ($board as $seat) {
-            $leader = self::leaderOf($seat);
+            $leader = self::leaderOf((array) $seat);
             if ($leader !== null) {
                 $counts[$leader] = ($counts[$leader] ?? 0) + 1;
             }
@@ -1167,7 +1232,13 @@ final class Campaign
         return $counts;
     }
 
-    /** Mean support across the whole board, for one party. */
+    /**
+     * Mean share across the whole board, for one party.
+     *
+     * Averaged over every seat, contested or not, so a party leading three
+     * seats out of 117 does not read as though it were on 90% statewide. An
+     * uncontested seat contributes nothing to anybody.
+     */
     public function averageSupport(array $board, string $partyId): float
     {
         if (!$board) {
@@ -1175,7 +1246,7 @@ final class Campaign
         }
         $total = 0.0;
         foreach ($board as $seat) {
-            $total += (float) ($seat[$partyId] ?? 0);
+            $total += self::shareOf((array) $seat, $partyId);
         }
         return round($total / count($board), 1);
     }

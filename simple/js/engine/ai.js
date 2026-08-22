@@ -23,9 +23,58 @@ CMP.ai = (function () {
     return CMP.CAMPAIGN.ai;
   }
 
-  /** Build an opponent for one party, entirely from the seed. */
-  function create(partyId, seed) {
+  /**
+   * A party nobody typed in.
+   *
+   * Built from the same three-part pattern a real new party's name tends to
+   * follow — a place, a cause, a kind of body — so the four names on a
+   * scoreboard sound like they belong to the same election without any two of
+   * them being the same. Every part is invented, and the combinations that
+   * would land on a real party's name are kept out of the pools.
+   */
+  function inventParty(slot, rand, taken) {
     var cfg = config();
+    var pick = function (list) {
+      return list[Math.floor(rand() * list.length) % list.length];
+    };
+    var free = function (list, used) {
+      var open = list.filter(function (x) {
+        return used.indexOf(typeof x === 'string' ? x : x.id) === -1;
+      });
+      return pick(open.length ? open : list);
+    };
+
+    var name;
+    for (var tries = 0; tries < 12; tries++) {
+      name = pick(cfg.partyPrefixes) + ' ' + pick(cfg.partyThemes) + ' ' +
+        pick(cfg.partyBodies);
+      if (taken.names.indexOf(name.toLowerCase()) === -1) break;
+    }
+    taken.names.push(name.toLowerCase());
+
+    var colour = free(CMP.PARTY_COLOURS, taken.colours);
+    taken.colours.push(colour.id);
+    var symbol = free(CMP.PARTY_SYMBOLS, taken.symbols);
+    taken.symbols.push(symbol.id);
+
+    var short = CMP.suggestShort(name);
+    if (taken.shorts.indexOf(short) !== -1) short = short + (slot + 1);
+    taken.shorts.push(short);
+
+    return CMP.normalisePartyDef({
+      id: CMP.partyIdForSlot(slot),
+      slot: slot,
+      name: name,
+      short: short,
+      symbol: symbol.id,
+      colourId: colour.id,
+    });
+  }
+
+  /** Build an opponent, entirely from the seed. */
+  function create(slot, seed, taken) {
+    var cfg = config();
+    var partyId = CMP.partyIdForSlot(slot);
     var rand = CMP.rng.create(seed + ':ai:' + partyId);
     var pick = function (list) {
       return list[Math.floor(rand() * list.length) % list.length];
@@ -36,14 +85,21 @@ CMP.ai = (function () {
     var surname = pick(cfg.surnames);
     var slogan = pick(cfg.slogans);
 
+    var party = inventParty(slot, rand, taken);
+    party.slogan = slogan;
+
+    var avatar = CMP.avatarUnused(taken.avatars, seed + ':' + partyId);
+    taken.avatars.push(avatar);
+
     return {
       id: 'ai-' + partyId,
       isAI: true,
       partyId: partyId,
+      party: party,
       profileId: profile.id,
       candidateName: given + ' ' + surname,
       slogan: slogan,
-      portraitSeed: seed + ':' + partyId,
+      avatar: avatar,
 
       // Opponents run on the same economy as the player: nothing to start
       // with, five crore a round, and whatever they hold ground for.
@@ -75,15 +131,28 @@ CMP.ai = (function () {
     };
   }
 
-  /** Every party the player did not take. */
-  function opponentsFor(partyId, seed) {
-    return CMP.PLAYABLE_PARTIES
-      .filter(function (p) {
-        return p.id !== partyId;
-      })
-      .map(function (p) {
-        return create(p.id, seed);
-      });
+  /**
+   * The three rivals in a solo game.
+   *
+   * Each invents its own party. What has already been claimed is threaded
+   * through so no two of them share a colour, a symbol, an abbreviation or a
+   * face — four candidates on a scoreboard have to be four people at a
+   * glance, and that is not something to leave to a roll.
+   */
+  function opponentsFor(partyId, seed, playerParty) {
+    var taken = {
+      names: playerParty ? [String(playerParty.name).toLowerCase()] : [],
+      shorts: playerParty ? [playerParty.short] : [],
+      colours: playerParty && playerParty.colourId ? [playerParty.colourId] : [],
+      symbols: playerParty ? [playerParty.symbol] : [],
+      avatars: [],
+    };
+
+    var out = [];
+    for (var slot = 2; slot <= 4; slot++) {
+      out.push(create(slot, seed, taken));
+    }
+    return out;
   }
 
   function profileOf(opponent) {

@@ -1,0 +1,263 @@
+/* ------------------------------------------------------------------
+   Founding a party: the symbol grid, the colour swatches and the card
+   that shows what all of it adds up to.
+   ------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------- symbols */
+
+.sym-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.sym-option {
+  appearance: none;
+  min-height: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.sym-option .sym {
+  width: 100%;
+  height: 100%;
+}
+.sym-option.is-on {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 12%, var(--ink-2));
+}
+.sym-option:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 2px;
+}
+.sym-option[disabled] { opacity: 0.45; cursor: default; }
+
+/* ---------------------------------------------------------- colours */
+
+.col-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6px;
+}
+
+.col-option {
+  appearance: none;
+  min-height: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.col-option.is-on {
+  border-color: var(--cream);
+  transform: scale(1.14);
+}
+.col-option:focus-visible {
+  outline: 2px solid var(--river);
+  outline-offset: 3px;
+}
+.col-option[disabled] { opacity: 0.45; cursor: default; }
+
+/* ------------------------------------------------------- the preview */
+
+/*
+ * What the scoreboard will show. Laid out the way a candidate row is laid
+ * out, so a colour that turns out to be unreadable behind a symbol is
+ * something you find out here rather than in round four.
+ */
+.pv-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--party, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+
+.pv-face .portrait {
+  border-radius: 50%;
+  display: block;
+  --portrait-bg: color-mix(in srgb, var(--party, #2a2f3a) 22%, var(--ink-3, #14171d));
+}
+
+.pv-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pv-name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-party {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--party, var(--muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-slogan {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-slogan.is-empty { opacity: 0.5; font-style: normal; }
+
+.pv-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--party, var(--muted));
+}
+.pv-short {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* --------------------------------------------------- the lobby editor */
+
+.party-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.party-preview { margin-top: 2px; }
+
+.field-input.is-short {
+  width: 7.5em;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+}
+
+/* The roster, now that a row carries a face and a founded party. */
+.roster-row {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+.roster-row .portrait {
+  border-radius: 50%;
+  display: block;
+}
+.roster-partyname {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roster-partyname.is-none { opacity: 0.6; }
+
+/* ------------------------------------------------------------- narrow */
+
+@media (max-width: 560px) {
+  .sym-grid { grid-template-columns: repeat(8, 1fr); gap: 5px; }
+  .col-grid { grid-template-columns: repeat(12, 1fr); gap: 5px; }
+  .pv-card { gap: 10px; padding: 11px 12px; }
+  .pv-name { font-size: 0.92rem; }
+}
+
+@media (max-width: 379px) {
+  .sym-grid { grid-template-columns: repeat(6, 1fr); }
+  .col-grid { grid-template-columns: repeat(6, 1fr); }
+}
+
+/* ------------------------------------------------ nothing decided yet */
+
+/*
+ * The states that only exist before a round has been settled: a seat nobody
+ * has campaigned in, and a scoreboard where nobody is ahead. They are drawn
+ * as absence rather than as a low score — an empty seat is not a bad seat.
+ */
+
+.lb-none,
+.lf-empty,
+.rr-quiet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  text-align: center;
+}
+.lb-none-title,
+.lf-empty-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.lb-none-note,
+.lf-empty-note {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+
+/* The flat listing under it: no ranks, no bars, because there is no order. */
+.lb.is-flat .lb-row {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+}
+.lb-sym {
+  display: grid;
+  place-items: center;
+  color: var(--party, var(--muted));
+}
+.lb-name {
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A seat nobody has been to. */
+.seat-row.is-open .seat-row-party,
+.area-row.is-open .area-tag {
+  color: var(--muted-2);
+  border-style: dashed;
+}
+.seat-row.is-open { opacity: 0.72; }
+
+.sd-leader.is-open {
+  border-left-color: var(--line);
+  background: var(--ink-2);
+}
+.sd-leader.is-open .sd-leader-kicker { color: var(--muted-2); }
+
+.readout-leading.is-open,
+.readout-band.is-open {
+  color: var(--muted-2);
+  background: none;
+  border: 1px dashed var(--line);
+}

@@ -228,10 +228,10 @@ CMP.ui.result = (function () {
     /* ------------------------------------------------------ sections */
 
     /** The portrait seed for whoever played a party, if anyone did. */
-    function portraitSeedFor(partyId) {
+    function avatarFor(partyId) {
       for (var i = 0; i < view.players.length; i++) {
         var p = view.players[i];
-        if (!p.empty && p.partyId === partyId && p.portraitSeed) return p.portraitSeed;
+        if (!p.empty && p.partyId === partyId && p.avatar) return p.avatar;
       }
       return null;
     }
@@ -242,16 +242,15 @@ CMP.ui.result = (function () {
      */
     function finalBoard() {
       var result = view.result;
+      // Every party in the game stands: there is no "others" bucket any more,
+      // because there are no parties in this election nobody is playing.
       var standings = result.standings
-        .filter(function (row) {
-          return row.party !== 'oth';
-        })
         .map(function (row) {
           return {
             party: row.party,
             playerId: row.playerId,
             candidateName: row.candidate,
-            portraitSeed: portraitSeedFor(row.party),
+            avatar: avatarFor(row.party),
             isAI: isAIParty(row.party),
             seats: row.seats,
             change: 0,
@@ -472,7 +471,7 @@ CMP.ui.result = (function () {
       if (result.outcome === 'majority' && result.winner) {
         var winnerIsYou = me() && result.winner.playerId === me().id;
         var party = CMP.getParty(result.winner.party);
-        var seed = portraitSeedFor(result.winner.party);
+        var seed = avatarFor(result.winner.party);
 
         return el('div', { class: 'verdict ' + (winnerIsYou ? 'verdict-win' : 'verdict-lose') }, [
           el('span', { class: 'verdict-kicker', text: 'Majority Government' }),
@@ -549,9 +548,19 @@ CMP.ui.result = (function () {
         coalition.status === 'failed'
           ? el('p', { class: 'notice notice-info', text: 'The last talks broke down. Another pairing can be tried.' })
           : null,
+        /*
+         * Four campaigns can finish close enough together that no two of them
+         * reach 59 between them. That is a real outcome rather than a missing
+         * option, so it is stated plainly instead of showing an empty list.
+         */
         options.length
           ? el('p', { class: 'muted', text: 'Pairings that would reach ' + view.result.majority + ' seats:' })
-          : el('p', { class: 'muted', text: 'No pairing involving you reaches a majority.' }),
+          : el('p', { class: 'muted' }, [
+              'No pairing involving you reaches ' + view.result.majority + ' seats. ',
+              (view.possibleCoalitions || []).length
+                ? 'Another pair may still form a government without you.'
+                : 'No two campaigns can form one, so the assembly stays hung.',
+            ]),
         el(
           'div',
           { class: 'pair-list' },

@@ -64,8 +64,8 @@ CMP.ui.scoreboard = (function () {
           el('span', { class: 'board-rank', text: String(i + 1) }),
 
           el('span', { class: 'board-face' },
-            row.portraitSeed
-              ? [CMP.ui.portrait.render(row.portraitSeed, opts.compact ? 34 : 46, row.candidateName)]
+            row.avatar
+              ? [CMP.ui.portrait.render(row.avatar, opts.compact ? 34 : 46, row.candidateName)]
               : [el('span', { class: 'board-face-blank', text: party.short })]),
 
           el('span', { class: 'board-who' }, [

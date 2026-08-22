@@ -1,14 +1,13 @@
 /**
  * Choosing a face.
  * ------------------------------------------------------------------
- * Every portrait in this game is drawn from a seed — a turban or hair, a
- * beard, a kurta, a skin tone, a pair of glasses — so an "avatar" is simply a
- * seed somebody picked rather than one they were dealt. That matters for two
- * reasons: nothing here is or could become a photograph of a real person, and
- * adding more faces later costs one line each.
+ * The cast lives in `CMP.ui.portrait`; this is the grid you pick from and the
+ * rule for handing somebody a face they did not pick.
  *
- * The set below is fixed and ordered so a player who picks the fourth face
- * gets the same fourth face on every device, forever.
+ * An avatar is an id into that cast, so it is small, it means the same thing
+ * on every device forever, and it can never become a photograph of anybody.
+ * The order is fixed: a player who chose the fourth face gets the fourth face
+ * back, so the list is append-only in practice.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -19,58 +18,35 @@ CMP.ui.avatars = (function () {
   var el = CMP.ui.dom.el;
   var mount = CMP.ui.dom.mount;
 
-  /*
-   * The built-in faces.
-   *
-   * Chosen by generating and looking: each seed below draws a distinct,
-   * plausible candidate, and between them they span turbaned and bare-headed,
-   * bearded and clean-shaven, young and old, with and without glasses.
-   *
-   * Adding a face is adding a string. Never reorder or remove one — a stored
-   * profile refers to the seed itself, so the list is append-only in practice.
-   */
-  var FACES = [
-    'punjab-a1', 'punjab-b7', 'punjab-c3', 'punjab-d9',
-    'punjab-e2', 'punjab-f8', 'punjab-g4', 'punjab-h6',
-    'punjab-j5', 'punjab-k1', 'punjab-m3', 'punjab-n8',
-  ];
-
   function list() {
-    return FACES.slice();
-  }
-
-  /** A seed nobody chose, for a player who never opens the picker. */
-  function fallback(from) {
-    var h = 0;
-    var text = String(from || '');
-    for (var i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) & 0xffff;
-    return FACES[h % FACES.length];
+    return CMP.AVATARS.slice();
   }
 
   /**
    * A grid of faces to choose from.
    *
-   * @param opts.selected  the seed currently chosen
-   * @param opts.onPick    called with the new seed
+   * @param opts.selected  the avatar currently chosen
+   * @param opts.onPick    called with the new avatar id
    * @param opts.size      pixel size of each face
    */
   function picker(opts) {
-    var chosen = opts.selected || FACES[0];
+    var faces = list();
+    var chosen = opts.selected || faces[0];
     var root = el('div', { class: 'av-picker' });
 
     function paint() {
-      mount(root, FACES.map(function (seed, i) {
+      mount(root, faces.map(function (id, i) {
         return el('button', {
-          class: 'av-option' + (seed === chosen ? ' is-on' : ''),
+          class: 'av-option' + (id === chosen ? ' is-on' : ''),
           type: 'button',
-          'aria-label': 'Avatar ' + (i + 1),
-          'aria-pressed': seed === chosen ? 'true' : 'false',
+          'aria-label': 'Candidate ' + (i + 1),
+          'aria-pressed': id === chosen ? 'true' : 'false',
           onclick: function () {
-            chosen = seed;
-            if (opts.onPick) opts.onPick(seed);
+            chosen = id;
+            if (opts.onPick) opts.onPick(id);
             paint();
           },
-        }, [CMP.ui.portrait.render(seed, opts.size || 46, 'Avatar ' + (i + 1))]);
+        }, [CMP.ui.portrait.render(id, opts.size || 46, 'candidate ' + (i + 1))]);
       }));
     }
 
@@ -78,5 +54,5 @@ CMP.ui.avatars = (function () {
     return root;
   }
 
-  return { list: list, picker: picker, fallback: fallback };
+  return { list: list, picker: picker, fallback: CMP.avatarFor, unused: CMP.avatarUnused };
 })();

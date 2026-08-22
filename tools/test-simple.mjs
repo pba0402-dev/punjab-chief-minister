@@ -262,7 +262,7 @@ check('   corruption and bribe are separate menus',
 
 /* ---------------------------------------------------------------- setup */
 
-section('Setup: no budget is asked for');
+section('Setup: founding a party');
 clickIt(dom, playButton(dom));
 await dom.window.CMP.data.ensure();
 await settle();
@@ -270,23 +270,54 @@ check('42. the board arrives when the player starts', CMP.CONSTITUENCIES.length 
   String(CMP.CONSTITUENCIES && CMP.CONSTITUENCIES.length));
 check('   majority is 59', CMP.MAJORITY === 59);
 check('   setup screen opens', !!q(dom, '.screen-setup'));
-check('   four parties offered', qq(dom, '.party-card').length === 4);
+/*
+ * 5. Nobody is handed a party any more.
+ *
+ * There is no list of four to pick from: the player invents one, and every
+ * screen afterwards shows what they invented. That is the difference between
+ * playing a tracker and playing a game.
+ */
+check('5. no party is offered to be picked', qq(dom, '.party-card').length === 0,
+  qq(dom, '.party-card').length + ' cards');
+check('8. setup asks for a name, a party, a short name and a slogan',
+  qq(dom, '.screen-setup .field-input').length === 4,
+  qq(dom, '.screen-setup .field-input').length + ' fields');
+check('9. and offers symbols to run under',
+  qq(dom, '.sym-option').length >= 12, qq(dom, '.sym-option').length + ' symbols');
+check('10. and colours', qq(dom, '.col-option').length >= 8,
+  qq(dom, '.col-option').length + ' colours');
 check('1. the budget is granted, not entered', !q(dom, '.field-money'));
 check('7. the round allowance is stated on the setup screen',
   /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
-check('16. setup asks for a name and an optional slogan',
-  qq(dom, '.screen-setup .field-input').length === 2,
-  qq(dom, '.screen-setup .field-input').length + ' fields');
-check('10. and offers faces to choose from',
-  qq(dom, '.av-option').length >= 8, qq(dom, '.av-option').length + ' avatars');
+check('12. and offers faces to choose from',
+  qq(dom, '.av-option').length >= 20, qq(dom, '.av-option').length + ' avatars');
+check('12. drawn, never photographed',
+  qq(dom, '.av-option svg').length === qq(dom, '.av-option').length &&
+  qq(dom, '.av-option img').length === 0);
 check('16. and the round length',
   qq(dom, '.screen-setup .clock-option').length === 3);
 check('16. two minutes by default',
   /2 min/.test(q(dom, '.screen-setup .clock-option.is-active').textContent));
 
-clickIt(dom, qq(dom, '.party-card').find((c) => c.textContent.includes('INC')));
 const inputs = qq(dom, '.screen-setup .field-input');
 typeInto(dom, inputs[0], 'Simran Kaur Gill');
+typeInto(dom, qq(dom, '.screen-setup .field-input')[1], 'Punjab Development Party');
+await settle();
+
+// 29. The abbreviation writes itself from the name, and stays editable.
+check('29. a short name is suggested from the party name',
+  q(dom, '.js-short').value === 'PDP', q(dom, '.js-short').value);
+
+// 11. And the card shows what all of it adds up to before anybody starts.
+check('11. the preview names the player and the party',
+  /SIMRAN KAUR GILL/.test(q(dom, '.pv-name').textContent) &&
+  /PUNJAB DEVELOPMENT PARTY/.test(q(dom, '.pv-party').textContent),
+  q(dom, '.pv-name').textContent + ' / ' + q(dom, '.pv-party').textContent);
+check('11. with the symbol and the badge on it',
+  !!q(dom, '.pv-badge svg') && q(dom, '.pv-short').textContent === 'PDP');
+
+clickIt(dom, qq(dom, '.sym-option')[3]);
+clickIt(dom, qq(dom, '.col-option')[5]);
 clickIt(dom, q(dom, '.btn-start'));
 
 /* ---------------------------------------------------------------- panel */
@@ -353,8 +384,8 @@ check('5. available, new this round and spent',
 check('5. available is the figure that leads',
   /₹5 crore/.test(q(dom, '.g-fig.is-lead').textContent),
   q(dom, '.g-fig.is-lead').textContent);
-check('4. and the party still shows, quietly',
-  /INC/.test(q(dom, '.g-who').textContent), q(dom, '.g-who').textContent);
+check('28. and the party still shows, quietly — the one they founded',
+  /PDP/.test(q(dom, '.g-who').textContent), q(dom, '.g-who').textContent);
 check('   no large stat cards remain', qq(dom, '.stat').length === 0);
 
 const menuLabels = () =>
@@ -377,17 +408,36 @@ check('1. the menu opens on the game home screen',
   !!q(dom, '.g-menu') && !!q(dom, '.lb'));
 
 check('6. the leaderboard is the centrepiece', /Who’s leading\?/i.test(text(dom)));
-check('   it ranks all four candidates', qq(dom, '.lb-row').length === 4);
-check('27. as a live bar chart rather than four cards',
-  qq(dom, '.lb-bar-fill').length === 4);
-check('   the leader is marked', !!q(dom, '.lb-row.is-leading'));
+
+/*
+ * 27. Before round one there is nobody to rank.
+ *
+ * Every campaign is on nothing and no constituency has been decided, so
+ * ordering four zeroes one to four would invent a leader out of sort order.
+ * The block says so and still lists everybody, because tapping through to a
+ * rival is how you look them up.
+ */
+check('27. no leader is claimed before a round is settled',
+  !!q(dom, '.lb-none-title') && /No leader yet/i.test(q(dom, '.lb-none-title').textContent),
+  q(dom, '.lb-none-title') ? q(dom, '.lb-none-title').textContent : 'no block');
+check('27. and it says every campaign is on nothing',
+  /0 seats/.test(q(dom, '.lb-none-note').textContent),
+  q(dom, '.lb-none-note').textContent);
+check('27. nobody is marked as leading', !q(dom, '.lb-row.is-leading'));
+check('27. and no bar is drawn', qq(dom, '.lb-bar-fill').length === 0);
+check('   all four campaigns are still listed', qq(dom, '.lb-row').length === 4);
+check('   with every seat count at zero',
+  qq(dom, '.lb-seats').every((n) => n.textContent.trim() === '0'),
+  qq(dom, '.lb-seats').map((n) => n.textContent).join('/'));
 check('   and you are marked', !!q(dom, '.lb-row.is-you'));
-check('57. with the seat share as a percentage',
-  qq(dom, '.lb-share').length === 4 && /%/.test(q(dom, '.lb-shares').textContent),
-  q(dom, '.lb-shares').textContent);
 check('8. the majority is one line, not a chart',
   qq(dom, '.g-majority').length === 1 &&
-  /of 59|majority of 59|past the majority/.test(q(dom, '.g-majority-text').textContent),
+  /of 59|majority of 59|past the majority|59 seats form a government/
+    .test(q(dom, '.g-majority-text').textContent),
+  q(dom, '.g-majority-text').textContent);
+// 27. And it names nobody while nobody has anything.
+check('27. the majority line claims no leader before a round is settled',
+  /none decided yet/.test(q(dom, '.g-majority-text').textContent),
   q(dom, '.g-majority-text').textContent);
 
 check('8. and no constituency list on the game home screen',
@@ -539,7 +589,11 @@ check('11. heat saved', typeof saved.heat === 'number');
 check('11. constituency support saved', Object.keys(saved.support).length === 117);
 check('11. actions taken saved', saved.actions.length >= 2);
 check('11. turn saved', typeof saved.turn === 'number');
-check('11. party saved', saved.partyId === 'inc');
+check('11. party saved', saved.partyId === 'p1', String(saved.partyId));
+check('23. and the party they founded went with it',
+  (saved.parties || []).length === 4 &&
+  saved.parties[0].name === 'Punjab Development Party',
+  JSON.stringify((saved.parties || []).map((x) => x.name)));
 check('11. candidate saved', saved.candidateName === 'Simran Kaur Gill');
 check('1. no slogan is stored any more', !saved.slogan);
 check('11. marked as a solo game', saved.mode === 'solo');
@@ -589,14 +643,31 @@ check('the state outline is drawn', !!q(dom, '.map-outline'));
 check('district lines are drawn', qq(dom, '.map-district-line').length > 0);
 check('each seat carries its AC number', qq(dom, '.map-seat-num').length === 117);
 
-check('every cell is coloured by its leader',
-  qq(dom, '.map-cell').every((c) => /^#[0-9a-f]{6}$/i.test(c.getAttribute('fill') || '')));
-check('confidence is shown by fade',
-  new Set(qq(dom, '.map-cell').map((c) => c.getAttribute('fill-opacity'))).size > 1);
+/*
+ * 20. Every cell is coloured by its leader, or drawn as unclaimed ground
+ * where there is not one — which early on is most of Punjab.
+ */
+const cellFills = qq(dom, '.map-cell').map((c) => c.getAttribute('fill') || '');
+const decidedHere = Object.keys(
+  dom.window.CMP.campaign.currentLeaders(dom.window.CMP.app.getGame().support)
+).length;
+check('20. a seat without a leader is drawn as unclaimed, not as somebody\u2019s',
+  cellFills.filter((f) => f === 'var(--line)').length === 117 - decidedHere,
+  cellFills.filter((f) => f === 'var(--line)').length + ' unclaimed of ' +
+  (117 - decidedHere) + ' undecided');
+check('20. and one with a leader takes that leader\u2019s colour',
+  cellFills.filter((f) => /^#[0-9a-f]{6}$/i.test(f)).length === decidedHere,
+  cellFills.filter((f) => /^#[0-9a-f]{6}$/i.test(f)).length + ' coloured');
 
+// The legend counts seats that have a leader, so it can only ever add up to
+// what has actually been decided.
 const legendCounts = qq(dom, '.legend-count').map((n) => Number(n.textContent));
-check('the legend counts every seat', legendCounts.reduce((a2, b2) => a2 + b2, 0) === 117,
-  String(legendCounts.reduce((a2, b2) => a2 + b2, 0)));
+const legendTotal = legendCounts.reduce((a2, b2) => a2 + b2, 0);
+const decidedNow = Object.keys(
+  dom.window.CMP.campaign.currentLeaders(dom.window.CMP.app.getGame().support)
+).length;
+check('the legend counts every decided seat and no others',
+  legendTotal === decidedNow, legendTotal + ' counted, ' + decidedNow + ' decided');
 check('the legend states the majority', /majority 59/.test(q(dom, '.map-legend').textContent));
 
 check('the map says the shapes are not official boundaries',
@@ -611,12 +682,24 @@ check('clicking a seat opens that constituency',
   q(dom, '.sd-name') ? q(dom, '.sd-name').textContent : 'no detail opened');
 check('11. it names the seat and district',
   /AC 17 · Amritsar/.test(q(dom, '.sd-where').textContent), q(dom, '.sd-where').textContent);
-check('11. it shows the current leader with a share',
-  !!q(dom, '.sd-leader') && /%$/.test(q(dom, '.sd-leader-share').textContent));
+check('11. it shows the current leader with a share, or says there is none',
+  !!q(dom, '.sd-leader') && (
+    q(dom, '.sd-leader-share')
+      ? /%$/.test(q(dom, '.sd-leader-share').textContent)
+      : /No leader/i.test(q(dom, '.sd-leader-name').textContent)
+  ),
+  q(dom, '.sd-leader').textContent.replace(/\s+/g, ' ').slice(0, 80));
 check('13. and a bar for every party', qq(dom, '.sd-bar').length >= 4);
-check('12. the real sitting MLA is shown separately', !!q(dom, '.sd-mla'));
-check('12. and marked as reference only',
-  /takes no part in the game/i.test(q(dom, '.sd-mla-note').textContent));
+/*
+ * 4. No sitting member, anywhere.
+ *
+ * The seat, its number and its district are real Punjab geography. Every
+ * person and every party on this screen is the game's own, and there is no
+ * MLA panel to keep separate from them because there is no MLA data left.
+ */
+check('4. no sitting member is shown', !q(dom, '.sd-mla'));
+check('4. and the engine no longer carries any',
+  !dom.window.CMP.INCUMBENTS && !dom.window.CMP.getIncumbent);
 check('   with a way to campaign there',
   !!qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
 
@@ -626,7 +709,12 @@ const seat17 = () => qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
 const before17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
 const g17 = dom.window.CMP.app.getGame();
 // Hand this seat overwhelmingly to the player and check the map follows.
-Object.keys(g17.support[17]).forEach((p2) => { g17.support[17][p2] = p2 === g17.partyId ? 80 : 5; });
+// The seat may be empty — most of them are — so the field is written rather
+// than adjusted.
+g17.support[17] = {};
+dom.window.CMP.getParties().forEach((p2) => {
+  g17.support[17][p2.id] = p2.id === g17.partyId ? 80 : 5;
+});
 dom.window.CMP.app.goTo('election');
 clickIt(dom, menuItem(dom, 'Map'));
 const after17 = seat17().getAttribute('fill') + '/' + seat17().getAttribute('fill-opacity');
@@ -717,6 +805,17 @@ check('19. and the five closest races, when there are any',
 check('20. with a way to see all of them',
   !!qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
 
+/*
+ * 20-22. Before a round is settled there are no strongest seats and no close
+ * races, because there is nothing to be strong in or close to. What the screen
+ * offers instead is the seats nobody has been to — which is what a player
+ * wants first, an uncontested seat being the cheapest one to win.
+ */
+const blockTitles = () => qq(dom, '.ar-block-title').map((n) => n.textContent);
+check('21-22. open seats are offered while nothing is decided',
+  blockTitles().includes('Open seats') || closeRaces > 0,
+  blockTitles().join(' / '));
+
 clickIt(dom, qq(dom, 'button').find((b) => /View all 117/.test(b.textContent)));
 await settle();
 
@@ -724,8 +823,20 @@ check('2. all 117 are listed', qq(dom, '.area-row').length === 117,
   qq(dom, '.area-row').length + ' rows');
 check('3. each row is compact and clickable',
   qq(dom, '.area-row').every((n) => n.tagName.toLowerCase() === 'button'));
-check('3. and shows my share against the best rival',
-  qq(dom, '.area-mine').length === 117 && qq(dom, '.area-rival').length === 117);
+// A contested row reports both shares; an uncontested one says so instead of
+// printing 0.0% against four parties nobody has campaigned for.
+check('3. and shows my share where anybody has campaigned',
+  qq(dom, '.area-mine').length === 117 &&
+  qq(dom, '.area-mine:not(.is-open)').every((n) => /%$/.test(n.textContent)),
+  qq(dom, '.area-mine:not(.is-open)').length + ' contested rows');
+// A rival line only where there is a rival: a seat only one campaign has been
+// to is led outright, and inventing an opponent for it would be a fiction.
+check('3. and a rival only where there is one',
+  qq(dom, '.area-rival').length <= qq(dom, '.area-mine:not(.is-open)').length,
+  qq(dom, '.area-rival').length + ' rivals');
+check('3. and an untouched seat says nobody has been there',
+  qq(dom, '.area-mine.is-open').length > 0,
+  qq(dom, '.area-mine.is-open').length + ' untouched');
 check('4. filters are offered', qq(dom, '.seat-filters .seat-filter').length === 5,
   qq(dom, '.seat-filters .seat-filter').map((n) => n.textContent).join('/'));
 check('4. with a search box', !!q(dom, '.seat-search'));
@@ -856,8 +967,8 @@ dom = await openPage();
 clickIt(dom, playButton(dom));
 await dom.window.CMP.data.ensure();
 await settle();
-clickIt(dom, qq(dom, '.party-card')[0]);
 typeInto(dom, qq(dom, '.field-input')[0], 'Round Runner');
+typeInto(dom, qq(dom, '.field-input')[1], 'Round Runner Party');
 clickIt(dom, dom.window.document.querySelector('.btn-xl'));
 await settle();
 
@@ -871,9 +982,9 @@ check('2. the ring carries the round, not a clock',
 check('2. and the ring itself is what drains',
   !!q(dom, '.rt-arc') && !!q(dom, '.rt-arc').getAttribute('stroke-dasharray'));
 check('the leaderboard is shown', qq(dom, '.lb-row').length === 4);
-check('and how many more seats are needed',
-  /needs \d+ more|past the majority/.test(q(dom, '.g-majority-text').textContent),
-  q(dom, '.g-majority-text').textContent.slice(0, 60));
+check('and how many more seats are needed, or that none are decided',
+  /needs \d+ more|past the majority|none decided yet/.test(q(dom, '.g-majority-text').textContent),
+  q(dom, '.g-majority-text').textContent);
 
 /**
  * Run a round out and let the shell pick it up. A round now has two stages:

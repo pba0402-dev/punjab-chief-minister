@@ -93,16 +93,35 @@ const J = async (a, p) =>
   ).json();
 const G = async (a, p) => (await fetch(BASE + '?action=' + a + '&' + new URLSearchParams(p))).json();
 
-/** Stand up a full four-player game already in the campaign phase. */
-async function startGame(parties) {
+// Parties are invented now, so a test that wants a game has to found some.
+const NAMES = ['Party One', 'Party Two', 'Party Three', 'Party Four'];
+const SYMBOLS = ['star', 'tree', 'lion', 'river'];
+const COLOURS = ['saffron', 'indigo', 'emerald', 'crimson'];
+
+/**
+ * Stand up a full four-player game already in the campaign phase.
+ *
+ * `count` is how many humans sit down; any chair left empty is filled by an
+ * opponent when the host starts, exactly as it is in a real game.
+ */
+async function startGame(count) {
+  count = count || 2;
+  const names = NAMES;
   const host = await J('create');
+  if (!host.code) console.log('  create failed: ' + JSON.stringify(host).slice(0, 300));
   const creds = [{ code: host.code, playerId: host.playerId, token: host.token }];
-  for (let i = 1; i < parties.length; i++) {
+  for (let i = 1; i < count; i++) {
     const j = await J('join', { code: host.code });
     creds.push({ code: host.code, playerId: j.playerId, token: j.token });
   }
-  for (let i = 0; i < parties.length; i++) {
-    await J('party', { ...creds[i], partyId: parties[i] });
+  for (let i = 0; i < count; i++) {
+    await J('party', {
+      ...creds[i],
+      name: names[i],
+      short: 'P' + (i + 1),
+      symbol: SYMBOLS[i],
+      colourId: COLOURS[i],
+    });
     await J('details', { ...creds[i], candidateName: 'Candidate ' + (i + 1), slogan: 'Slogan ' + (i + 1) });
     await J('ready', { ...creds[i], ready: true });
   }
@@ -110,37 +129,23 @@ async function startGame(parties) {
   return { code: host.code, creds, started };
 }
 
-/* ---------------------------------------------------------------- data */
+/* --------------------------------------------------------- empty board */
 
-section('Incumbent data');
-const inc = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'js/data/incumbents.js'), 'utf8')
-    .match(/CMP\.INCUMBENTS = (\[.*?\]);/s)[1]
-);
-check('117 sitting MLAs', inc.length === 117, String(inc.length));
-check('every seat has a named MLA', inc.every((i) => i.mla && i.mla.length > 2));
-check('every seat has a party', inc.every((i) => i.party));
-check('numbers run 1..117', inc.every((i, n) => i.number === n + 1));
-check('no duplicate MLA/seat pairing', new Set(inc.map((i) => i.number)).size === 117);
-check(
-  'party totals add to 117',
-  Object.values(inc.reduce((m, i) => ((m[i.party] = (m[i.party] || 0) + 1), m), {})).reduce((a, b) => a + b, 0) === 117
-);
-const byElection = inc.filter((i) => i.byElection);
-check('by-elections are recorded with a date and reason',
-  byElection.length === 7 && byElection.every((i) => i.byElection.date && i.byElection.reason),
-  byElection.length + ' recorded');
-check('Amritsar Central shows its sitting MLA',
-  inc[16].name === 'Amritsar Central' && inc[16].mla === 'Ajay Gupta', inc[16].mla);
-check('Ludhiana West reflects the 2025 by-election',
-  inc[63].mla === 'Sanjeev Arora', inc[63].mla);
-check('Barnala reflects the 2024 by-election',
-  inc.find((i) => i.name === 'Barnala').party === 'INC');
+/*
+ * A new election starts on nothing.
+ *
+ * Not "nearly nothing", and not "a starting position somebody could argue
+ * about" — every one of the 117 constituencies holds no influence, has no
+ * leader and shows no percentage until somebody spends money in it. That is
+ * the single fact this whole change exists to make true, so it is checked at
+ * the database level rather than by reading the screen.
+ */
+section('A new election starts on nothing');
 
-/* ------------------------------------------------------- baseline */
-
-section('Incumbency baseline');
-const g1 = await startGame(['aap', 'inc', 'bjp', 'sad']);
+const g1 = await startGame();
+if (!g1.started || !g1.started.game) {
+  console.log('  start failed: ' + JSON.stringify(g1.started));
+}
 const view1 = g1.started.game;
 check('the election starts', view1.phase === 'election');
 
@@ -151,43 +156,59 @@ check('and it is one board everyone shares', !me1.support,
 check('the round clock has started', view1.round === 1 && view1.secondsLeft > 0,
   'round ' + view1.round + ', ' + view1.secondsLeft + 's left');
 
-// The party holding a seat should usually lead it at the start.
-let holderLeads = 0;
-for (const seat of inc) {
-  const s = view1.board[String(seat.number)];
-  const leader = Object.entries(s).sort((a, b) => b[1] - a[1])[0][0];
-  const holder = ['aap', 'inc', 'bjp', 'sad'].includes(seat.party.toLowerCase())
-    ? seat.party.toLowerCase()
-    : 'oth';
-  if (leader === holder) holderLeads++;
-}
-// One game says little: the per-game swing means the incumbent bloc can open
-// under real pressure. What matters is the behaviour across games — incumbency
-// is a genuine advantage on average, but never a foregone conclusion.
-const holderCounts = [holderLeads];
-for (let s = 0; s < 7; s++) {
-  const gx = await startGame(['aap', 'inc', 'bjp', 'sad']);
-  const board = gx.started.game.board;
-  let n = 0;
-  for (const seat of inc) {
-    const row = board[String(seat.number)];
-    const leader = Object.entries(row).sort((x, y) => y[1] - x[1])[0][0];
-    const holder = ['aap', 'inc', 'bjp', 'sad'].includes(seat.party.toLowerCase())
-      ? seat.party.toLowerCase()
-      : 'oth';
-    if (leader === holder) n++;
-  }
-  holderCounts.push(n);
-}
-const meanHolder = holderCounts.reduce((a2, b2) => a2 + b2, 0) / holderCounts.length;
-const spreadHolder = Math.max(...holderCounts) - Math.min(...holderCounts);
-console.log('     incumbent leads at kick-off across 8 games: ' +
-  holderCounts.join(', ') + '  (mean ' + meanHolder.toFixed(0) + ')');
-check('incumbency is a real advantage on average', meanHolder > 45, 'mean ' + meanHolder.toFixed(0));
-check('but it is never a foregone conclusion', Math.max(...holderCounts) < 117,
-  'max ' + Math.max(...holderCounts));
-check('and it varies game to game, so the real result does not simply replay',
-  spreadHolder > 15, 'spread ' + spreadHolder);
+const seatsWithAnything = Object.entries(view1.board)
+  .filter(([, seat]) => Object.values(seat || {}).some((v) => Number(v) > 0));
+check('117 of 117 constituencies are empty', seatsWithAnything.length === 0,
+  seatsWithAnything.length + ' had support: ' +
+  seatsWithAnything.slice(0, 3).map(([n, s]) => n + '=' + JSON.stringify(s)).join(' '));
+
+check('no constituency has a leader',
+  Object.keys(view1.leaders || {}).length === 0,
+  Object.keys(view1.leaders || {}).length + ' leaders');
+
+check('every player is on zero seats',
+  view1.players.every((p) => (p.seatsLed || 0) === 0),
+  JSON.stringify(view1.players.map((p) => p.seatsLed)));
+
+// Nothing anywhere in what the server sends should look like a poll, an MLA
+// or a real party. This is the check that would catch seed data creeping back
+// in through some other door.
+const wire = JSON.stringify(view1);
+check('no real party codes are shipped',
+  !/"(aap|inc|bjp|sad|bsp)"/i.test(wire),
+  (wire.match(/"(aap|inc|bjp|sad|bsp)"/i) || [''])[0]);
+check('and no sitting-member data',
+  !/\bmla\b|byElection|incumben/i.test(wire),
+  (wire.match(/\bmla\b|byElection|incumben/i) || [''])[0]);
+
+/* --------------------------------------------------------- the parties */
+
+section('Parties are invented, not chosen');
+
+check('every party in the game has a name',
+  (view1.parties || []).length === 4 && view1.parties.every((p) => p.name),
+  JSON.stringify((view1.parties || []).map((p) => p.name)));
+check('and an abbreviation, a symbol and a colour',
+  view1.parties.every((p) => p.short && p.symbol && p.colour),
+  JSON.stringify(view1.parties.map((p) => p.short + '/' + p.symbol + '/' + p.colour)));
+check('ids are slots, so two parties may share a name',
+  view1.parties.every((p, i) => p.id === 'p' + (i + 1)),
+  view1.parties.map((p) => p.id).join(','));
+check('the ones the players typed are the ones that came back',
+  view1.parties[0].name === 'Party One' && view1.parties[1].name === 'Party Two',
+  view1.parties.slice(0, 2).map((p) => p.name).join(' / '));
+
+// Opponents fill the empty chairs and must be told apart from each other.
+const aiParties = view1.parties.slice(2);
+check('opponents invent their own parties',
+  aiParties.every((p) => p.name && p.name !== 'Unnamed Party'),
+  JSON.stringify(aiParties.map((p) => p.name)));
+check('and no two parties share a colour',
+  new Set(view1.parties.map((p) => p.colour)).size === 4,
+  view1.parties.map((p) => p.colour).join(','));
+check('or a symbol',
+  new Set(view1.parties.map((p) => p.symbol)).size === 4,
+  view1.parties.map((p) => p.symbol).join(','));
 
 /* ------------------------------------------------------- reporting */
 
@@ -247,7 +268,7 @@ section('Reports are not verdicts');
  * the real API is that the whole path works: three reports open an inquiry, a
  * finding comes back, and the score behind it never leaves the server.
  */
-const gv = await startGame(['aap', 'inc', 'bjp', 'sad']);
+const gv = await startGame(4);
 const clean = gv.started.game.players.find((p) => p.slot === 4).id;
 await J('report', { ...gv.creds[0], accusedId: clean, reason: 'other' });
 await J('report', { ...gv.creds[1], accusedId: clean, reason: 'other' });
@@ -267,7 +288,7 @@ check('the evidence score never leaves the server',
 /* ------------------------------------------------------- fines */
 
 section('Fines come out of cash');
-const gf = await startGame(['aap', 'inc', 'bjp', 'sad']);
+const gf = await startGame(4);
 const poorId = gf.started.game.players.find((p) => p.slot === 4).id;
 const poor = gf.creds[3];
 
@@ -312,7 +333,7 @@ section('Campaign restriction');
 let restrictedSeen = false;
 const seenOutcomes = {};
 for (let i = 0; i < 60 && !restrictedSeen; i++) {
-  const g = await startGame(['aap', 'inc', 'bjp', 'sad']);
+  const g = await startGame(4);
   const tid = g.started.game.players.find((p) => p.slot === 4).id;
   const tc = g.creds[3];
   // Three risky moves is a full round's allowance, and enough heat to make a
@@ -349,7 +370,7 @@ console.log('     findings sampled: ' + JSON.stringify(seenOutcomes));
 /* ------------------------------------------------------- election */
 
 section('Election day');
-const ge = await startGame(['aap', 'inc', 'bjp', 'sad']);
+const ge = await startGame(4);
 const nonHost = await J('declare', ge.creds[1]);
 check('only the host can close the polls', nonHost.ok === false, nonHost.error);
 
@@ -378,7 +399,7 @@ let hung = null;
 let hungCount = 0;
 const SAMPLE = 25;
 for (let i = 0; i < SAMPLE; i++) {
-  const g = await startGame(['aap', 'inc', 'bjp', 'sad']);
+  const g = await startGame(4);
   const dec = await J('declare', g.creds[0]);
   if (dec.game.result.outcome === 'hung') {
     hungCount++;
@@ -386,11 +407,54 @@ for (let i = 0; i < SAMPLE; i++) {
   }
 }
 console.log('     hung assemblies: ' + hungCount + ' of ' + SAMPLE + ' elections');
-check('a hung assembly happens often enough to matter', hungCount >= 2,
-  hungCount + ' of ' + SAMPLE);
-check('but a majority is still the common outcome', hungCount < SAMPLE,
+
+/*
+ * An election nobody contested hangs, and it should.
+ *
+ * These games are declared the moment they start, so no seat has had a rupee
+ * spent in it and all 117 fall to the polling-day roll — four campaigns
+ * splitting a board none of them worked for. Nobody reaching 59 out of that is
+ * the correct result, and it is the reason leaving seats uncontested is a
+ * gamble rather than a free saving.
+ */
+check('an election nobody contested hangs', hungCount === SAMPLE,
   hungCount + ' of ' + SAMPLE);
 check('a hung assembly was captured for the talks', !!hung);
+
+/*
+ * And a seat somebody campaigns in stops being uncontested.
+ *
+ * This is the other half of the same claim, and the mechanism the whole
+ * change rests on: influence is created by spending, a seat with influence in
+ * it has a leader, and a seat with one campaign in it is led by that campaign.
+ * A round's allowance buys five rallies, so five is what is checked.
+ */
+const pushed = await startGame(2);
+const pushCreds = pushed.creds[0];
+let contested = 0;
+for (let seat = 1; seat <= 8; seat++) {
+  const res = await J('campaign', { ...pushCreds, actionId: 'rally', constituency: seat });
+  if (res.ok) contested++;
+}
+const pushView = (await G('state', pushCreds)).game;
+const pushMe = pushView.players.find((x) => x.isYou);
+console.log('     one campaign, ' + contested + ' rallies affordable of 8 attempted');
+
+check('a round buys what a round can pay for', contested >= 4 && contested < 8,
+  contested + ' of 8');
+// Read off the board rather than off `leaders`, which is the settled map from
+// the last round end and is deliberately empty until a round has ended.
+const touched = Object.entries(pushView.board)
+  .filter(([, seat]) => Object.values(seat || {}).some((v) => Number(v) > 0));
+check('a seat campaigned in stops being uncontested', touched.length === contested,
+  touched.length + ' seats have influence, for ' + contested + ' rallies');
+check('and the campaign that paid for it leads it',
+  touched.every(([, seat]) => Object.keys(seat)[0] === pushMe.partyId),
+  JSON.stringify(touched.slice(0, 2)));
+check('every other seat is still empty',
+  Object.keys(pushView.board).length - touched.length === 117 - contested);
+check('so it now holds seats it did not start with', pushMe.seatsLed === contested,
+  pushMe.seatsLed + ' vs ' + contested);
 
 if (hung) {
   const { g, dec } = hung;
@@ -459,7 +523,13 @@ check('games are on disk', files.length > 0);
 const raw = JSON.parse(fs.readFileSync(path.join(DATA, files[files.length - 1]), 'utf8'));
 check('the saved game keeps player records', Object.values(raw.players)[0].record !== undefined);
 check('the saved game keeps coalition state', raw.coalition !== undefined);
-check('the saved game keeps the incumbency baseline', raw.incumbency !== undefined);
+// Nothing about a real election is stored, which is checked here rather than
+// on screen because a screen can be made to hide what a file still holds.
+check('nothing about a real election is stored',
+  raw.incumbency === undefined && !/\bmla\b/i.test(JSON.stringify(raw)));
+check('and every party on disk is one somebody founded',
+  Object.values(raw.players).every((pl) => pl.party && pl.party.name),
+  JSON.stringify(Object.values(raw.players).map((pl) => pl.party && pl.party.name)));
 
 section('Server log');
 check('no PHP warnings or fatals', phpErrors.length === 0, phpErrors.slice(0, 2).join(' | '));

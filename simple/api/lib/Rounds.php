@@ -361,7 +361,7 @@ final class Rounds
         // board so every client is reading the same arithmetic.
         // The round is settled: seats are awarded now, not while it ran.
         $game['board'] = $board;
-        $seats = $engine->seatCounts($board);
+        $seats = $engine->seatCounts($board, Lobby::partyIdsOf($game));
         $game['seatTotals'] = $seats;
         $game['seatsDecided'] = true;
 
@@ -554,8 +554,10 @@ final class Rounds
             }
         }
 
+        // Every party in this game, in slot order — invented by the people
+        // playing rather than picked from a list.
         $standings = [];
-        foreach (Lobby::PARTIES as $partyId) {
+        foreach (Lobby::partyIdsOf($game) as $partyId) {
             $pid = $byParty[$partyId] ?? null;
             $player = $pid !== null ? $game['players'][$pid] : null;
             $summary = $pid !== null ? ($summaries[$pid] ?? null) : null;
@@ -564,7 +566,7 @@ final class Rounds
                 'party' => $partyId,
                 'playerId' => $pid,
                 'candidateName' => $player['candidateName'] ?? null,
-                'portraitSeed' => $player['portraitSeed'] ?? null,
+                'avatar' => $player['avatar'] ?? null,
                 'isAI' => !empty($player['isAI']),
                 'seats' => (int) ($seats[$partyId] ?? 0),
                 'change' => $summary !== null ? (int) $summary['seatsChange'] : 0,
@@ -616,10 +618,24 @@ final class Rounds
     }
 
     /** The shared board, tolerating the empty-object form JSON round-trips to. */
+    /**
+     * The board, as arrays all the way down.
+     *
+     * An untouched seat is written to the wire as `{}` so it survives JSON as
+     * an object rather than as an empty list — but inside the engine every
+     * seat is an array, and this is the one place that guarantees it. Casting
+     * at each of the twenty places a seat is read would be twenty chances to
+     * forget.
+     */
     public static function boardOf(array $game): array
     {
-        $board = $game['board'] ?? [];
-        return is_array($board) ? $board : (array) $board;
+        $board = (array) ($game['board'] ?? []);
+        foreach ($board as $key => $seat) {
+            if (!is_array($seat)) {
+                $board[$key] = (array) $seat;
+            }
+        }
+        return $board;
     }
 
     /**

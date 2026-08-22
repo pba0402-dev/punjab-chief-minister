@@ -139,8 +139,21 @@ CMP.net = (function () {
     return request('state', authed(), 'GET');
   }
 
-  function setParty(partyId) {
-    return request('party', authed({ partyId: partyId || '' }));
+  /**
+   * Found or rename the party this player is standing for.
+   *
+   * The id is not sent: it is the slot they are sitting in, and the server
+   * decides that. Everything else about the party is theirs.
+   */
+  function setParty(party) {
+    party = party || {};
+    return request('party', authed({
+      name: party.name || '',
+      short: party.short || '',
+      symbol: party.symbol || '',
+      colourId: party.colourId || '',
+      slogan: party.slogan || '',
+    }));
   }
 
   function setDetails(candidateName, slogan, profile) {
@@ -224,11 +237,11 @@ CMP.net = (function () {
   }
 
   /** Fetch a profile, creating it on first contact. */
-  function profile(profileId, name, portraitSeed) {
+  function profile(profileId, name, avatar) {
     return request('profile', {
       profileId: profileId,
       name: name,
-      portraitSeed: portraitSeed,
+      avatar: avatar,
     });
   }
 

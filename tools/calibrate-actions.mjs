@@ -41,7 +41,7 @@ function loadEngine() {
   const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
   const win = dom.window;
   for (const f of [
-    'js/data/parties.js', 'js/data/constituencies.js', 'js/data/incumbents.js',
+    'js/data/parties.js', 'js/data/avatars.js', 'js/data/constituencies.js',
     'js/data/regions.js', 'js/data/actions.js', 'js/engine/rng.js',
     'js/engine/campaign.js', 'js/engine/ai.js', 'js/state.js',
   ]) {
@@ -51,34 +51,77 @@ function loadEngine() {
 }
 
 /**
- * Mean seats-worth of support one play of an action moves, across the whole
- * board, at its own base price. Measured on real opening boards so the
- * normalisation that makes this hard is included rather than assumed away.
+ * What a crore actually buys, in seats.
+ *
+ * The board starts empty, so the thing a move buys is influence in a seat —
+ * and what influence is worth is the chance that seat is still yours when the
+ * undecided part of it is rolled on polling day. Measuring the support delta
+ * would say nothing now: the first move in an untouched seat always reads as
+ * a hundred per cent of very little.
+ *
+ * So this spends a fixed sum on one action, over and over, the way a campaign
+ * running that one plan would — a fresh seat each time until the board is
+ * covered, then round again — and asks how many seats it ends up expected to
+ * win. Reach is included, because a move that is seen in three seats really
+ * does contest three seats.
  */
 function efficiencyOf(win, actionId) {
   const CMP = win.CMP;
   const E = CMP.campaign;
   const action = CMP.getAction(actionId);
   const rand = CMP.rng.create('calibrate:' + actionId);
+  const k = CMP.CAMPAIGN.election.undecidedWeight || 0;
 
-  let moved = 0;
-  let plays = 0;
-  for (let i = 0; i < SAMPLES; i++) {
+  const BUDGET = 60 * CR;
+  let seats = 0;
+  let runs = 0;
+
+  for (let i = 0; i < Math.max(6, Math.round(SAMPLES / 40)); i++) {
     const g = CMP.state.startElection({
-      partyId: 'aap', candidateName: 'Bot', seed: 'cal' + (i % 25),
+      candidateName: 'Bot',
+      partyName: 'Calibration Party',
+      seed: 'cal' + i,
     });
-    g.cash = 200 * CR;
-    const seat = 1 + Math.floor(rand() * 117);
-    const before = E.averageSupport(g.support, 'aap') * 117;
-    const res = E.play(g, actionId, action.needsConstituency === false ? null : seat, {
-      outcome: rand(), consequence: 1, consequencePick: 0.5,
+    g.cash = BUDGET;
+    const me = g.partyId;
+
+    let seat = 1;
+    for (let move = 0; move < 400 && g.cash >= action.cost; move++) {
+      const target = action.needsConstituency === false ? null : seat;
+      const res = E.play(g, actionId, target, {
+        outcome: rand(), consequence: 1, consequencePick: 0.5,
+      });
+      if (!res || !res.ok) break;
+      seat = (seat % 117) + 1;
+    }
+
+    /*
+     * Expected seats, not seats led.
+     *
+     * A seat this campaign leads with almost nothing in it is a coin toss on
+     * the day, and counting it as a seat would be the very mistake this whole
+     * measurement exists to avoid.
+     */
+    let expected = 0;
+    Object.keys(g.support).forEach((key) => {
+      const cell = g.support[key];
+      let total = 0;
+      Object.keys(cell).forEach((id) => {
+        total += Math.max(0, cell[id] || 0);
+      });
+      const undecided = k > 0 ? k / (k + total) : 0;
+      const share = E.shareOf(cell, me) / 100;
+      // The decided part is yours in proportion to your share of it; the
+      // undecided part is a draw between however many parties are standing.
+      expected += (1 - undecided) * share + undecided / (CMP.PARTIES.length || 4);
     });
-    if (!res.ok) continue;
-    const after = E.averageSupport(g.support, 'aap') * 117;
-    moved += after - before;
-    plays++;
+
+    seats += expected;
+    runs++;
   }
-  return { mean: moved / Math.max(1, plays), perCrore: (moved / Math.max(1, plays)) / (action.cost / CR) };
+
+  const mean = seats / Math.max(1, runs);
+  return { mean: mean, perCrore: mean / (BUDGET / CR) };
 }
 
 /* ------------------------------------------------------------- measure */

@@ -237,7 +237,7 @@ CMP.ui.election = (function () {
             return {
               partyId: p.partyId,
               candidateName: p.candidateName,
-              portraitSeed: p.portraitSeed,
+              avatar: p.avatar,
               isAI: p.isAI,
               isYou: p.isYou,
             };
@@ -248,14 +248,14 @@ CMP.ui.election = (function () {
       var mine = [{
         partyId: game.partyId,
         candidateName: game.candidateName,
-        portraitSeed: game.portraitSeed,
+        avatar: game.avatar,
         isYou: true,
       }];
       return mine.concat((game.opponents || []).map(function (o) {
         return {
           partyId: o.partyId,
           candidateName: o.candidateName,
-          portraitSeed: o.portraitSeed,
+          avatar: o.avatar,
           isAI: true,
         };
       }));
@@ -265,7 +265,7 @@ CMP.ui.election = (function () {
       var mine = roster().filter(function (p) {
         return p.partyId === game.partyId;
       })[0];
-      return mine ? mine.portraitSeed : game.portraitSeed;
+      return mine ? mine.avatar : game.avatar;
     }
 
     function seatDef(number) {
@@ -781,8 +781,15 @@ CMP.ui.election = (function () {
       var sheet = el('div', { class: 'sheet is-opening' }, [
         el('div', { class: 'sheet-panel op-panel', role: 'dialog', 'aria-modal': 'true' }, [
           el('span', { class: 'op-kicker', text: 'Election started' }),
-          el('p', { class: 'op-line', text: 'All players begin with 0 seats.' }),
-          el('p', { class: 'op-line is-quiet', text: 'The battle for 117 constituencies begins now.' }),
+          el('p', {
+            class: 'op-line',
+            text: (CMP.TOTAL_SEATS || 117) + ' constituencies. Every player begins ' +
+              'with 0 seats.',
+          }),
+          el('p', {
+            class: 'op-line is-quiet',
+            text: 'No constituency has a leader yet. Build your campaign.',
+          }),
           el('strong', { class: 'op-round', text: 'Round 1 of ' + (game.roundsTotal || CMP.ROUNDS.total) }),
           el('button', {
             class: 'btn btn-primary btn-wide',
@@ -1080,6 +1087,53 @@ CMP.ui.election = (function () {
       var most = Math.max(1, rows[0].seats);
       var total = CMP.TOTAL_SEATS || 117;
 
+      /*
+       * Nobody is leading yet.
+       *
+       * Before the first round is settled every campaign is on nothing, and
+       * ranking four zeroes one to four would invent a leader out of sort
+       * order. So the block says what is actually true and still lists
+       * everybody, because tapping through to a rival is how you look them up.
+       */
+      var anySeats = rows.some(function (row) {
+        return row.seats > 0;
+      });
+
+      if (!anySeats) {
+        return el('section', { class: 'g-block' }, [
+          el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
+          el('div', { class: 'lb-none' }, [
+            el('strong', { class: 'lb-none-title', text: 'No leader yet' }),
+            el('span', {
+              class: 'lb-none-note',
+              text: 'All ' + rows.length + ' campaigns are on 0 seats and no ' +
+                'constituency has been decided. Round one decides all ' +
+                total + '.',
+            }),
+          ]),
+          el('ol', { class: 'lb is-flat' }, rows.map(function (row) {
+            return el('li', {}, [el('button', {
+              class: 'lb-row' + (row.isYou ? ' is-you' : ''),
+              type: 'button',
+              style: { '--party': row.party.colour },
+              title: row.candidate || row.party.name,
+              onclick: function () {
+                openCandidate(row.party.id);
+              },
+            }, [
+              el('span', { class: 'lb-sym' }, [CMP.ui.symbol.render(row.party.symbol, 18)]),
+              el('span', { class: 'lb-party', text: row.party.short }),
+              el('span', { class: 'lb-name', text: row.candidate || row.party.name }),
+              el('strong', { class: 'lb-seats', text: '0' }),
+              el('span', {
+                class: 'lb-tag' + (row.isYou ? ' is-leading' : ''),
+                text: row.isYou ? 'You' : '',
+              }),
+            ])]);
+          })),
+        ]);
+      }
+
       return el('section', { class: 'g-block' }, [
         el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
         el('ol', { class: 'lb' }, rows.map(function (row, i) {
@@ -1127,6 +1181,26 @@ CMP.ui.election = (function () {
         return b.seats - a.seats;
       })[0];
       var needed = Math.max(0, CMP.MAJORITY - top.seats);
+
+      /*
+       * Nobody is ahead of anybody on nothing.
+       *
+       * Naming whichever campaign happened to sort first as "0 of 59" reads
+       * as a standing, and it is not one — it is four campaigns level before a
+       * seat has been decided.
+       */
+      if (top.seats === 0) {
+        return el('div', { class: 'g-majority is-open' }, [
+          el('span', { class: 'g-majority-track' }, [
+            el('span', { class: 'g-majority-fill', style: { width: '0%' } }),
+          ]),
+          el('p', { class: 'g-majority-text' }, [
+            el('strong', { text: CMP.MAJORITY + ' seats' }),
+            ' form a government · ',
+            el('span', { text: 'none decided yet' }),
+          ]),
+        ]);
+      }
 
       return el('div', {
         class: 'g-majority',

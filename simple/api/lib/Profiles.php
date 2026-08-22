@@ -88,13 +88,13 @@ final class Profiles
     }
 
     /** A blank profile. Every counter starts where it should: at nothing. */
-    public static function blank(string $id, string $name, string $portraitSeed): array
+    public static function blank(string $id, string $name, string $avatar): array
     {
         $now = time();
         return [
             'id' => $id,
             'name' => $name,
-            'portraitSeed' => $portraitSeed,
+            'avatar' => $avatar,
             'createdAt' => $now,
             'lastSeen' => $now,
 
@@ -120,7 +120,7 @@ final class Profiles
     }
 
     /** Find a profile, or start one. */
-    public function ensure(string $id, string $name, string $portraitSeed): array
+    public function ensure(string $id, string $name, string $avatar): array
     {
         $id = self::cleanId($id);
         if ($id === '') {
@@ -128,7 +128,7 @@ final class Profiles
         }
         $profile = $this->load($id);
         if ($profile === null) {
-            $profile = self::blank($id, self::cleanName($name) ?: 'Player', $portraitSeed);
+            $profile = self::blank($id, self::cleanName($name) ?: 'Player', $avatar);
             $this->save($profile);
             $this->bumpCounter('players');
             return $profile;
@@ -139,8 +139,8 @@ final class Profiles
         if ($clean !== '' && $clean !== $profile['name']) {
             $profile['name'] = $clean;
         }
-        if ($portraitSeed !== '') {
-            $profile['portraitSeed'] = $portraitSeed;
+        if ($avatar !== '') {
+            $profile['avatar'] = $avatar;
         }
         $profile['lastSeen'] = time();
         $this->save($profile);
@@ -358,7 +358,7 @@ final class Profiles
 
         return [
             'name' => $profile['name'],
-            'portraitSeed' => $profile['portraitSeed'],
+            'avatar' => $profile['avatar'],
             'played' => (int) $profile['played'],
             'won' => (int) $profile['won'],
             'winRate' => $profile['played'] > 0
@@ -493,7 +493,7 @@ final class Profiles
             }
             $rows[] = [
                 'name' => $data['name'],
-                'portraitSeed' => $data['portraitSeed'],
+                'avatar' => $data['avatar'],
                 'score' => $score,
                 'won' => (int) $data['verifiedWon'],
                 'played' => (int) $data['verifiedPlayed'],

@@ -107,7 +107,7 @@ PEOPLE.forEach((person, i) => {
   const profile = {
     id,
     name: person.name,
-    portraitSeed: id,
+    avatar: id,
     createdAt: now - 86400,
     lastSeen: now,
     played: 0,

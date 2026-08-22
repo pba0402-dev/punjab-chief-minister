@@ -36,8 +36,8 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const f of [
   'js/data/parties.js',
+  'js/data/avatars.js',
   'js/data/constituencies.js',
-  'js/data/incumbents.js',
   'js/data/regions.js',
   'js/data/actions.js',
   'js/engine/rng.js',
@@ -105,10 +105,37 @@ function playCampaign(name, seed) {
   });
   const rand = CMP.rng.create('moves:' + name + ':' + seed);
 
+  /*
+   * Where a move is worth most, best first.
+   *
+   * An empty seat comes top: a move there wins a seat outright rather than
+   * narrowing a gap. After that the closest races, because that is where a
+   * move can still change who holds it. Seats already dominated come last —
+   * spending there buys nothing but a bigger number.
+   *
+   * This is what "aiming" means under an empty board, and it is the thing
+   * scattergun deliberately does not do.
+   */
+  /*
+   * Where a move is worth most, best first.
+   *
+   * An empty seat comes top: a move there wins a seat outright rather than
+   * narrowing a gap. Then the seats this campaign is *behind* in, closest
+   * first, because those are the cheapest to flip. Seats already led come
+   * last — spending there buys a bigger number and not a seat.
+   *
+   * The margin alone cannot tell those apart: forty ahead and forty behind
+   * are the same distance and completely different decisions.
+   */
+  const value = (v) => {
+    if (!v.contested) return -1;
+    return v.leading ? 1000 + v.margin : v.margin;
+  };
+
   const marginals = () =>
     CMP.CONSTITUENCIES.map((c) => CMP.campaign.seatView(game, c.number))
       .filter(Boolean)
-      .sort((a, b) => a.margin - b.margin);
+      .sort((a, b) => value(a) - value(b));
 
   for (let round = 1; round <= CMP.ROUNDS.total; round++) {
     // A borrower who cannot cover the repayment is not testing the loan
@@ -134,9 +161,12 @@ function playCampaign(name, seed) {
       const action = plan.pick(game, Math.max(0, game.cash - dueSoon));
       if (!action) break;
       const pool = marginals();
+      // Aiming takes the best seat available; scattering takes any seat at
+      // all. A seat just campaigned in drops down the order, so aiming
+      // spreads by itself rather than hammering the same eight.
       const seat =
         plan.aim === 'marginal'
-          ? pool[Math.floor(rand() * 8)] || pool[0]
+          ? pool[0]
           : pool[Math.floor(rand() * pool.length)] || pool[0];
       const amount = SPEND[plan.spend](game, action, round);
       CMP.campaign.play(game, action.id, action.needsConstituency ? seat.number : null, {

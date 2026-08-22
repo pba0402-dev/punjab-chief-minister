@@ -539,11 +539,27 @@
   },
   "election": {
     "_comment": [
-      "Election day. Each seat is decided on its support plus a little noise, so",
-      "a narrow lead is not a guarantee and a close race can go either way.",
-      "seatNoise is in percentage points."
+      "Election day. Each seat is decided on the shares in it plus a little",
+      "noise, so a narrow lead is not a guarantee and a close race can go",
+      "either way. seatNoise is in percentage points.",
+      "",
+      "undecidedWeight is what stops the board being won by turning up.",
+      "",
+      "A seat holds raw campaign influence, and the shares are worked out",
+      "from it - so one rally in an untouched seat reads as 100% of nothing",
+      "much. Without a counterweight the best play would be a single cheap",
+      "move in all 117, and choosing where to campaign would stop mattering",
+      "entirely.",
+      "",
+      "So part of every seat stays undecided, and that part is larger the",
+      "less work has been done there: undecided = k / (k + influence). At",
+      "k=14 a seat with one rally in it is about three quarters a coin toss;",
+      "a seat somebody has really campaigned in is barely a toss at all. The",
+      "undecided part splits at random on the day, which is what makes",
+      "breadth a gamble and depth a decision."
     ],
     "seatNoise": 3.2,
+    "undecidedWeight": 14,
     "majority": 59,
     "totalSeats": 117
   },
@@ -1102,6 +1118,62 @@
         "territoryFocus": 0.25,
         "blurb": "Runs hot and hopes the scrutiny lands elsewhere."
       }
+    ],
+    "_partyNameComment": [
+      "Party names are built from three pools: where it says it speaks for,",
+      "what it says it is for, and what kind of body it calls itself. That is",
+      "the shape most new parties' names actually take, so four of them sound",
+      "like they belong to the same election without any two being alike.",
+      "",
+      "Every combination is invented. The pools are chosen so that no pairing",
+      "of them lands on the name of a real party, and an opponent never takes",
+      "a name, colour, symbol or abbreviation a player has already used."
+    ],
+    "partyPrefixes": [
+      "Punjab",
+      "New Punjab",
+      "United Punjab",
+      "Greater Punjab",
+      "Sutlej",
+      "Beas",
+      "Ravi",
+      "Doaba",
+      "Malwa",
+      "Majha",
+      "Pind",
+      "Sanjha",
+      "Satluj Valley",
+      "Northern"
+    ],
+    "partyThemes": [
+      "Development",
+      "Reform",
+      "Progress",
+      "Farmers",
+      "Workers",
+      "Welfare",
+      "Unity",
+      "Youth",
+      "Village",
+      "Justice",
+      "Prosperity",
+      "Renewal",
+      "Future",
+      "Water",
+      "Livelihood",
+      "Heritage"
+    ],
+    "partyBodies": [
+      "Party",
+      "Front",
+      "Alliance",
+      "Morcha",
+      "Manch",
+      "Union",
+      "Sabha",
+      "Council",
+      "Movement",
+      "Coalition"
     ],
     "givenNames": [
       "Arjun",

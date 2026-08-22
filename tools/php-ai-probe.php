@@ -29,17 +29,6 @@ $games = (int) ($argv[1] ?? 20);
 $mode = $argv[2] ?? 'naive';
 
 /* The real sitting members, so the opening board is the one players see. */
-$incumbents = (function (): array {
-    $js = @file_get_contents(__DIR__ . '/../simple/js/data/incumbents.js');
-    if ($js === false || !preg_match('/CMP\.INCUMBENTS = (\[.*?\]);/s', $js, $m)) {
-        return [];
-    }
-    $map = [];
-    foreach (json_decode($m[1], true) ?: [] as $row) {
-        $map[(string) $row['number']] = $row['party'];
-    }
-    return $map;
-})();
 
 $out = [];
 
@@ -49,34 +38,40 @@ for ($n = 0; $n < $games; $n++) {
     // by an opponent only means something on the same starting map — the
     // seeded boards vary far too widely to average out otherwise.
     $game = Lobby::newGame('AITST');
-    $game['id'] = 'ai-balance-' . intdiv($n, count(Lobby::PARTIES));
 
-    // Rotate which party the human plays. AAP holds 94 seats in the real
-    // membership, so a human always playing AAP would be measuring the
-    // incumbency baseline rather than the opponents.
-    $humanParty = Lobby::PARTIES[$n % count(Lobby::PARTIES)];
-    $human = Lobby::newPlayer(1, $engine->startingBudget());
-    $human['partyId'] = $humanParty;
+    /*
+     * Four games share one seed, with the human sitting in each chair in turn.
+     *
+     * The board is empty for all four, so the chairs are interchangeable in a
+     * way they were not when the map was dealt — but rotating still matters,
+     * because who moves in which order is not.
+     */
+    $seats = 4;
+    $game['id'] = 'ai-balance-' . intdiv($n, $seats);
+    $humanSlot = ($n % $seats) + 1;
+
+    $human = Lobby::newPlayer($humanSlot, $engine->startingBudget());
     $human['candidateName'] = 'Human';
+    $human['party'] = Lobby::makeParty($humanSlot, [
+        'name' => 'Human Campaign',
+        'short' => 'HUM',
+        'symbol' => 'star',
+        'colourId' => 'slate',
+    ]);
     $human['slogan'] = 'Test';
     $human['ready'] = true;
     $game['players'][$human['id']] = $human;
     $game['hostId'] = $human['id'];
     $humanId = $human['id'];
+    $humanParty = $human['partyId'];
     $game['phase'] = 'election';
 
-    [$board, $incumbency] = $engine->seedSupport(
-        range(1, 117),
-        Lobby::GAME_PARTIES,
-        $game['id'],
-        $incumbents
-    );
+    // Every one of the 117 starts holding nothing at all.
+    $board = $engine->emptyBoard(range(1, 117));
     $game['board'] = $board;
-    $game['incumbency'] = $incumbency;
 
-    $slot = Lobby::MAX_PLAYERS;
-    foreach (Lobby::unclaimedParties($game) as $partyId) {
-        $ai = AI::newPlayer($slot--, $partyId, $game['id'], $engine);
+    foreach (Lobby::freeSlots($game) as $slot) {
+        $ai = AI::newPlayer($slot, $game['id'], $engine, Lobby::claimed($game));
         $game['players'][$ai['id']] = $ai;
     }
     foreach ($game['players'] as $pid => $p) {
@@ -133,25 +128,47 @@ for ($n = 0; $n < $games; $n++) {
             continue;
         }
 
-        // A reasonable human: three safe moves, aimed at the closest races.
-        for ($move = 0; $move < 3; $move++) {
+        /*
+         * A reasonable human: safe moves, aimed where they are worth most,
+         * until the money runs out.
+         *
+         * Three a round was right when a round's allowance bought three
+         * moves. It buys five now, and a baseline that stopped at three would
+         * be measuring its own restraint rather than the opponents.
+         */
+        for ($move = 0; $move < 40; $move++) {
             $player = $game['players'][$humanId];
             $b = Rounds::boardOf($game);
 
-            $margins = [];
+            /*
+             * Where a move is worth most, best first.
+             *
+             * An empty seat comes top: a move there wins one outright rather
+             * than narrowing a gap. Then the seats this campaign is behind in,
+             * closest first, because those are the cheapest to flip. Seats
+             * already led come last. The margin alone cannot tell the last two
+             * apart — forty ahead and forty behind are the same distance and
+             * completely different decisions.
+             */
+            $value = [];
             foreach ($b as $key => $seat) {
-                $mine = (float) ($seat[$humanParty] ?? 0);
+                $shares = Campaign::shares((array) $seat);
+                if ($shares === []) {
+                    $value[(string) $key] = -1.0;
+                    continue;
+                }
+                $mine = (float) ($shares[$humanParty] ?? 0);
                 $best = 0.0;
-                foreach ($seat as $pid => $v) {
+                foreach ($shares as $pid => $v) {
                     if ($pid !== $humanParty && $v > $best) {
                         $best = (float) $v;
                     }
                 }
-                $margins[(string) $key] = abs($mine - $best);
+                $margin = abs($mine - $best);
+                $value[(string) $key] = $mine > $best ? 1000 + $margin : $margin;
             }
-            asort($margins);
-            $shortlist = array_slice(array_map('strval', array_keys($margins)), 0, 8);
-            $target = $shortlist[(int) floor($rand() * count($shortlist)) % count($shortlist)];
+            asort($value);
+            $target = (string) array_key_first($value);
 
             // Whatever safe action is affordable right now. A baseline that
             // downed tools the moment its first choice was out of reach would

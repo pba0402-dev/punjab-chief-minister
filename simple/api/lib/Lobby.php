@@ -16,11 +16,128 @@ final class Lobby
     /** A player is "connected" if we have heard from them recently. */
     public const CONNECT_TIMEOUT = 20;
 
-    /** Party ids a player may pick. Mirrors js/data/parties.js. */
-    public const PARTIES = ['aap', 'inc', 'bjp', 'sad'];
+    /**
+     * Parties belong to a game, not to the game.
+     *
+     * There is no list of four to choose from any more: every player invents
+     * their own, and the id is the slot they are sitting in. That makes the id
+     * stable for the whole game, independent of what anybody typed, and means
+     * two players can found parties with the same name without colliding.
+     */
+    public static function partyIdForSlot(int $slot): string
+    {
+        return 'p' . $slot;
+    }
 
-    /** Every party the board tracks, including the unplayable Others bucket. */
-    public const GAME_PARTIES = ['aap', 'inc', 'bjp', 'sad', 'oth'];
+    /** Every party in one game, in slot order. */
+    public static function partiesOf(array $game): array
+    {
+        $out = [];
+        foreach ($game['players'] as $p) {
+            if (!empty($p['party'])) {
+                $out[(int) $p['slot']] = $p['party'];
+            }
+        }
+        ksort($out);
+        return array_values($out);
+    }
+
+    /** Every party id in one game. */
+    public static function partyIdsOf(array $game): array
+    {
+        return array_map(
+            static fn($p) => (string) ($p['id'] ?? ''),
+            self::partiesOf($game)
+        );
+    }
+
+    /**
+     * Fill in whatever a party definition is missing.
+     *
+     * A party arriving from a half-finished form is still painted somewhere,
+     * so every field has an answer even when nobody chose one. The colour and
+     * symbol lists are the client's; the server only checks that what came
+     * back is one of them, which is why they are named here too.
+     */
+    public const COLOURS = [
+        'saffron' => ['#E08A2E', '#2a1600'],
+        'indigo' => ['#5A6FD8', '#ffffff'],
+        'emerald' => ['#2FA46B', '#04220f'],
+        'crimson' => ['#D0455A', '#ffffff'],
+        'teal' => ['#2C9EA8', '#04211f'],
+        'violet' => ['#8B5FD0', '#ffffff'],
+        'gold' => ['#D4A62A', '#2a2000'],
+        'rose' => ['#D46A9B', '#2a0c1a'],
+        'sky' => ['#4BA3DD', '#04202f'],
+        'clay' => ['#B5714A', '#ffffff'],
+        'moss' => ['#7A9E3F', '#12210a'],
+        'slate' => ['#8892A8', '#12161f'],
+    ];
+
+    public const SYMBOLS = [
+        'star', 'tree', 'lion', 'sunrise', 'mountain', 'wheel', 'book',
+        'flower', 'handshake', 'torch', 'crown', 'river', 'shield', 'wheat',
+        'lamp', 'bridge',
+    ];
+
+    /** An abbreviation, from a name nobody supplied one for. */
+    public static function suggestShort(string $name): string
+    {
+        $clean = trim(preg_replace('/[^\p{L} ]+/u', ' ', $name) ?? '');
+        if ($clean === '') {
+            return '';
+        }
+        $skip = ['of', 'the', 'and', 'for', 'a', 'an'];
+        $letters = '';
+        foreach (preg_split('/\s+/u', $clean) as $word) {
+            if (in_array(mb_strtolower($word), $skip, true)) {
+                continue;
+            }
+            $letters .= mb_strtoupper(mb_substr($word, 0, 1));
+        }
+        if (mb_strlen($letters) >= 2) {
+            return mb_substr($letters, 0, 4);
+        }
+        return mb_strtoupper(mb_substr(str_replace(' ', '', $clean), 0, 3));
+    }
+
+    /** A party definition, checked and completed. */
+    public static function makeParty(int $slot, array $in): array
+    {
+        $name = trim(mb_substr((string) ($in['name'] ?? ''), 0, 40));
+        if ($name === '') {
+            $name = 'Unnamed Party';
+        }
+
+        $short = mb_strtoupper(trim(mb_substr((string) ($in['short'] ?? ''), 0, 4)));
+        if ($short === '') {
+            $short = self::suggestShort($name) ?: 'PTY';
+        }
+
+        $symbol = (string) ($in['symbol'] ?? '');
+        if (!in_array($symbol, self::SYMBOLS, true)) {
+            $symbol = self::SYMBOLS[($slot - 1) % count(self::SYMBOLS)];
+        }
+
+        $colourId = (string) ($in['colourId'] ?? '');
+        if (!isset(self::COLOURS[$colourId])) {
+            $keys = array_keys(self::COLOURS);
+            $colourId = $keys[($slot - 1) % count($keys)];
+        }
+        [$colour, $ink] = self::COLOURS[$colourId];
+
+        return [
+            'id' => self::partyIdForSlot($slot),
+            'slot' => $slot,
+            'name' => $name,
+            'short' => $short,
+            'slogan' => trim(mb_substr((string) ($in['slogan'] ?? ''), 0, 60)),
+            'symbol' => $symbol,
+            'colourId' => $colourId,
+            'colour' => $colour,
+            'ink' => $ink,
+        ];
+    }
 
     public static function newGame(string $code): array
     {
@@ -69,7 +186,6 @@ final class Lobby
             'lastResult' => null,
             'stage' => 'lobby', // lobby | playing | results | final
             'players' => [],
-            'incumbency' => (object) [],
             'result' => null,
             'coalition' => Coalition::newState(),
             'possibleCoalitions' => [],
@@ -85,7 +201,12 @@ final class Lobby
             'id' => bin2hex(random_bytes(8)),
             'token' => bin2hex(random_bytes(16)),
             'slot' => $slot,
-            'partyId' => null,
+
+            // The party this player founded. The id is the slot, so it is
+            // fixed the moment they sit down; everything else about it is
+            // theirs to choose.
+            'partyId' => self::partyIdForSlot($slot),
+            'party' => self::makeParty($slot, []),
             'candidateName' => '',
             'slogan' => '',
 
@@ -141,7 +262,7 @@ final class Lobby
             // fixed the moment a player sits down and never changes, so the
             // face on the scoreboard is the same face all game — including
             // after a disconnection and a rejoin.
-            'portraitSeed' => bin2hex(random_bytes(6)),
+            'avatar' => bin2hex(random_bytes(6)),
             'isAI' => false,
 
             // Linked to a lasting profile when the browser carries one, so a
@@ -196,14 +317,20 @@ final class Lobby
         }));
     }
 
-    /** Parties with nobody sitting behind them. */
-    public static function unclaimedParties(array $game): array
+    /** Slots with nobody sitting in them, in order. */
+    public static function freeSlots(array $game): array
     {
-        $taken = self::takenParties($game);
-        return array_values(array_filter(
-            self::PARTIES,
-            static fn($id) => !in_array($id, $taken, true)
-        ));
+        $taken = [];
+        foreach ($game['players'] as $p) {
+            $taken[] = (int) $p['slot'];
+        }
+        $free = [];
+        for ($slot = 1; $slot <= self::MAX_PLAYERS; $slot++) {
+            if (!in_array($slot, $taken, true)) {
+                $free[] = $slot;
+            }
+        }
+        return $free;
     }
 
     /**
@@ -232,32 +359,43 @@ final class Lobby
         return $game;
     }
 
-    /** Party ids already claimed, excluding one player if given. */
-    public static function takenParties(array $game, ?string $exceptPlayerId = null): array
+    /**
+     * Things already spoken for, so an opponent does not turn up wearing
+     * somebody else's colour.
+     *
+     * @return array{names:string[],shorts:string[],colours:string[],symbols:string[],avatars:string[]}
+     */
+    public static function claimed(array $game): array
     {
-        $taken = [];
-        foreach ($game['players'] as $id => $p) {
-            if ($exceptPlayerId !== null && $id === $exceptPlayerId) {
-                continue;
+        $out = ['names' => [], 'shorts' => [], 'colours' => [], 'symbols' => [], 'avatars' => []];
+        foreach ($game['players'] as $p) {
+            $party = $p['party'] ?? null;
+            if ($party) {
+                $out['names'][] = mb_strtolower((string) $party['name']);
+                $out['shorts'][] = (string) $party['short'];
+                $out['colours'][] = (string) $party['colourId'];
+                $out['symbols'][] = (string) $party['symbol'];
             }
-            if (!empty($p['partyId'])) {
-                $taken[] = $p['partyId'];
+            if (!empty($p['avatar'])) {
+                $out['avatars'][] = (string) $p['avatar'];
             }
         }
-        return $taken;
+        return $out;
     }
 
-    public static function partyIsFree(array $game, string $partyId, string $playerId): bool
-    {
-        return !in_array($partyId, self::takenParties($game, $playerId), true);
-    }
-
-    /** A player is startable when they have a party and a candidate name. */
+    /**
+     * A player is startable when they have named themselves and their party.
+     *
+     * A party they never touched still has an id and a colour — the slot gave
+     * it those — but "Unnamed Party" on a scoreboard is somebody who did not
+     * finish, so it does not count as ready.
+     */
     public static function playerIsComplete(array $p): bool
     {
-        return !empty($p['partyId'])
-            && trim((string) $p['candidateName']) !== ''
-            && true;   // no slogan: see the note in js/ui/setup.js
+        $name = trim((string) ($p['party']['name'] ?? ''));
+        return trim((string) $p['candidateName']) !== ''
+            && $name !== ''
+            && $name !== 'Unnamed Party';
     }
 
     /**
@@ -305,19 +443,20 @@ final class Lobby
      * Seats currently led, per party. Everyone sees the same figures because
      * everyone is looking at the same board.
      */
-    public static function seatCounts(array $board): array
+    public static function seatCounts(array $board, array $partyIds = []): array
     {
         $counts = [];
-        foreach (self::GAME_PARTIES as $id) {
-            $counts[$id] = 0;
+        foreach ($partyIds as $id) {
+            $counts[(string) $id] = 0;
         }
         foreach ($board as $seat) {
-            $best = null;
+            // Nobody leads an uncontested seat, and it is counted for nobody.
+            $best = 0.0;
             $bestId = null;
-            foreach ($seat as $pid => $v) {
-                if ($best === null || $v > $best) {
-                    $best = $v;
-                    $bestId = $pid;
+            foreach ((array) $seat as $pid => $v) {
+                if ((float) $v > $best) {
+                    $best = (float) $v;
+                    $bestId = (string) $pid;
                 }
             }
             if ($bestId !== null) {
@@ -355,9 +494,10 @@ final class Lobby
                 'isYou' => $isYou,
                 'connected' => self::isConnected($p, $now),
                 'isAI' => !empty($p['isAI']),
-                'portraitSeed' => $p['portraitSeed'] ?? null,
+                'avatar' => $p['avatar'] ?? null,
                 'profileName' => $p['profileName'] ?? null,
                 'partyId' => $p['partyId'],
+                'party' => $p['party'] ?? null,
                 'candidateName' => $p['candidateName'],
                 'slogan' => $p['slogan'],
                 // Money, broken down. Cash and debt are separate numbers and
@@ -451,7 +591,7 @@ final class Lobby
         // What is held, not what is ahead. Until round one is settled every
         // party holds nothing, whatever the board underneath says.
         $settled = $game['seatTotals'] ?? null;
-        $seats = is_array($settled) ? $settled : array_fill_keys(self::PARTIES, 0);
+        $seats = is_array($settled) ? $settled : array_fill_keys(self::partyIdsOf($game), 0);
 
         [$readyCount, $readyOf] = Rounds::readyCount($game);
 
@@ -499,7 +639,7 @@ final class Lobby
             'leaders' => $game['leaders'] ?? (object) [],
 
             // One board, seen by everyone.
-            'board' => $board ?: (object) [],
+            'board' => $board ? Campaign::boardForWire($board) : (object) [],
             'projected' => $seats,
             'seatTrend' => array_map(
                 static fn($h) => ['round' => (int) $h['round'], 'seats' => $h['seats']],
@@ -512,9 +652,8 @@ final class Lobby
             'hostId' => $game['hostId'],
             'youAreHost' => $viewerId !== null && $viewerId === $game['hostId'],
             'players' => $slots,
-            'takenParties' => self::takenParties($game),
+            'parties' => self::partiesOf($game),
             'startBlockedReason' => self::startBlockedReason($game),
-            'incumbency' => $game['incumbency'] ?? null,
             'result' => $game['result'] ?? null,
             'coalition' => $game['coalition'] ?? null,
             'possibleCoalitions' => $game['possibleCoalitions'] ?? [],
