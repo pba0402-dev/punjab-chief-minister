@@ -46,8 +46,8 @@ function sectionScene(label) {
   return startGame() +
     "setTimeout(function(){" +
     "  var name=" + JSON.stringify(label) + ";" +
-    "  var s=[].slice.call(document.querySelectorAll('.g-strategy-item'))" +
-    "    .filter(function(b){var n=b.querySelector('.g-strategy-label');" +
+    "  var s=[].slice.call(document.querySelectorAll('.g-nav-item'))" +
+    "    .filter(function(b){var n=b.querySelector('.g-nav-label');" +
     "      return n&&n.textContent===name;})[0];" +
     "  if(s){s.click();return;}" +
     "  var more=document.querySelector('.g-more');if(more)more.click();" +
@@ -270,6 +270,27 @@ const SCENES = {
     "setTimeout(function(){" +
     "  var s=document.querySelector('.rr-skip');if(s)s.click();" +
     "},200);",
+
+  /*
+   * The readout with a seat chosen, which is the thing that has to be
+   * readable at arm's length on a phone.
+   */
+  'map-readout':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});" +
+    "for(var r=0;r<8;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var c=document.querySelector('.map-cell[data-seat=\"73\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('mouseenter',{bubbles:true}));" +
+    "  window.scrollTo(0,700);" +
+    "},250);",
 
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +

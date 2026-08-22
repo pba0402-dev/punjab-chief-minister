@@ -169,6 +169,26 @@ final class Territory
         return $out;
     }
 
+    /**
+     * Who holds each seat right now: whoever leads it, or whoever won it.
+     *
+     * A grant is paid on this rather than on wins alone. Wins alone made a
+     * grant something a campaign reached once and then kept, and meant most
+     * games paid none at all; leading is live, so the grant is live with it.
+     * A won seat still counts for its winner — winning is a stronger claim
+     * than leading, and it cannot be campaigned in again anyway.
+     */
+    public static function ownersOf(array $board, array $won): array
+    {
+        $owners = self::leadersOf($board);
+        foreach (self::wonOf($won) as $seat => $party) {
+            if ($party !== '') {
+                $owners[$seat] = $party;
+            }
+        }
+        return $owners;
+    }
+
     public static function leadersOf(array $board): array
     {
         $out = [];

@@ -112,7 +112,6 @@ CMP.ui.election = (function () {
     var noticeNode = el('div', { class: 'g-notice' });
     var bodyNode = el('div', { class: 'g-body' });
     var resultsNode = el('div', { class: 'g-results' });
-    var endNode = el('div', { class: 'g-end' });
     var summaryNode = el('div', { class: 'summary-slot' });
 
     var roundView = CMP.ui.round.create({
@@ -254,11 +253,13 @@ CMP.ui.election = (function () {
     // "the player is in a campaign"; screen-game is the hook this design
     // styles against. Keeping both means the redesign did not quietly rename
     // a thing other code depends on.
+    var navNode = el('nav', { class: 'g-nav', 'aria-label': 'Game sections' });
+
     var root = el('section', { class: 'screen screen-election screen-game' }, [
       el('div', { class: 'g-inner' }, [
         headNode,
+        navNode,
         roundNode,
-        endNode,
         noticeNode,
         summaryNode,
         resultsNode,
@@ -443,6 +444,38 @@ CMP.ui.election = (function () {
       ]);
     }
 
+    /*
+     * The four systems a campaign is run from, always in reach.
+     *
+     * Home, Grant, Alliances and Loan were three buttons above the board that
+     * scrolled away with it, and everything else was behind More. They are a
+     * bar under the title now: wherever you are, the other three are one tap,
+     * and the one you are on says so.
+     */
+    var NAV = [
+      { id: 'home', label: 'Home', glyph: '\u25c8' },
+      { id: 'priorities', label: 'Grant', glyph: '\u20b9' },
+      { id: 'allies', label: 'Alliances', glyph: '\u26ad' },
+      { id: 'loan', label: 'Loan', glyph: '\u25d1' },
+    ];
+
+    function paintNav() {
+      mount(navNode, NAV.map(function (item) {
+        var on = section === item.id;
+        return el('button', {
+          class: 'g-nav-item' + (on ? ' is-on' : ''),
+          type: 'button',
+          'aria-current': on ? 'page' : null,
+          onclick: function () {
+            setSection(item.id);
+          },
+        }, [
+          el('span', { class: 'g-nav-glyph', 'aria-hidden': 'true', text: item.glyph }),
+          el('span', { class: 'g-nav-label', text: item.label }),
+        ]);
+      }));
+    }
+
     /**
      * One switch in the menu.
      *
@@ -543,42 +576,18 @@ CMP.ui.election = (function () {
           el('h2', { class: 'sheet-title', text: 'Menu' }),
 
           /*
-           * Everything that came off the dashboard.
+           * Four things, and none of them is a move.
            *
-           * The map is the game now, and none of these is a thing anybody
-           * opens every round: money is a ledger you check, grants and loans
-           * are occasional decisions, and the risky screens are where you go
-           * to read about heat rather than to campaign — campaigning with a
-           * bribe happens on the map with everything else.
+           * Money, Grants, Corruption, Bribe, all 117 constituencies and the
+           * election history were here. They are gone from this menu on
+           * purpose: it is the place you go while a round is running, and a
+           * list of eleven destinations is not that.
+           *
+           * What that leaves reachable elsewhere: Loan and Grant are buttons
+           * above the board, the grant ledger opens from the grant figure in
+           * the round strip, and a corruption or negative campaign is a mode
+           * on the campaign panel where every other kind of spending lives.
            */
-          el('div', { class: 'sheet-group' }, [
-            { id: 'money', label: 'Money' },
-            { id: 'grants', label: 'Grants' },
-            { id: 'loan', label: 'Loan' },
-            { id: 'corruption', label: 'Corruption' },
-            { id: 'bribe', label: 'Bribe' },
-            { id: 'seats', label: 'All 117 constituencies' },
-          ].map(function (item) {
-            return el('button', {
-              class: 'sheet-item',
-              type: 'button',
-              text: item.label,
-              onclick: function () {
-                close();
-                setSection(item.id);
-              },
-            });
-          })),
-
-          el('button', {
-            class: 'sheet-item',
-            type: 'button',
-            text: 'Election history',
-            onclick: function () {
-              close();
-              showHistorySheet();
-            },
-          }),
 
           /*
            * Sound, and what the map is not claiming.
@@ -791,12 +800,25 @@ CMP.ui.election = (function () {
         ]);
       }
 
+      /*
+       * The figures are the way into what is behind them.
+       *
+       * Money came off the menu, and a ledger nothing opens is a ledger
+       * nobody reads — so the figure that summarises it opens it, which is
+       * how the grant purse beside it has always worked.
+       */
       mount(roundView.aside, [
-        figure('Available', money.words(cash) || '₹0', 'is-lead'),
+        figure('Available', money.words(cash) || '₹0', 'is-lead', function () {
+          setSection('money');
+        }),
         figure('Grant', money.words(grants) || '₹0', grants ? 'is-grant' : null,
           grants ? function () { setSection('grants'); } : null),
-        figure('Spent', money.words(game.roundSpent || 0) || '₹0'),
-        debt ? figure('Owed', money.words(debt), 'is-debt') : null,
+        figure('Spent', money.words(game.roundSpent || 0) || '₹0', null, function () {
+          setSection('money');
+        }),
+        debt ? figure('Owed', money.words(debt), 'is-debt', function () {
+          setSection('loan');
+        }) : null,
       ]);
     }
 
@@ -812,7 +834,7 @@ CMP.ui.election = (function () {
      */
     function paintEndRound() {
       if (!game || isCounting() || !CMP.campaign.roundIsLive(game)) {
-        mount(endNode, []);
+        mount(roundView.action, []);
         return;
       }
 
@@ -822,7 +844,7 @@ CMP.ui.election = (function () {
           ? Math.max(0, view.readyOf - (view.readyCount || 0))
           : 0;
 
-        mount(endNode, [
+        mount(roundView.action, [
           el('div', { class: 'g-ready' }, [
             el('span', { class: 'g-ready-tick', 'aria-hidden': 'true', text: '✓' }),
             el('div', { class: 'g-ready-text' }, [
@@ -840,7 +862,7 @@ CMP.ui.election = (function () {
       }
 
       /*
-       * Compact, and up with the round it ends.
+       * Opposite the round it ends, on the same line.
        *
        * It used to be a full-width two-line button at the foot of the screen,
        * under everything else — which meant scrolling past the whole board to
@@ -848,7 +870,7 @@ CMP.ui.election = (function () {
        * within the round. It asks before it acts, so it does not need to be
        * hard to reach as well.
        */
-      mount(endNode, [
+      mount(roundView.action, [
         el('button', {
           class: 'btn btn-end',
           type: 'button',
@@ -1127,12 +1149,9 @@ CMP.ui.election = (function () {
        * Nothing was deleted. The district panel opens when a district is
        * tapped, and what the map is not claiming is under More.
        */
+      // Loan, Grant and Alliances were three buttons here and are the
+      // navigation bar now, which is on every screen rather than only this one.
       return [
-        el('div', { class: 'g-strategy' }, [
-          strategyButton('loan', '⌾', 'Loan', 'Borrow against what is coming'),
-          strategyButton('priorities', '₹', 'Grant', 'Regions and targets'),
-          strategyButton('allies', '⚭', 'Alliances', 'Partners'),
-        ]),
         mapSection(),
         leaderboardBlock(counts, people),
       ];
@@ -1297,8 +1316,16 @@ CMP.ui.election = (function () {
       return [grantView.root];
     }
 
+    /**
+     * The other players: who you work with, and who you watch.
+     *
+     * Reporting a rival used to live on the corruption screen, with the risky
+     * play it exists to police. That screen has gone — corruption is a mode on
+     * the campaign panel now — and rivals belong here anyway: an alliance and
+     * an investigation are the two things one campaign does about another.
+     */
     function alliesSection() {
-      return [
+      var blocks = [
         CMP.ui.territory.alliances(game, opts.getServerView && opts.getServerView(), {
           onAlly: function (move, otherId) {
             CMP.net.ally(move, otherId).then(function (res) {
@@ -1309,6 +1336,17 @@ CMP.ui.election = (function () {
           },
         }),
       ];
+
+      if (game.mode === 'multiplayer') {
+        if (!oversight) oversight = CMP.ui.oversight.create({});
+        oversight.update(opts.getServerView && opts.getServerView());
+        blocks.push(el('section', { class: 'g-block' }, [
+          el('h2', { class: 'g-block-title', text: 'Rivals' }),
+          oversight.root,
+        ]));
+      }
+
+      return blocks;
     }
 
     function candidateSection() {
@@ -1702,7 +1740,22 @@ CMP.ui.election = (function () {
         ]),
 
         transactionsBlock(ledger.rows),
-      ];
+
+        /*
+         * The campaign so far, as seats rather than rupees.
+         *
+         * It was a sheet under More, which is now four settings and nothing
+         * else. This screen is already the record of what has happened —
+         * every movement of money since round one — so the other record of
+         * the same campaign belongs beside it rather than nowhere.
+         */
+        (game.seatTrend || []).length > 1
+          ? el('section', { class: 'g-block' }, [
+              el('h2', { class: 'g-block-title', text: 'Seats, round by round' }),
+              CMP.ui.scoreboard.historyChart(game.seatTrend || []),
+            ])
+          : null,
+      ].filter(Boolean);
     }
 
     /**
@@ -2305,6 +2358,7 @@ CMP.ui.election = (function () {
       }
 
       paintHead();
+      paintNav();
       roundView.render(game, secondsFromServer);
       mount(roundNode, [roundView.root]);
       paintPlayer();

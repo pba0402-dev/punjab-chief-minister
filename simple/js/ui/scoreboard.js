@@ -515,10 +515,33 @@ CMP.ui.scoreboard = (function () {
       }, ms);
     }
 
-    /** Long enough to read the districts on screen, and no longer. */
+    /*
+     * How a result is counted out.
+     *
+     * A district takes about six-tenths of a second to arrive and the next
+     * one starts half a second later, which is the pace of a results
+     * programme reading them off: slow enough to look at each one, quick
+     * enough that a fifteen-district region does not become a wait.
+     *
+     * Both are read by the stylesheet as well, so the animation and the
+     * timing that waits for it cannot drift apart.
+     */
+    var REVEAL_IN = 620;      // one card's entrance
+    var REVEAL_GAP = 520;     // and the pause before the next starts
+
+    /** Districts arrive one at a time, so the dwell has to cover all of them. */
+    function revealTime(count) {
+      if (!count) return 0;
+      return (count - 1) * REVEAL_GAP + REVEAL_IN;
+    }
+
+    /** Long enough to watch the region counted out, and to read the last of it. */
     function regionDwell(region) {
       var rows = regionRows(region).length;
-      return Math.min(9000, 2600 + rows * 700);
+      // Capped, because a region of fifteen districts should not hold the
+      // game for fifteen seconds; past the cap the tail is still arriving
+      // and Skip is there for anybody who has seen enough.
+      return Math.min(14000, revealTime(rows) + 1800);
     }
 
     var LEADER_DWELL = 6000;
@@ -629,11 +652,26 @@ CMP.ui.scoreboard = (function () {
       return [
         resultsBar(region ? region.name : stage, 'Round ' + result.round + ' results'),
 
-        el('div', { class: 'rr-districts' }, rows.map(function (row, i) {
+        el('div', {
+          class: 'rr-districts',
+          // The pace, given to the stylesheet rather than duplicated in it.
+          style: {
+            '--reveal-in': REVEAL_IN + 'ms',
+            '--reveal-gap': REVEAL_GAP + 'ms',
+          },
+        }, rows.map(function (row, i) {
           var top = row.rows[0];
           return el('section', {
             class: 'rr-district',
-            style: { animationDelay: Math.min(i, 6) * 60 + 'ms' },
+            /*
+             * Counted out from the top, one at a time.
+             *
+             * Every district used to arrive within four hundred milliseconds
+             * of the one before it, capped at six — which is a page loading,
+             * not a result being read out. The delay is per district and
+             * uncapped, so the twelfth is genuinely the twelfth.
+             */
+            style: { animationDelay: i * REVEAL_GAP + 'ms' },
           }, [
             el('header', { class: 'rr-district-head' }, [
               el('h3', { class: 'rr-district-name', text: row.district.name }),
@@ -650,7 +688,12 @@ CMP.ui.scoreboard = (function () {
               return el('div', {
                 class: 'rr-runner' + (place === 0 ? ' is-first' : '') +
                   (mine ? ' is-you' : ''),
-                style: { '--party': party.colour },
+                // The bars fill after their own card has arrived, so a
+                // district reads as one thing settling rather than four.
+                style: {
+                  '--party': party.colour,
+                  '--runner-delay': (i * REVEAL_GAP + 180 + place * 90) + 'ms',
+                },
               }, [
                 CMP.ui.portrait.render(avatarFor(r.partyId), 30, party.name),
                 el('span', { class: 'rr-runner-name', text: party.short }),
@@ -706,12 +749,19 @@ CMP.ui.scoreboard = (function () {
       return [
         resultsBar('Overall leader', 'After round ' + result.round),
 
-        el('div', { class: 'rr-grid' }, rows.map(function (row, i) {
+        el('div', {
+          class: 'rr-grid',
+          style: { '--reveal-in': REVEAL_IN + 'ms' },
+        }, rows.map(function (row, i) {
           var party = partyOf(row.partyId || row.party);
           return el('article', {
             class: 'rr-card' + (i === 0 ? ' is-leading' : '') +
               ((row.partyId || row.party) === mine ? ' is-you' : ''),
-            style: { '--party': party.colour },
+            // Read out in order, like the districts were.
+            style: {
+              '--party': party.colour,
+              animationDelay: i * 260 + 'ms',
+            },
           }, [
             CMP.ui.portrait.render(row.avatar || avatarFor(row.partyId || row.party),
               58, row.candidateName || party.name),

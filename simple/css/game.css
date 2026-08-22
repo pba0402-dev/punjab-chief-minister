@@ -247,15 +247,47 @@
 
 .lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 
+/*
+ * A face, a party, a seat count. Nothing else.
+ *
+ * The columns used to be rank, party, bar, seats, tag — the bar took the
+ * flexible column and the party name sat in an `auto` one beside a 16px
+ * rank. Putting a 36px portrait in the rank's place squeezed the party name
+ * behind it. The name has the flexible column now, and the face is a fixed
+ * track of its own.
+ */
 .lb-row {
   display: grid;
-  grid-template-columns: 16px auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 9px;
-  padding: 7px 11px;
+  padding: 8px 11px;
   border-radius: 11px;
   border: 1px solid var(--line-soft);
   background: var(--ink-2);
+}
+.lb-party {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-row.is-leading .lb-party { color: var(--party); }
+.lb-seats {
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+.lb-seats-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
 }
 .lb-row.is-leading {
   border-color: var(--party);
@@ -283,31 +315,13 @@
   font-size: 0.6rem;
   font-weight: 700;
 }
-.lb-who { display: flex; flex-direction: column; min-width: 0; }
-.lb-name {
-  font-size: 0.86rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.lb-party { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; color: var(--party); }
-.lb-seats {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.lb-status {
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--muted-2);
-  min-width: 46px;
-  text-align: right;
-}
-.lb-status.is-leading { color: var(--party); }
+/*
+ * An older leaderboard row — a name over a party, with a status on the right
+ * — used to be styled here. Nothing renders it any more, and its `.lb-party`
+ * and `.lb-seats` rules were quietly winning over the ones above by sitting
+ * further down the file: the party abbreviation came out at 0.64rem behind
+ * the portrait, which is how it ended up unreadable.
+ */
 
 /* ------------------------------------------------------------ majority */
 
@@ -878,7 +892,6 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
-  grid-template-columns: 16px auto minmax(0, 1fr) auto auto 10px;
 }
 .lb-row:hover { border-color: var(--wheat-deep); }
 .lb-row:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }

@@ -87,10 +87,17 @@
 }
 
 /* The round number, not a countdown. */
+/*
+ * The round, inside the ring that drains around it.
+ *
+ * Slightly smaller than it was, because it is now the only place the round
+ * number appears and it has to hold "R20" inside a 52px circle without
+ * touching the arc.
+ */
 .round-clock {
-  font-size: 0.95rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
@@ -223,14 +230,27 @@
   gap: 3px;
 }
 
+/*
+ * A face, a party, a seat count.
+ *
+ * The columns were rank, party, bar, seats, tag: 14px for the rank and a
+ * flexible track for the bar. Putting a 36px portrait where the 14px rank was
+ * pushed it straight over the party abbreviation, which is why the names read
+ * as "HU" and "RP". The face has a track its own size now and the party name
+ * has the flexible one.
+ *
+ * This is the only place these columns are set. Two other rules used to set
+ * them as well, in a file that loads earlier, and the one that won was not
+ * the one anybody was reading.
+ */
 .lb-row {
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   display: grid;
-  grid-template-columns: 14px 34px minmax(0, 1fr) 30px 46px;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 9px;
-  padding: 6px 8px;
+  gap: 10px;
+  padding: 7px 9px;
   border: 0;
   border-left: 2px solid transparent;
   border-radius: 6px;
@@ -253,11 +273,16 @@
   font-variant-numeric: tabular-nums;
 }
 .lb-party {
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--party, var(--cream));
+  letter-spacing: 0.01em;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.lb-row.is-leading .lb-party { color: var(--party); }
 .lb-bar {
   height: 6px;
   border-radius: 3px;
@@ -348,3 +373,104 @@
   letter-spacing: 0.18em;
 }
 .btn-end-note { font-size: 0.62rem; }
+
+/* ------------------------------------------ the four, always in reach */
+
+/*
+ * Home, Grant, Alliances and Loan.
+ *
+ * They were three buttons above the board that scrolled away with it, and
+ * everything else lived behind More. A campaign is run from these four, so
+ * they sit under the title on every screen and the one you are on says so.
+ *
+ * A row of tabs rather than four cards: cards would cost forty pixels of a
+ * phone screen to say what a rule and a label say.
+ */
+.g-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ink-2);
+}
+
+.g-nav-item {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 46px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-family: var(--font);
+  color: var(--muted-2);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.g-nav-item:hover { color: var(--muted); }
+.g-nav-item:focus-visible { outline: 2px solid var(--river); outline-offset: -2px; }
+
+/* The one you are on, in the gold the rest of the game uses for "chosen". */
+.g-nav-item.is-on {
+  background: var(--ink-3, rgba(255, 255, 255, 0.05));
+  color: var(--wheat);
+  box-shadow: inset 0 -2px 0 var(--wheat);
+}
+
+.g-nav-glyph { font-size: 0.92rem; line-height: 1; }
+.g-nav-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 359px) {
+  .g-nav-label { letter-spacing: 0.06em; }
+}
+
+/* --------------------------------------------- ending the round, in place */
+
+/*
+ * Opposite the ring, on the same line.
+ *
+ * It was a full-width two-line button at the foot of the page, reached by
+ * scrolling past the whole board; then it was a full-width button under the
+ * header. The space beside the ring has been empty since the round number
+ * stopped being written out twice, and this is what it is for.
+ */
+.round-action { display: flex; justify-content: flex-end; }
+
+.round-action .btn-end {
+  min-height: 40px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Being ready is a state, not a button: it says so and takes less room. */
+.round-action .g-ready {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--good);
+  border-radius: 999px;
+}
+.round-action .g-ready-tick { color: var(--good); font-weight: 700; }
+.round-action .g-ready-title { font-size: 0.68rem; font-weight: 700; }
+.round-action .g-ready-note { display: none; }
+
+@media (max-width: 379px) {
+  .round-action .btn-end { padding: 8px 13px; letter-spacing: 0.08em; }
+}

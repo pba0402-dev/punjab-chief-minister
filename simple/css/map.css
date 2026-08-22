@@ -101,30 +101,71 @@
 
 /* ---------------------------------------------------------- readout */
 
+/*
+ * What you just tapped, and it has to be readable at a glance on a phone.
+ *
+ * This used to be one wrapping line at 0.86rem with the constituency name
+ * only a shade larger than the AC number beside it, the party badge, the
+ * band and the district — five things of nearly the same weight, none of
+ * them the answer to "which seat is this".
+ *
+ * The name leads now: its own line, display face, nearly twice the size of
+ * anything else, at full contrast. Everything else is secondary and looks it.
+ */
+.map-readout:empty { display: none; }
 .map-readout {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'district district' 'name badge' 'meta meta';
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-height: 30px;
-  padding: 9px 13px;
+  gap: 3px 10px;
+  padding: 11px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-soft);
   background: var(--ink-2);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
 }
-.readout-ac { color: var(--muted-2); font-variant-numeric: tabular-nums; }
-.readout-name { font-family: var(--font-display); font-size: 1rem; font-weight: 600; }
+.readout-name {
+  grid-area: name;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.readout-ac {
+  grid-area: meta;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
 .readout-leading {
-  padding: 3px 9px;
+  grid-area: badge;
+  justify-self: end;
+  padding: 5px 11px;
   border-radius: 999px;
   background: var(--party);
   color: var(--party-ink, #fff);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
-.readout-band { font-weight: 700; font-size: 0.74rem; letter-spacing: 0.04em; }
+.readout-band {
+  grid-area: meta;
+  justify-self: end;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 .readout-mla { color: var(--muted-2); margin-left: auto; }
 
 /* ---------------------------------------------------------- legend */
@@ -292,14 +333,16 @@
   stroke-width: 2.4;
 }
 
+/* The district the seat sits in, above the seat's own name. */
 .readout-district {
-  display: inline-flex;
+  grid-area: district;
+  display: flex;
   align-items: baseline;
   gap: 7px;
   flex-wrap: wrap;
-  padding-right: 9px;
-  margin-right: 3px;
-  border-right: 1px solid var(--line);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
 }
 .readout-district-name {
   font-weight: 700;
@@ -320,15 +363,8 @@
 .readout-district-lead.is-controlled::after { content: ' ✓'; }
 .readout-district-lead.is-open { color: var(--muted-2); }
 
-@media (max-width: 430px) {
-  /* The district gets its own line rather than fighting the seat for one. */
-  .readout-district {
-    width: 100%;
-    padding: 0 0 5px;
-    margin: 0 0 5px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
+@media (max-width: 379px) {
+  .readout-name { font-size: 1.22rem; }
 }
 
 /* ------------------------------------------------- a seat that is finished */

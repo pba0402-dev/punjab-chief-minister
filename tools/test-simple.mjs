@@ -127,13 +127,19 @@ const actionCard = (d, label) =>
  * Home is the map with the two strategic buttons above it, so that is what
  * arriving there looks like — there is no menu grid to find any more.
  */
+/*
+ * Back to the board.
+ *
+ * The four-way bar is on every screen now, so walking back until it appears
+ * finds it immediately and goes nowhere. Home is a tap.
+ */
 function goHome(d) {
-  for (let i = 0; i < 4 && !q(d, '.g-strategy'); i++) {
-    const back = q(d, '.g-section-head .sd-back') || q(d, '.areas .sd-back') || q(d, '.sd-back');
-    if (!back) break;
-    clickIt(d, back);
-  }
-  if (!q(d, '.g-strategy')) throw new Error('could not get back to the game board');
+  const home = qq(d, '.g-nav-item').find((n) => {
+    const label = n.querySelector('.g-nav-label');
+    return label && label.textContent === 'Home';
+  });
+  if (home) clickIt(d, home);
+  if (!q(d, '.g-nav')) throw new Error('could not get back to the game board');
 }
 
 /*
@@ -147,12 +153,19 @@ function openSection(d, label) {
   // The map is the home screen now, so there is nowhere to go for it.
   if (label === 'Home' || label === 'Map') return;
 
-  const strategy = qq(d, '.g-strategy-item').find((n) => {
-    const name = n.querySelector('.g-strategy-label');
+  const strategy = qq(d, '.g-nav-item').find((n) => {
+    const name = n.querySelector('.g-nav-label');
     return name && name.textContent === label;
   });
   if (strategy) {
     clickIt(d, strategy);
+    return;
+  }
+
+  // Money came off the More menu; the figure that summarises it opens it,
+  // which is how the grant purse beside it has always worked.
+  if (label === 'Money') {
+    clickIt(d, q(d, '.round-aside .g-fig.is-lead'));
     return;
   }
 
@@ -458,9 +471,16 @@ check('2. no numerical countdown anywhere on the screen',
  * "Round 15 / 20" is two numbers where one is wanted. The dots under the bar
  * already say how far through the campaign this is.
  */
-check('1. the round number is beside it', /^Round 1$/.test(q(dom, '.round-of').textContent),
-  q(dom, '.round-of').textContent);
-check('1. and the total is not', !/\/\s*20/.test(q(dom, '.round-bar').textContent),
+/*
+ * 1. The round is the ring, and the ring is the only place it appears.
+ *
+ * It read "R1" inside the circle and "Round 1 / 20" beside it: the same
+ * number three times over.
+ */
+check('1. the ring carries the round', q(dom, '.round-clock').textContent === 'R1',
+  q(dom, '.round-clock').textContent);
+check('1. and nothing beside it repeats the number',
+  !q(dom, '.round-of') && !/Round\s*1/.test(q(dom, '.round-bar').textContent),
   q(dom, '.round-bar').textContent.slice(0, 60));
 
 /*
@@ -513,10 +533,22 @@ check('4. the map is on the home screen', !!q(dom, '.punjab-map'));
  * Borrowing was three taps down a menu, which is a long way for the thing a
  * player reaches for when they have run out of money mid-round.
  */
-check('2. Loan, Grant and Alliances are above the map',
-  qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/') ===
-  'Loan/Grant/Alliances',
-  qq(dom, '.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/'));
+/*
+ * 2. Four systems, always in reach.
+ *
+ * They were three buttons above the board that scrolled away with it, and
+ * everything else was behind More. A campaign is run from these four, so they
+ * are a bar under the title on every screen.
+ */
+check('2. the four systems are always in reach',
+  qq(dom, '.g-nav-item .g-nav-label').map((n) => n.textContent).join('/') ===
+  'Home/Grant/Alliances/Loan',
+  qq(dom, '.g-nav-item .g-nav-label').map((n) => n.textContent).join('/'));
+check('14. and the one you are on says so',
+  qq(dom, '.g-nav-item.is-on').length === 1 &&
+  q(dom, '.g-nav-item.is-on .g-nav-label').textContent === 'Home',
+  q(dom, '.g-nav-item.is-on')
+    ? q(dom, '.g-nav-item.is-on .g-nav-label').textContent : 'none marked');
 check('5. the map offers Punjab and its three regions',
   qq(dom, '.map-regions .term-option').length === 4,
   qq(dom, '.map-regions .term-option').map((n) => n.textContent).join('/'));
@@ -1287,8 +1319,8 @@ clickIt(dom, dom.window.document.querySelector('.btn-xl'));
 await settle();
 
 check('the round bar is shown', !!q(dom, '.round-bar'));
-check('it opens on round 1', /Round\s*1(?!\d)/.test(q(dom, '.round-bar').textContent),
-  q(dom, '.round-bar').textContent.slice(0, 40));
+check('it opens on round 1', q(dom, '.round-clock').textContent === 'R1',
+  q(dom, '.round-clock').textContent);
 check('2. the ring carries the round, not a clock',
   q(dom, '.round-clock').textContent === 'R1',
   q(dom, '.round-clock').textContent);
@@ -1403,6 +1435,40 @@ check('play is locked while the round is counted',
  * Somebody who does not want to watch the districts wants to know who is
  * leading, not to be shown the next region.
  */
+/*
+ * 1. The districts are counted out, not posted all at once.
+ *
+ * Every card used to arrive within four hundred milliseconds of the one
+ * before it, capped at six — which is a page loading rather than a result
+ * being read out. The delay is per district and uncapped now, so the twelfth
+ * card is genuinely the twelfth, and the screen is held open long enough for
+ * the last of them to arrive.
+ */
+const revealDelays = qq(dom, '.rr-district')
+  .map((n) => Number((n.style.animationDelay || '0ms').replace('ms', '')));
+check('1. each district is delayed further than the one above it',
+  revealDelays.every((v, i, a) => i === 0 || v > a[i - 1]),
+  revealDelays.join(', '));
+check('1. and the gap between them is the same every time',
+  new Set(revealDelays.slice(1).map((v, i) => v - revealDelays[i])).size <= 1,
+  revealDelays.join(', '));
+check('1. the first arrives immediately', revealDelays[0] === 0, String(revealDelays[0]));
+check('1. no card is capped into arriving with an earlier one',
+  new Set(revealDelays).size === revealDelays.length,
+  revealDelays.length + ' districts, ' + new Set(revealDelays).size + ' distinct delays');
+
+// 1. The pace is a pace: slow enough to read, and the same for everybody.
+const gap = revealDelays.length > 1 ? revealDelays[1] - revealDelays[0] : 0;
+check('1. at a deliberate pace rather than a flicker',
+  gap >= 400 && gap <= 700, gap + 'ms between districts');
+
+// 1. And the bars inside a card wait for their own card.
+const firstRunner = q(dom, '.rr-runner');
+check('1. the bars follow the card they are on',
+  Number((firstRunner.style.getPropertyValue('--runner-delay') || '0ms')
+    .replace('ms', '')) > 0,
+  firstRunner.style.getPropertyValue('--runner-delay'));
+
 check('8. Skip is offered on a region screen', !!q(dom, '.rr-skip'),
   qq(dom, '.round-results button').map((b) => b.textContent).join(' | '));
 clickIt(dom, q(dom, '.rr-skip'));
@@ -1574,8 +1640,8 @@ await settle();
 
 goHome(dom);
 check('and the board is back',
-  qq(dom, '.g-strategy-item').length === 3 && !!q(dom, '.punjab-map'),
-  qq(dom, '.g-strategy-item').length + ' strategy buttons');
+  qq(dom, '.g-nav-item').length === 4 && !!q(dom, '.punjab-map'),
+  qq(dom, '.g-nav-item').length + ' navigation items');
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
 check('a summary card appears', !!q(dom, '.summary-card'));
@@ -2038,11 +2104,11 @@ dom.window.CMP.app.goTo('election');
 await settle();
 
 check('1. the board offers Grant, not My Areas',
-  qq(dom, '.g-strategy-label').map((n) => n.textContent).indexOf('Grant') !== -1 &&
+  qq(dom, '.g-nav-label').map((n) => n.textContent).indexOf('Grant') !== -1 &&
   !/My Areas/.test(text(dom)),
-  qq(dom, '.g-strategy-label').map((n) => n.textContent).join('/'));
+  qq(dom, '.g-nav-label').map((n) => n.textContent).join('/'));
 
-clickIt(dom, qq(dom, '.g-strategy-item').find((b) => /Grant/.test(b.textContent)));
+clickIt(dom, qq(dom, '.g-nav-item').find((b) => /Grant/.test(b.textContent)));
 await settle();
 
 /* ---- the three regions ---- */
@@ -2146,6 +2212,73 @@ check('12. and it says what taking a district would and would not do',
 /* ---- 2. and none of the old dashboard came with it ---- */
 check('2. no seats-led summary on the grant screen',
   !q(dom, '.ma-control') && !/Your control/i.test(text(dom)));
+
+section('3. The More menu is four things');
+
+/*
+ * It is the menu you open while a round is running, and a list of eleven
+ * destinations is not that. Money, Grants, Loan, Corruption, Bribe, all 117
+ * constituencies and the election history came off it.
+ *
+ * What matters as much as the removal is that nothing was stranded, so this
+ * checks the ways back in as well.
+ */
+dom.window.CMP.app.setGame(dom.window.CMP.state.startElection({
+  candidateName: 'Simran Kaur Gill',
+  partyName: 'Punjab Development Party',
+}));
+dom.window.CMP.app.goTo('election');
+await settle();
+
+clickIt(dom, q(dom, '.g-more'));
+await settle();
+
+const moreLabels = qq(dom, '.sheet-panel .sheet-item').map((n) =>
+  (n.querySelector('.sheet-item-title') || n).textContent.replace(/^\W+\s*/, '').trim());
+
+check('3. the menu offers four things', moreLabels.length === 4,
+  moreLabels.join(' | '));
+check('3. and they are music, sound, about the map and exit',
+  ['Music', 'Sound', 'About the map', 'Exit game']
+    .every((want, i) => moreLabels[i] === want),
+  moreLabels.join(' | '));
+check('3. nothing that came off it is still listed',
+  ['Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'All 117', 'Election history']
+    .every((gone) => !moreLabels.some((l) => l.indexOf(gone) === 0)),
+  moreLabels.join(' | '));
+check('3. and no empty rows are left behind',
+  qq(dom, '.sheet-panel .sheet-item').every((n) => n.textContent.trim().length > 0));
+
+// Music and sound still work, and remember.
+const musicRow = qq(dom, '.sheet-item.is-toggle')[0];
+const wasOn = musicRow.classList.contains('is-on');
+clickIt(dom, musicRow);
+await settle();
+check('4. music can be switched', musicRow.classList.contains('is-on') !== wasOn,
+  musicRow.textContent.trim());
+check('4. and the preference is stored',
+  dom.window.CMP.settings.get('music') === !wasOn,
+  String(dom.window.CMP.settings.get('music')));
+clickIt(dom, musicRow);
+await settle();
+
+clickIt(dom, qq(dom, '.sheet-panel button').find((b) => b.textContent === 'Close'));
+await settle();
+
+/* ---- and nothing was stranded ---- */
+check('3. money is still reachable, from the figure that summarises it',
+  !!q(dom, '.round-aside .g-fig.is-lead'));
+clickIt(dom, q(dom, '.round-aside .g-fig.is-lead'));
+await settle();
+check('3. which opens the ledger', /Money|spent|debt/i.test(text(dom)) &&
+  !q(dom, '.punjab-map'), text(dom).slice(0, 80));
+
+openSection(dom, 'Home');
+await settle();
+check('3. loan and grant are one tap from anywhere',
+  qq(dom, '.g-nav-label').map((n) => n.textContent).join('/') ===
+    'Home/Grant/Alliances/Loan',
+  qq(dom, '.g-nav-label').map((n) => n.textContent).join('/'));
 
 section('12. Console');
 const realErrors = consoleErrors.filter((e) => !/Could not parse CSS|Not implemented/.test(e));

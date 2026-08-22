@@ -507,9 +507,10 @@ final class Campaign
             return $player;
         }
 
-        // A grant is paid for a district controlled outright, so it cannot be
-        // lost the round after it starts paying.
-        $held = $this->territory()->heldBy(Territory::wonOf($won), $partyId);
+        // A grant is paid for a district a party leads every seat of, counted
+        // live: lose one constituency and it stops paying, and whoever leads
+        // all of them instead starts.
+        $held = $this->territory()->heldBy(Territory::ownersOf($board, $won), $partyId);
         $player['districtsHeld'] = count($held);
 
         // A grant is for a district taken, not one inherited. The opening
@@ -591,7 +592,7 @@ final class Campaign
         $perRound = 0;
         if ($partyId !== '') {
             $opening = $player['openingDistricts'] ?? [];
-            foreach ($this->territory()->heldBy(Territory::wonOf($won), $partyId) as $d) {
+            foreach ($this->territory()->heldBy(Territory::ownersOf($board, $won), $partyId) as $d) {
                 if (!in_array($d['id'], $opening, true)) {
                     $perRound += (int) $d['grant'];
                 }

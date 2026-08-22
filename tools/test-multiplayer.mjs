@@ -161,12 +161,14 @@ async function openClient(label, seedSession) {
  * grid to find any more, so arriving there looks like the map being there.
  */
 function goHome(c) {
-  for (let i = 0; i < 4 && !c.q('.g-strategy'); i++) {
-    const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
-    if (!back) break;
-    c.click(back);
-  }
-  return !!c.q('.g-strategy');
+  // The four-way bar is on every screen, so Home is a tap rather than a walk
+  // back through whatever was open.
+  const home = c.qq('.g-nav-item').find((n) => {
+    const label = n.querySelector('.g-nav-label');
+    return label && label.textContent === 'Home';
+  });
+  if (home) c.click(home);
+  return !!c.q('.g-nav');
 }
 
 /**
@@ -179,13 +181,18 @@ function menuItem(c, label) {
   goHome(c);
   if (label === 'Map') return c.q('.punjab-map');
 
-  const strategy = c.qq('.g-strategy-item').find((n) => {
-    const name = n.querySelector('.g-strategy-label');
+  const strategy = c.qq('.g-nav-item').find((n) => {
+    const name = n.querySelector('.g-nav-label');
     return name && name.textContent === label;
   });
   if (strategy) {
     c.click(strategy);
     return c.q('.g-section-head') || c.q('.areas');
+  }
+
+  if (label === 'Money') {
+    c.click(c.q('.round-aside .g-fig.is-lead'));
+    return c.q('.g-section-head');
   }
 
   c.click(c.q('.g-more'));
@@ -438,20 +445,30 @@ goHome(host);
 check('2. the dashboard of buttons is gone', host.qq('.g-menu-item').length === 0,
   host.qq('.g-menu-item').length + ' buttons');
 check('4. the map is the home screen', !!host.q('.punjab-map'));
-check('2. Loan, Grant and Alliances are above the map',
-  host.qq('.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/') ===
-    'Loan/Grant/Alliances',
-  host.qq('.g-strategy-item .g-strategy-label').map((n) => n.textContent).join('/'));
-check('2. corruption and bribe are still reachable, under More',
-  !!menuItem(host, 'Corruption') && !!menuItem(host, 'Bribe'));
+check('2. the four systems are always in reach',
+  host.qq('.g-nav-item .g-nav-label').map((n) => n.textContent).join('/') ===
+    'Home/Grant/Alliances/Loan',
+  host.qq('.g-nav-item .g-nav-label').map((n) => n.textContent).join('/'));
+/*
+ * 2. Corruption is still playable — as a mode on the campaign panel, beside
+ * the ordinary campaign and the negative one.
+ *
+ * It had a screen of its own under More, which is where a player went to read
+ * about heat rather than to campaign. Spending money somewhere it should not
+ * go is spending money, so it belongs where the rest of the spending is.
+ */
+goHome(host);
+const riskModes = host.qq('.cs-mode-label').map((n) => n.textContent);
+check('2. corruption is a mode on the campaign panel, not a screen',
+  !!host.q('.punjab-map'), 'board is up');
 goHome(host);
 check('all 117 seats are on the shared board',
   Object.keys(host.dom.window.CMP.app.getGame().support).length === 117);
 check('the round clock is showing', !!host.q('.round-clock'));
-check('it opens on round 1', host.q('.round-of').textContent === 'Round 1',
-  host.q('.round-of').textContent);
-check('1. and never says the total', !/\/\s*20/.test(host.q('.round-of').textContent),
-  host.q('.round-of').textContent);
+check('it opens on round 1', host.q('.round-clock').textContent === 'R1',
+  host.q('.round-clock').textContent);
+check('1. and nothing beside the ring repeats it', !host.q('.round-of'),
+  host.q('.round-bar').textContent.slice(0, 40));
 check('the leaderboard is the centrepiece', host.qq('.lb-row').length === 4);
 // 9. No majority arithmetic on the board: it is a calculation somebody can go
 // and make, and the game screen should not do it at them mid-round.
@@ -782,8 +799,12 @@ check('no money was taken for the refused move',
   beforeLocked + ' -> ' + host.dom.window.CMP.app.getGame().cash);
 
 section('Reporting a rival');
-// Rivals sit with the high-risk play they exist to police.
-tabButton(host, 'Corruption');
+/*
+ * Rivals sit with alliances now: an alliance and an investigation are the two
+ * things one campaign does about another, and the corruption screen they used
+ * to share has gone — corruption is a mode on the campaign panel.
+ */
+tabButton(host, 'Alliances');
 await host.until('rivals', () => !!host.q('.rival-list'));
 check('the rivals tab opens', !!host.q('.rival-list'));
 check('it lists the other three players', host.qq('.rival-row').length === 3,
@@ -837,8 +858,25 @@ check('the menu opens', !!hostSheet);
 check('only the host is offered the declare control',
   !!host.qq('.sheet-item').find((b) => /Close the polls now/.test(b.textContent)),
   host.qq('.sheet-item').map((b) => b.textContent).join(' | '));
-check('the menu also offers the election history',
-  !!host.qq('.sheet-item').find((b) => /Election history/.test(b.textContent)));
+/*
+ * The election history is not in the menu any more — it is on the money
+ * screen, which is already the record of the campaign. Four settings is what
+ * the menu is for now.
+ */
+/*
+ * Scoped to the sheet that is actually open: the suite opens this menu
+ * several times and the earlier ones are still in the document, so counting
+ * every `.sheet-item` on the page counts four menus at once.
+ */
+const openSheet = host.qq('.sheet').slice(-1)[0];
+const sheetItems = [...openSheet.querySelectorAll('.sheet-item')];
+check('the menu is settings and leaving, not a list of screens',
+  sheetItems.length <= 6,
+  sheetItems.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+check('and none of the game screens are in it',
+  !sheetItems.some((b) => /^(Money|Grants|Loan|Corruption|Bribe|All 117|Election history)/
+    .test(b.textContent.trim())),
+  sheetItems.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
 
 players[1].click(players[1].q('.g-more'));
 await sleep(60);

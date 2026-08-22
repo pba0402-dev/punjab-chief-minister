@@ -154,14 +154,13 @@
    * row underneath keeps every figure readable and still costs one line.
    */
   .round-bar-main {
-    grid-template-columns: 46px minmax(0, 1fr);
-    gap: 8px 10px;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    gap: 7px 10px;
   }
   .round-timer { width: 46px; height: 46px; }
   .round-clock { font-size: 0.74rem; }
 
   .round-aside {
-    grid-column: 1 / -1;
     /* Three figures normally, four when the campaign owes money — auto-fit
        so the fourth wraps to a second line instead of crushing the other
        three. */

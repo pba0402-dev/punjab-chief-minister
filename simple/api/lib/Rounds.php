@@ -423,7 +423,10 @@ final class Rounds
             $before = (int) ($player['districtsHeld'] ?? 0);
             $heldNow = $partyId === ''
                 ? []
-                : $engine->territory()->heldBy(Territory::wonOf((array) ($game['wonSeats'] ?? [])), $partyId);
+                : $engine->territory()->heldBy(
+                    Territory::ownersOf($board, (array) ($game['wonSeats'] ?? [])),
+                    $partyId
+                );
             $opening = $player['openingDistricts'] ?? [];
             $grantIncome = 0;
             foreach ($heldNow as $d) {

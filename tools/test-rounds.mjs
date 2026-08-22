@@ -190,12 +190,14 @@ async function openClient(label) {
  * a player moves is what proves the way back exists on every screen.
  */
 function goHome(c) {
-  for (let i = 0; i < 4 && !c.q('.g-strategy'); i++) {
-    const back = c.q('.g-section-head .sd-back') || c.q('.areas .sd-back') || c.q('.sd-back');
-    if (!back) break;
-    c.click(back);
-  }
-  return !!c.q('.g-strategy');
+  // The four-way bar is on every screen, so Home is a tap rather than a walk
+  // back through whatever was open.
+  const home = c.qq('.g-nav-item').find((n) => {
+    const label = n.querySelector('.g-nav-label');
+    return label && label.textContent === 'Home';
+  });
+  if (home) c.click(home);
+  return !!c.q('.g-nav');
 }
 
 /** One item in the game's menu grid, by its label. */
@@ -207,8 +209,8 @@ function goHome(c) {
  */
 function menuItem(c, label) {
   goHome(c);
-  const strategy = c.qq('.g-strategy-item').find((n) => {
-    const name = n.querySelector('.g-strategy-label');
+  const strategy = c.qq('.g-nav-item').find((n) => {
+    const name = n.querySelector('.g-nav-label');
     return name && name.textContent === label;
   });
   if (strategy) {

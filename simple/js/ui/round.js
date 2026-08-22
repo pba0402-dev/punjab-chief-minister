@@ -163,10 +163,20 @@ CMP.ui.round = (function () {
      */
     var asideNode = el('div', { class: 'round-aside' });
 
+    /*
+     * A slot beside the ring for the one thing that ends the round.
+     *
+     * The ring says which round it is and this says how to finish it: the two
+     * belong on the same line, and the space between them was empty from the
+     * moment "Round 15 / 20" came out of it.
+     */
+    var actionNode = el('div', { class: 'round-action' });
+
     var root = el('div', { class: 'round-bar' }, [
       el('div', { class: 'round-bar-main' }, [
         ringNode,
         el('div', { class: 'round-bar-text' }, [labelNode, movesNode, readyNode]),
+        actionNode,
         asideNode,
       ]),
       stepsNode,
@@ -241,14 +251,14 @@ CMP.ui.round = (function () {
       var total = game.roundsTotal || CMP.ROUNDS.total;
 
       /*
-       * The round, and not the total.
+       * The round is the ring, and the ring already says it.
        *
-       * "Round 15 / 20" is two numbers where one is wanted; the dots under
-       * the bar already show how far through the campaign this is, and the
-       * final round says so in a word rather than by arithmetic.
+       * It read "R15" inside the circle and "Round 15 / 20" beside it: the
+       * same number three times. The ring keeps it; what is left beside it is
+       * only what the ring cannot say — that this is the last one, or that it
+       * has finished counting.
        */
       mount(labelNode, [
-        el('span', { class: 'round-of', text: 'Round ' + round }),
         round >= total ? el('span', { class: 'round-final', text: 'Final' }) : null,
         game.stage === 'results'
           ? el('span', { class: 'round-final is-quiet', text: 'Round complete' })
@@ -319,7 +329,14 @@ CMP.ui.round = (function () {
       }
     }
 
-    return { root: root, aside: asideNode, render: render, stop: stop, secondsLeft: secondsLeft };
+    return {
+      root: root,
+      aside: asideNode,
+      action: actionNode,
+      render: render,
+      stop: stop,
+      secondsLeft: secondsLeft,
+    };
   }
 
   /* ------------------------------------------------------- projection */

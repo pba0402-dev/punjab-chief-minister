@@ -298,7 +298,7 @@ CMP.campaign = (function () {
     if (game.grantsCredited[key]) return 0;
     game.grantsCredited[key] = true;
 
-    var held = districtsWonBy(game, game.partyId);
+    var held = districtsControlledBy(game, game.partyId);
     game.districtsHeld = held.length;
 
     // A grant is for a district taken, not one inherited.
@@ -383,9 +383,25 @@ CMP.campaign = (function () {
     });
   }
 
-  /** Districts controlled outright by one party in this game. */
+  /** Districts every seat of which one party has won outright, for good. */
   function districtsWonBy(game, partyId) {
     return districtsHeldBy(game.support, partyId, game.wonSeats || {});
+  }
+
+  /**
+   * Districts a party is leading every seat of, right now.
+   *
+   * This is what a grant is paid on. It used to be the permanent version
+   * above — every seat won outright — which made a grant something a campaign
+   * reached once and then kept, and meant most games paid none at all.
+   *
+   * Leading is live, so a grant is live with it: lose one constituency in a
+   * district and it stops paying that round, and whoever leads all of them
+   * instead starts. A seat already won counts, because winning it is a stronger
+   * claim than leading it and `currentLeaders` returns its winner either way.
+   */
+  function districtsControlledBy(game, partyId) {
+    return districtsHeldBy(game.support, partyId);
   }
 
   /** How a district stands for one party: held, leading, or neither. */
@@ -853,7 +869,7 @@ CMP.campaign = (function () {
 
     // Grants already being paid by districts already held. Region-locked, so
     // they count toward capacity but are spent where they were earned.
-    var held = districtsWonBy(game, game.partyId);
+    var held = districtsControlledBy(game, game.partyId);
     var opening = game.openingDistricts || [];
     var perRound = held.reduce(function (t, d) {
       return opening.indexOf(d.id) === -1 ? t + d.grant : t;
@@ -1180,7 +1196,7 @@ CMP.campaign = (function () {
 
     // Territory, and what it will pay next round while it is held. Districts
     // the deal handed over pay nothing, so they are counted but not billed.
-    var heldNow = districtsWonBy(game, game.partyId);
+    var heldNow = districtsControlledBy(game, game.partyId);
     var openingHeld = game.openingDistricts || [];
     game.districtsHeld = heldNow.length;
     summary.districtsAfter = heldNow.length;
@@ -2148,6 +2164,7 @@ CMP.campaign = (function () {
     creditDistrictGrants: creditDistrictGrants,
     districtsHeldBy: districtsHeldBy,
     districtsWonBy: districtsWonBy,
+    districtsControlledBy: districtsControlledBy,
     openingDistrictsFor: openingDistrictsFor,
     districtStanding: districtStanding,
     amountRange: amountRange,
