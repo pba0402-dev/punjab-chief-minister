@@ -125,6 +125,30 @@ function throughStages(setup, clicks) {
 
 const SCENES = {
   home: '',
+
+  /*
+   * The home screen with the live counters filled in.
+   *
+   * `home` above renders it with them empty, because this harness serves
+   * static files and the stats call fails — which quietly meant the widest
+   * block on that screen was never measured at any width. The deployed site
+   * has numbers, and numbers is what has to fit.
+   *
+   * The stub goes in before home is entered, so the first paint is the one
+   * with data in it.
+   */
+  'home-live':
+    "CMP.net.stats=function(){return Promise.resolve({ok:true," +
+    "  summary:{players:128,started:12,elections:64,governments:41,coalitions:9," +
+    "    byParty:[{party:'p1',share:38},{party:'p2',share:31}," +
+    "      {party:'p3',share:19},{party:'p4',share:12}]}," +
+    "  leaderboard:[" +
+    "    {name:'Simran Kaur Gill',avatar:'a3',score:9600,won:5,played:7,level:4}," +
+    "    {name:'Harpreet Singh Dhillon',avatar:'a7',score:8800,won:4,played:6,level:3}," +
+    "    {name:'Gurpreet Kaur Sandhu',avatar:'a12',score:7100,won:3,played:5,level:3}]" +
+    "});};" +
+    "CMP.app.goTo('setup');setTimeout(function(){CMP.app.goTo('home');},40);",
+
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
@@ -450,7 +474,12 @@ const BASE = 'http://127.0.0.1:' + server.address().port;
 
 const overflows = [];
 
+// `node tools/shots-simple.mjs <outdir> <scene>` renders one scene, which is
+// what you want while chasing a single layout down.
+const ONLY = process.argv[3] || '';
+
 for (const scene of Object.keys(SCENES)) {
+  if (ONLY && scene !== ONLY) continue;
   for (const c of CASES) {
     const png = path.join(OUT, scene + '-' + c.w + '.png');
     // execFile (async) keeps the event loop free so the server can serve.
