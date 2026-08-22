@@ -104,9 +104,9 @@ const text = (d) => d.window.document.body.textContent;
 // Actions resolve through a promise (the same call is async in multiplayer),
 // so let the microtask queue drain before asserting on the repainted UI.
 const settle = () => new Promise((r) => setTimeout(r, 10));
-const modeCard = (d, label) =>
-  qq(d, '.h-play-btn').find((b) => new RegExp(label, 'i').test(b.textContent));
-const playButton = (d) => qq(d, '.h-play-btn')[0];
+// The solo card: still the way this suite starts a game, but no longer the
+// first button on the page — Play / Join leads now.
+const playButton = (d) => qq(d, '.h-card.is-solo')[0];
 const actionCard = (d, label) =>
   qq(d, '.act').find((c) => {
     const n = c.querySelector('.act-name');
@@ -255,13 +255,40 @@ check('13. with the three facts that define it',
   /117/.test(text(dom)) && /59/.test(text(dom)) && /20/.test(text(dom)),
   qq(dom, '.h-fact').map((f) => f.textContent).join('/'));
 check('46. "Play solo" appears nowhere', !/play solo/i.test(text(dom)));
-check('14. Election Time is the first and strongest action',
-  /Election Time/.test(playButton(dom).textContent) &&
-  playButton(dom).className.indexOf('is-primary') !== -1,
-  playButton(dom).className);
-check('14. with play with friends and join underneath',
-  qq(dom, '.h-play-btn').length === 3 &&
-  /Play with friends/i.test(text(dom)) && /Join election/i.test(text(dom)));
+/*
+ * 2 + 10. One way in, and it is one button.
+ *
+ * Creating an election and joining one were two cards of their own, which made
+ * them look like two games. They are the same game from either end, so the
+ * choice between them belongs one step in.
+ */
+const primaryCard = qq(dom, '.h-card.is-primary')[0];
+check('2. Play / Join Election is the strongest action',
+  !!primaryCard && /Play \/ Join Election/i.test(primaryCard.textContent),
+  primaryCard ? primaryCard.textContent : 'no primary card');
+check('2. and it says what it does',
+  /create an election or join one/i.test(primaryCard.textContent),
+  primaryCard.textContent);
+check('2. "Play with friends" and "Join election" are not separate cards',
+  !/Play with friends/i.test(text(dom)) &&
+  qq(dom, '.h-card').filter((c) => /^Join election/i.test(c.textContent)).length === 0);
+check('2. solo is still offered', !!playButton(dom),
+  qq(dom, '.h-card').map((c) => c.querySelector('.h-card-label').textContent).join(' / '));
+
+/*
+ * 4 + 8 + 9 + 10. Three places to go, and the statistics are not on this page.
+ */
+const navLabels = qq(dom, '.h-nav .h-card-label').map((n) => n.textContent);
+check('10. the three navigation cards are there',
+  navLabels.join('/') === 'Game Statistics/Leaderboard/My Profile',
+  navLabels.join('/'));
+check('4. no statistics block is on the home screen',
+  !q(dom, '.h-figures') && !q(dom, '.st-figs'));
+check('8. and no leaderboard rows either',
+  qq(dom, '.h-board-row').length === 0, qq(dom, '.h-board-row').length + ' rows');
+check('3. nothing to continue means no Continue card',
+  qq(dom, '.h-card.is-continue').length === 0,
+  qq(dom, '.h-card.is-continue').length + ' shown');
 check('   statistics are never invented when there is no server',
   !/[1-9]\d*\s*(players|elections|governments)/i.test(text(dom)),
   text(dom).slice(0, 160));
@@ -791,11 +818,14 @@ dom = await openPage([
 
 check('36. a returning player is welcomed back by name',
   /Welcome back/.test(text(dom)), text(dom).slice(0, 120));
-check('36. and offered the election they are in the middle of',
-  /Continue solo election/.test(text(dom)), text(dom).slice(0, 220));
-check('4. the offer names the round they left it on',
-  /Round \d+ of 20/.test(text(dom)), text(dom).slice(0, 220));
-clickIt(dom, qq(dom, '.resume-link').find((b) => /Continue solo/.test(b.textContent)));
+check('3. and offered the election they are in the middle of',
+  qq(dom, '.h-card.is-continue').length === 1 &&
+  /Continue Election/i.test(text(dom)),
+  text(dom).slice(0, 220));
+check('3. the offer names the round they left it on',
+  /Round \d+ of 20/.test(q(dom, '.h-card.is-continue').textContent),
+  q(dom, '.h-card.is-continue').textContent);
+clickIt(dom, q(dom, '.h-card.is-continue'));
 // Resuming pulls the board in on the way, so give it a moment.
 await dom.window.CMP.data.ensure();
 await settle();

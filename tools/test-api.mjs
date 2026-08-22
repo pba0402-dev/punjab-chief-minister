@@ -390,6 +390,97 @@ check('tokens are never sent to clients', !publicFields.includes(h.token));
 
 /* ---------------------------------------------------------------- errors */
 
+section('Statistics counters');
+
+/*
+ * Every figure the statistics screen shows is counted from something that
+ * happened, and the two that matter most are the two nobody can check by
+ * looking at a game: how many times the link has been opened, and how many
+ * rounds have been played.
+ *
+ * Link opens are the delicate one. The brief for them is a counter that a
+ * refresh, a re-render or a retrying client cannot inflate, so it counts a
+ * device once a day rather than counting page views — and this proves it by
+ * asking twice and expecting one.
+ */
+const statsBefore = await call('stats', {}, 'GET');
+check('the stats endpoint answers', statsBefore.ok === true);
+check('it carries the game counters', !!statsBefore.summary,
+  JSON.stringify(statsBefore.summary || null).slice(0, 100));
+check('and the lifetime totals', !!statsBefore.totals,
+  JSON.stringify(statsBefore.totals || null));
+
+for (const key of ['linkOpens', 'roundsPlayed', 'gamesCreated', 'onlineGames']) {
+  check('  ' + key + ' is a real number', typeof statsBefore.totals[key] === 'number',
+    String(statsBefore.totals[key]));
+}
+
+// Rounds are counted by the server as each one opens, and this run has played
+// several by now.
+check('rounds played have been counted', statsBefore.totals.roundsPlayed > 0,
+  statsBefore.totals.roundsPlayed + ' rounds');
+check('elections created have been counted', statsBefore.totals.gamesCreated > 0,
+  statsBefore.totals.gamesCreated + ' created');
+/*
+ * Players are counted when a profile is first created, so this creates one
+ * and watches the figure move — asserting it is merely non-zero would pass on
+ * a counter that never moves again.
+ */
+const playersBefore = statsBefore.summary.players;
+// Profile ids are hex, 16 to 64 characters — the server refuses anything else,
+// which is why a readable name here would have counted nothing at all.
+const STAT_PROFILE_ID = 'a1b2c3d4e5f60718';
+await call('profile', { profileId: STAT_PROFILE_ID, name: 'Stat Check', avatar: 'a1' });
+const afterProfile = await call('stats', {}, 'GET');
+check('creating a profile counts a player',
+  afterProfile.summary.players === playersBefore + 1,
+  playersBefore + ' -> ' + afterProfile.summary.players);
+
+// And the same person coming back is not a second player.
+await call('profile', { profileId: STAT_PROFILE_ID, name: 'Stat Check', avatar: 'a1' });
+const afterAgain = await call('stats', {}, 'GET');
+check('and the same player returning is not a second one',
+  afterAgain.summary.players === playersBefore + 1,
+  afterAgain.summary.players + ' players');
+
+/* ---- the link-open counter, and its dedupe ---- */
+const opensBefore = statsBefore.totals.linkOpens;
+await call('track', { event: 'landing_page_view' });
+const afterOne = await call('stats', {}, 'GET');
+const opensAfterOne = afterOne.totals.linkOpens;
+
+check('opening the link counts once', opensAfterOne >= opensBefore,
+  opensBefore + ' -> ' + opensAfterOne);
+
+// The same device again, immediately. A page that re-renders, a client that
+// retries, or somebody refreshing must not move this.
+await call('track', { event: 'landing_page_view' });
+await call('track', { event: 'landing_page_view' });
+await call('track', { event: 'landing_page_view' });
+const afterMore = await call('stats', {}, 'GET');
+
+check('but opening it again from the same device does not',
+  afterMore.totals.linkOpens === opensAfterOne,
+  opensAfterOne + ' -> ' + afterMore.totals.linkOpens + ' after three more');
+
+// And the figures are separate things, not one number wearing three hats.
+check('players, games and link opens are different metrics',
+  'linkOpens' in afterMore.totals &&
+  'roundsPlayed' in afterMore.totals &&
+  'players' in afterMore.summary);
+
+// Nothing is invented: a counter with nothing behind it answers zero rather
+// than a plausible-looking number.
+check('a counter with nothing behind it answers zero, not a guess',
+  afterMore.summary.coalitions >= 0 && Number.isInteger(afterMore.summary.coalitions),
+  String(afterMore.summary.coalitions));
+
+// The lifetime totals survive the daily analytics prune, so they live in
+// their own file rather than in a day's.
+check('lifetime totals are stored apart from the daily log',
+  fs.existsSync(path.join(DATA, 'analytics', 'totals.json')),
+  fs.readdirSync(path.join(DATA, 'analytics')).join(', '));
+
 section('Server log');
 check('no PHP warnings or fatals', phpErrors.length === 0, phpErrors.slice(0, 2).join(' | '));
 

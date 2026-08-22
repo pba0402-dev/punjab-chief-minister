@@ -646,3 +646,106 @@
   .h-play-btn { transition: none; }
   .h-play-btn:hover { transform: none; }
 }
+
+/* ================================================== the opening screen */
+
+/*
+ * One card shape for everything you can press.
+ *
+ * The page used to be five differently-sized boxes and four blocks of
+ * statistics; it is a short list of choices now, and a list reads as a list
+ * only if the items look like each other. What varies between them is weight,
+ * not shape.
+ */
+.h-card {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 62px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  font-family: var(--font);
+  text-align: left;
+  color: var(--cream);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.h-card:hover { transform: translateY(-1px); border-color: var(--line-2, var(--muted-2)); }
+.h-card:active { transform: translateY(0); }
+.h-card:focus-visible { outline: 2px solid var(--river); outline-offset: 3px; }
+
+.h-card-label {
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+.h-card-sub {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* The way in: the one thing on the page that is meant to be pressed. */
+.h-card.is-primary {
+  background: linear-gradient(168deg, var(--wheat) 0%, var(--wheat-deep) 100%);
+  border-color: var(--wheat);
+  color: #1a1408;
+  min-height: 84px;
+  box-shadow: 0 16px 34px rgba(232, 185, 60, 0.16);
+}
+.h-card.is-primary .h-card-label { font-size: 1.5rem; }
+.h-card.is-primary .h-card-sub { color: rgba(26, 20, 8, 0.7); }
+
+.h-card.is-solo {
+  border-color: rgba(88, 168, 184, 0.4);
+  background: linear-gradient(168deg, rgba(88, 168, 184, 0.14) 0%, var(--ink-2) 100%);
+}
+.h-card.is-solo .h-card-sub { color: var(--river); }
+
+/*
+ * Something left unfinished, which is the only card that is not always there.
+ * It leads with the river accent because picking a game back up is a
+ * different kind of act from starting one.
+ */
+.h-card.is-continue {
+  border-left: 3px solid var(--river);
+}
+.h-card.is-continue .h-card-sub { color: var(--river); }
+
+/* The three places to go: present, quiet, and never competing with Play. */
+.h-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.h-card.is-quiet {
+  min-height: 0;
+  padding: 13px 16px;
+  background: none;
+}
+.h-card.is-quiet .h-card-label { font-size: 1rem; }
+.h-card.is-quiet .h-card-sub {
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--muted-2);
+}
+
+.h-resume:empty { display: none; }
+
+@media (max-width: 430px) {
+  .h-card { padding: 15px 16px; }
+  .h-card.is-primary { min-height: 78px; }
+  .h-card.is-primary .h-card-label { font-size: 1.34rem; }
+  .h-card-label { font-size: 1.18rem; }
+}

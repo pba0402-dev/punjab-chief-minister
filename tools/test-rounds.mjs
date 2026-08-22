@@ -231,7 +231,7 @@ const clients = [];
 const host = await openClient('host');
 clients.push(host);
 
-host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+host.click(host.q('.h-card.is-primary'));
 host.click(host.button('CREATE GAME'));
 await host.until('lobby', () => !!host.q('.screen-lobby'));
 // The lobby paints before the create call lands, so the code slot shows
@@ -244,7 +244,7 @@ check('the host created a game', /^[23479ACDEFGHJKMNPQRTUVWXY]{5}$/.test(code), 
 
 for (let i = 2; i <= 4; i++) {
   const c = await openClient('p' + i);
-  c.click(c.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+  c.click(c.q('.h-card.is-primary'));
   c.click(c.button('JOIN GAME'));
   c.type(c.q('.field-input'), code);
   c.click(c.button('JOIN'));

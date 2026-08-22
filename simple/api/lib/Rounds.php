@@ -36,6 +36,18 @@ final class Rounds
         $cfg = $engine->rounds();
         $now = time();
 
+        /*
+         * Counted here rather than by the clients.
+         *
+         * A round begins once, on the server, for everybody in the game — so
+         * this is the one place that can say how many rounds have actually
+         * been played. Four clients each reporting a round they saw would
+         * count it four times.
+         */
+        if (isset($GLOBALS['analytics'])) {
+            $GLOBALS['analytics']->record('round_started');
+        }
+
         // The host chose the round length before the game started; fall back
         // to the configured default for a game created before they could.
         //

@@ -1,20 +1,14 @@
 /**
  * The opening screen.
  * ------------------------------------------------------------------
- * The question this screen has to raise is "can I win Punjab?", not "here are
- * some election statistics". So the two ways to play are the loudest things on
- * it, and everything else — who is playing, who is winning, what you have
- * done before — sits underneath in a form you can take in at a glance.
+ * Six things and nothing else: what the game is, who you are, the way in, what
+ * you left unfinished, and three places to go. Everything that used to be
+ * spread down this page — the counters, the leaderboard, party performance,
+ * your recent elections — is a screen of its own now, because none of it is
+ * something you come here to read. You come here to play.
  *
- * Every figure here comes from the server, counted from games that actually
- * finished. Nothing is seeded and nothing is estimated: a new installation
- * shows zero players and zero elections, and says so, until somebody plays.
- * That is worth more than an impressive-looking screen — a number nobody can
- * trust is worse than a small one.
- *
- * The statistics load after the buttons, and the 117 constituencies are not
- * touched until a game starts. Nobody should wait on a leaderboard to press
- * Play.
+ * That matters most on a phone in portrait, where the old page put four blocks
+ * of statistics between the title and the button somebody actually came for.
  */
 window.CMP = window.CMP || {};
 CMP.ui = CMP.ui || {};
@@ -25,83 +19,93 @@ CMP.ui.home = (function () {
   var el = CMP.ui.dom.el;
   var mount = CMP.ui.dom.mount;
 
-  /** Cached between visits so returning to the menu is instant. */
-  var cachedStats = null;
-
   function render(opts) {
-    var statsNode = el('div', { class: 'h-stats' });
-    var boardNode = el('div', { class: 'h-block' });
-    var profileNode = el('div', { class: 'h-block' });
-    var partiesNode = el('div', { class: 'h-block' });
-    var recentNode = el('div', { class: 'h-block' });
-
     var saved = CMP.storage.load();
     var me = CMP.profile.get();
     var resumeNode = el('div', { class: 'h-resume' });
 
+    /** One of the three facts under the title. */
+    function fact(value, label) {
+      return el('div', { class: 'h-fact' }, [
+        el('strong', { class: 'h-fact-value', text: value }),
+        el('span', { class: 'h-fact-label', text: label }),
+      ]);
+    }
+
+    /**
+     * A card you press to go somewhere.
+     *
+     * One shape for all of them, so the page reads as a short list of choices
+     * rather than as a collection of differently-sized boxes.
+     */
+    function card(label, sub, onclick, cls) {
+      return el('button', {
+        class: 'h-card' + (cls ? ' ' + cls : ''),
+        type: 'button',
+        onclick: onclick,
+      }, [
+        el('span', { class: 'h-card-label', text: label }),
+        el('span', { class: 'h-card-sub', text: sub }),
+      ]);
+    }
+
     var root = el('section', { class: 'screen screen-home' }, [
       el('div', { class: 'h-inner' }, [
-        /* ---- the title ---- */
+        /* ---- what this is ---- */
         el('header', { class: 'h-hero' }, [
           el('h1', { class: 'h-title', text: 'Election Time' }),
           el('p', { class: 'h-sub', text: 'Punjab Assembly' }),
 
           // The three facts that define the game, as figures rather than a
-          // sentence. Somebody deciding whether to play needs the shape of it,
-          // not a paragraph about it.
+          // sentence. Somebody deciding whether to play needs the shape of
+          // it, not a paragraph about it.
           el('div', { class: 'h-facts' }, [
             fact('117', 'Seats'),
-            fact('59', 'Majority'),
+            fact(String(CMP.MAJORITY || 59), 'Majority'),
             fact(String(CMP.ROUNDS.total), 'Rounds'),
           ]),
 
-          me ? el('p', { class: 'h-welcome' }, ['Welcome back, ', el('strong', { text: me.name })]) : null,
+          me
+            ? el('p', { class: 'h-welcome' }, ['Welcome back, ', el('strong', { text: me.name })])
+            : null,
         ]),
 
         /*
-         * What there is to do.
+         * The way in, which is one button.
          *
-         * "Election Time" is the way in, whether the other three parties are
-         * people or not — a player choosing a game should be choosing an
-         * election, not a mode. The distinction lives in the setup that
-         * follows, where it is a fact about who else is playing rather than a
-         * label on a button.
+         * Creating an election and joining one were two cards of their own,
+         * which made them look like two games. They are the same game from
+         * either end, so the choice between them belongs one step in — where
+         * it is a question about what you are doing rather than a fork in the
+         * road before you have decided anything.
          */
         el('div', { class: 'h-play' }, [
-          el('button', {
-            class: 'h-play-btn is-primary',
-            type: 'button',
-            onclick: opts.onSolo,
-          }, [
-            el('span', { class: 'h-play-label', text: 'Election Time' }),
-            el('span', { class: 'h-play-sub', text: 'Choose a party and contest all 117' }),
-          ]),
-          el('button', {
-            class: 'h-play-btn',
-            type: 'button',
-            onclick: opts.onMultiplayer,
-          }, [
-            el('span', { class: 'h-play-label', text: 'Play with friends' }),
-            el('span', { class: 'h-play-sub', text: 'Create an election, share the code' }),
-          ]),
-          el('button', {
-            class: 'h-play-btn is-quiet',
-            type: 'button',
-            onclick: opts.onJoin || opts.onMultiplayer,
-          }, [
-            el('span', { class: 'h-play-label', text: 'Join election' }),
-            el('span', { class: 'h-play-sub', text: 'Enter a code from a friend' }),
-          ]),
+          card(
+            'Play / Join Election',
+            'Create an election or join one with friends',
+            opts.onMultiplayer,
+            'is-primary'
+          ),
+          card(
+            'Election Time',
+            'Play on your own against three opponents',
+            opts.onSolo,
+            'is-solo'
+          ),
         ]),
 
         /* ---- anything already in progress ---- */
         resumeNode,
 
-        statsNode,
-        boardNode,
-        profileNode,
-        partiesNode,
-        recentNode,
+        /* ---- and the three places to go ---- */
+        el('nav', { class: 'h-nav' }, [
+          card('Game Statistics', 'Election activity and game statistics',
+            opts.onStats, 'is-quiet'),
+          card('Leaderboard', 'Who is winning, across every election',
+            opts.onLeaderboard, 'is-quiet'),
+          card('My Profile', 'Your record, your face and your name',
+            opts.onProfile, 'is-quiet'),
+        ]),
       ]),
     ]);
 
@@ -115,7 +119,9 @@ CMP.ui.home = (function () {
      *
      * A game the player deliberately ended is never offered. That is what
      * ending means, and an "end game" that kept suggesting itself afterwards
-     * would be no different from leaving.
+     * would be no different from leaving. Nothing at all is shown when there
+     * is nothing to continue — an empty Continue card is a promise the game
+     * cannot keep.
      */
     function paintResume(openGames) {
       var rows = [];
@@ -125,211 +131,34 @@ CMP.ui.home = (function () {
           ? 'Round ' + entry.round + ' of ' + (entry.roundsTotal || CMP.ROUNDS.total)
           : 'Waiting in the lobby';
         rows.push(el('button', {
-          class: 'resume-link is-rejoin',
+          class: 'h-card is-continue',
           type: 'button',
           onclick: function () {
             CMP.net.adopt(entry);
             if (opts.onRejoin) opts.onRejoin();
           },
         }, [
-          el('span', { class: 'resume-title', text: 'Rejoin game ' + entry.code }),
-          el('span', { class: 'resume-note', text: where }),
+          el('span', { class: 'h-card-label', text: 'Continue Election' }),
+          el('span', { class: 'h-card-sub', text: where + ' · game ' + entry.code }),
         ]));
       });
 
       if (saved && CMP.state.isValid(saved)) {
         rows.push(el('button', {
-          class: 'resume-link',
+          class: 'h-card is-continue',
           type: 'button',
           onclick: opts.onContinueSolo,
         }, [
-          el('span', { class: 'resume-title', text: 'Continue solo election' }),
+          el('span', { class: 'h-card-label', text: 'Continue Election' }),
           el('span', {
-            class: 'resume-note',
-            text: 'Round ' + (saved.round || 1) + ' of ' + (saved.roundsTotal || CMP.ROUNDS.total),
+            class: 'h-card-sub',
+            text: 'Round ' + (saved.round || 1) + ' of ' +
+              (saved.roundsTotal || CMP.ROUNDS.total),
           }),
         ]));
       }
 
       mount(resumeNode, rows);
-    }
-
-    /* ------------------------------------------------------- painting */
-
-    /** One of the three facts under the title. */
-    function fact(value, label) {
-      return el('div', { class: 'h-fact' }, [
-        el('strong', { class: 'h-fact-value', text: value }),
-        el('span', { class: 'h-fact-label', text: label }),
-      ]);
-    }
-
-    function figure(value, label) {
-      return el('div', { class: 'h-figure' }, [
-        el('strong', { class: 'h-figure-value', text: String(value) }),
-        el('span', { class: 'h-figure-label', text: label }),
-      ]);
-    }
-
-    function paintStats(summary) {
-      mount(statsNode, [
-        el('h2', { class: 'h-block-title', text: 'The Punjab election' }),
-        el('div', { class: 'h-figures' }, [
-          figure(summary.players, summary.players === 1 ? 'player' : 'players'),
-          figure(summary.elections, summary.elections === 1 ? 'election' : 'elections'),
-          figure(summary.governments, 'governments'),
-        ]),
-        summary.elections === 0
-          ? el('p', { class: 'h-note', text: 'No elections have finished here yet. Yours would be the first.' })
-          : null,
-      ]);
-    }
-
-    function paintLeaderboard(rows) {
-      if (!rows.length) {
-        mount(boardNode, [
-          el('h2', { class: 'h-block-title', text: 'Top players' }),
-          el('p', { class: 'h-note', text: 'Nobody has won an election here yet.' }),
-        ]);
-        return;
-      }
-
-      mount(boardNode, [
-        el('div', { class: 'h-block-head' }, [
-          el('h2', { class: 'h-block-title', text: 'Top players' }),
-          el('button', {
-            class: 'h-more',
-            type: 'button',
-            text: 'Leaderboard →',
-            onclick: function () {
-              if (opts.onLeaderboard) opts.onLeaderboard();
-            },
-          }),
-        ]),
-        el('ol', { class: 'h-board' }, rows.slice(0, 5).map(function (row, i) {
-          return el('li', { class: 'h-board-row' }, [
-            el('span', { class: 'h-board-rank', text: String(i + 1) }),
-            row.avatar
-              ? CMP.ui.portrait.render(row.avatar, 28, row.name)
-              : el('span', { class: 'h-board-blank' }),
-            el('span', { class: 'h-board-name', text: row.name }),
-            el('span', { class: 'h-board-score', text: row.score.toLocaleString('en-IN') }),
-          ]);
-        })),
-      ]);
-    }
-
-    function paintProfile(profile) {
-      if (!profile) {
-        mount(profileNode, []);
-        return;
-      }
-      mount(profileNode, [
-        el('div', { class: 'h-block-head' }, [
-          el('h2', { class: 'h-block-title', text: 'Your profile' }),
-          el('button', {
-            class: 'h-more',
-            type: 'button',
-            text: 'View profile →',
-            onclick: function () {
-              if (opts.onProfile) opts.onProfile();
-            },
-          }),
-        ]),
-        el('div', { class: 'h-profile' }, [
-          profile.avatar
-            ? CMP.ui.portrait.render(profile.avatar, 48, profile.name)
-            : null,
-          el('div', { class: 'h-profile-who' }, [
-            el('strong', { class: 'h-profile-name', text: profile.name }),
-            el('span', { class: 'h-profile-level', text: 'Level ' + profile.level }),
-          ]),
-          el('div', { class: 'h-profile-figures' }, [
-            figure(profile.won, 'wins'),
-            figure(profile.played, 'games'),
-            figure(profile.winRate + '%', 'win rate'),
-          ]),
-        ]),
-      ]);
-    }
-
-    function paintParties(summary) {
-      if (!summary.byParty.length) {
-        mount(partiesNode, []);
-        return;
-      }
-      mount(partiesNode, [
-        el('h2', { class: 'h-block-title', text: 'Party performance' }),
-        el('p', { class: 'h-kicker', text: 'Game player statistics — not a real-world poll.' }),
-        el('div', { class: 'h-parties' }, summary.byParty.map(function (row) {
-          var party = CMP.getParty(row.party);
-          return el('div', { class: 'h-party', style: { '--party': party.colour } }, [
-            el('span', { class: 'h-party-name', text: party.short }),
-            el('span', { class: 'h-party-track' }, [
-              el('span', { class: 'h-party-fill', style: { width: row.share + '%' } }),
-            ]),
-            el('span', { class: 'h-party-share', text: row.share + '%' }),
-          ]);
-        })),
-      ]);
-    }
-
-    function paintRecent(profile) {
-      var history = (profile && profile.history) || [];
-      if (!history.length) {
-        mount(recentNode, []);
-        return;
-      }
-      mount(recentNode, [
-        el('div', { class: 'h-block-head' }, [
-          el('h2', { class: 'h-block-title', text: 'Your recent elections' }),
-          el('button', {
-            class: 'h-more',
-            type: 'button',
-            text: 'All results →',
-            onclick: function () {
-              if (opts.onProfile) opts.onProfile();
-            },
-          }),
-        ]),
-        el('div', { class: 'h-recent' }, history.slice(0, 3).map(function (row) {
-          var party = CMP.getParty(row.party);
-          return el('div', {
-            class: 'h-recent-row' + (row.won ? ' is-win' : ''),
-            style: { '--party': party.colour },
-          }, [
-            el('span', { class: 'h-recent-party', text: party.short }),
-            el('span', { class: 'h-recent-seats', text: row.seats + ' seats' }),
-            el('span', {
-              class: 'h-recent-result',
-              text: row.won ? 'Won' : row.outcome === 'hung' ? 'Hung' : 'Lost',
-            }),
-          ]);
-        })),
-      ]);
-    }
-
-    /* --------------------------------------------------------- loading */
-
-    function apply(data) {
-      cachedStats = data;
-      paintStats(data.summary);
-      paintLeaderboard(data.leaderboard || []);
-      paintParties(data.summary);
-    }
-
-    // Show whatever is already known immediately, then refresh. The buttons
-    // never wait on the network.
-    if (cachedStats) apply(cachedStats);
-    else {
-      mount(statsNode, [
-        el('h2', { class: 'h-block-title', text: 'The Punjab election' }),
-        el('p', { class: 'h-note', text: 'Counting…' }),
-      ]);
-    }
-    if (CMP.profile.stats()) {
-      paintProfile(CMP.profile.stats());
-      paintRecent(CMP.profile.stats());
     }
 
     // Show whatever this browser already knows about immediately, then ask
@@ -341,28 +170,6 @@ CMP.ui.home = (function () {
     if (me) {
       CMP.net.resumable(me.id).then(function (res) {
         if (res && res.ok) paintResume(res.games);
-      });
-    }
-
-    CMP.net
-      .stats()
-      .then(function (res) {
-        if (res && res.ok) apply(res);
-        else {
-          mount(statsNode, [
-            el('h2', { class: 'h-block-title', text: 'The Punjab election' }),
-            el('p', { class: 'h-note', text: 'Statistics are not available offline.' }),
-          ]);
-        }
-      })
-      .catch(function () {
-        mount(statsNode, []);
-      });
-
-    if (CMP.profile.has()) {
-      CMP.profile.refresh().then(function (profile) {
-        paintProfile(profile);
-        paintRecent(profile);
       });
     }
 

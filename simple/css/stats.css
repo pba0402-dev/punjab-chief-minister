@@ -1,0 +1,162 @@
+/* ------------------------------------------------------------------
+   Game statistics: what has actually happened, on a screen of its own.
+   Loaded after home.css.
+   ------------------------------------------------------------------ */
+
+.screen-stats { padding: 0; }
+
+.st-inner {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 22px 18px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.st-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.st-back {
+  appearance: none;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-top: 2px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink-2);
+  color: var(--cream);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.st-back:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+
+.st-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.st-sub {
+  margin: 3px 0 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.st-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.st-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+}
+.st-block-title {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.st-block-note {
+  margin: -4px 0 0;
+  font-size: 0.7rem;
+  color: var(--muted-2);
+}
+
+/*
+ * Three across on a phone, because these are short numbers and a column of
+ * three would push the next block off the screen for no gain.
+ */
+.st-figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 10px;
+}
+.st-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.st-fig-value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+.st-fig-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.st-fig-note {
+  font-size: 0.6rem;
+  line-height: 1.35;
+  color: var(--muted-2);
+}
+
+.st-parties { display: flex; flex-direction: column; gap: 7px; }
+.st-party {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 40px;
+  grid-template-areas: 'name track share' '. record record';
+  align-items: center;
+  gap: 2px 9px;
+  font-size: 0.76rem;
+}
+.st-party-name { grid-area: name; font-weight: 700; color: var(--party, var(--muted)); }
+.st-party-track {
+  grid-area: track;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.st-party-fill { display: block; height: 100%; background: var(--party, var(--muted)); }
+.st-party-share {
+  grid-area: share;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.st-party-record {
+  grid-area: record;
+  font-size: 0.62rem;
+  color: var(--muted-2);
+}
+
+.st-note,
+.st-foot {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--muted-2);
+}
+
+@media (max-width: 379px) {
+  /* "Governments formed" needs the width more than a third column does. */
+  .st-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-fig-value { font-size: 1.45rem; }
+}

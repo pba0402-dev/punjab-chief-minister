@@ -53,6 +53,19 @@ final class Analytics
         return $this->dir . '/' . $day . '.json';
     }
 
+    /*
+     * Lifetime totals, kept apart from the days.
+     *
+     * The daily files are pruned after ninety days, which is right for a
+     * funnel and wrong for "how many times has this been opened" — that
+     * figure should only ever go up. So the running totals live in their own
+     * file and are added to under the same lock that writes the day.
+     */
+    private function totalsPath(): string
+    {
+        return $this->dir . '/totals.json';
+    }
+
     private static function today(): string
     {
         return gmdate('Y-m-d');
@@ -114,9 +127,11 @@ final class Analytics
         $data['events'][$event] = (int) ($data['events'][$event] ?? 0) + 1;
 
         // Unique visitors, as a set of hashes for the day only.
+        $newVisitor = false;
         if ($visitor !== '') {
             $data['visitors'] = $data['visitors'] ?? [];
             if (!in_array($visitor, $data['visitors'], true)) {
+                $newVisitor = true;
                 // Bounded: a very busy day should not grow this file forever.
                 if (count($data['visitors']) < 20000) {
                     $data['visitors'][] = $visitor;
@@ -145,7 +160,65 @@ final class Analytics
         flock($handle, LOCK_UN);
         fclose($handle);
 
+        $this->addTotals($event, $newVisitor);
         $this->prune();
+    }
+
+    /**
+     * Add one event to the running totals.
+     *
+     * `opens` is the one worth explaining. It counts a visitor once a day
+     * rather than counting page views, so a refresh, a re-render, a client
+     * that retries, or somebody leaving the tab open overnight and coming
+     * back all add nothing. What it answers is "how many device-days has this
+     * been opened on", which is the honest version of the question.
+     */
+    private function addTotals(string $event, bool $newVisitor): void
+    {
+        $path = $this->totalsPath();
+        $handle = @fopen($path, 'c+');
+        if ($handle === false) {
+            return;
+        }
+        if (!flock($handle, LOCK_EX)) {
+            fclose($handle);
+            return;
+        }
+
+        $raw = stream_get_contents($handle);
+        $totals = $raw === false || $raw === '' ? [] : (json_decode($raw, true) ?: []);
+
+        $totals[$event] = (int) ($totals[$event] ?? 0) + 1;
+        if ($newVisitor) {
+            $totals['visitors'] = (int) ($totals['visitors'] ?? 0) + 1;
+            if ($event === 'landing_page_view') {
+                $totals['opens'] = (int) ($totals['opens'] ?? 0) + 1;
+            }
+        }
+
+        ftruncate($handle, 0);
+        rewind($handle);
+        fwrite($handle, json_encode($totals, JSON_UNESCAPED_SLASHES));
+        fflush($handle);
+        flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+
+    /**
+     * Everything counted since this installation started, which is what the
+     * statistics screen asks for. Zero is a real answer.
+     */
+    public function lifetime(): array
+    {
+        $raw = @file_get_contents($this->totalsPath());
+        $totals = $raw === false ? [] : (json_decode($raw, true) ?: []);
+
+        $out = ['opens' => (int) ($totals['opens'] ?? 0),
+                'visitors' => (int) ($totals['visitors'] ?? 0)];
+        foreach (self::EVENTS as $name) {
+            $out[$name] = (int) ($totals[$name] ?? 0);
+        }
+        return $out;
     }
 
     /** One day's figures, with the visitor hashes reduced to a count. */

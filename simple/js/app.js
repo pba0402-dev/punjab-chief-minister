@@ -472,6 +472,12 @@ CMP.app = (function () {
           goTo('home');
         },
       });
+    } else if (screen === 'stats') {
+      view = CMP.ui.stats.render({
+        onBack: function () {
+          goTo('home');
+        },
+      });
     } else if (screen === 'leaderboard') {
       view = CMP.ui.profile.leaderboard({
         onBack: function () {
@@ -509,6 +515,9 @@ CMP.app = (function () {
         },
         onLeaderboard: function () {
           goTo('leaderboard');
+        },
+        onStats: function () {
+          goTo('stats');
         },
         onRejoin: function () {
           goTo('lobby');

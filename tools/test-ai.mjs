@@ -175,7 +175,7 @@ const serverAvatars = (function () {
 section('Two people sit down');
 
 const host = await openClient('host');
-host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+host.click(host.q('.h-card.is-primary'));
 host.click(host.button('CREATE GAME'));
 await host.until('lobby', () => !!host.q('.screen-lobby'));
 await host.until('code', () =>
@@ -184,7 +184,7 @@ await host.until('code', () =>
 const code = host.q('.code-value').textContent.trim();
 
 const guest = await openClient('guest');
-guest.click(guest.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+guest.click(guest.q('.h-card.is-primary'));
 guest.click(guest.button('JOIN GAME'));
 guest.type(guest.q('.field-input'), code);
 guest.click(guest.button('JOIN'));
@@ -353,9 +353,9 @@ section('A face does not change');
 const rejoined = await openClient('rejoin', host.session());
 // A returning player lands on the home screen with their game offered as a
 // resume line, exactly as they would after closing the tab.
-const resume = rejoined.qq('.resume-link').find((b) => /Rejoin game/.test(b.textContent));
+const resume = rejoined.q('.h-card.is-continue');
 check('the returning player is offered their game back', !!resume,
-  rejoined.qq('.resume-link').map((b) => b.textContent).join(' | '));
+  rejoined.qq('.h-card.is-continue').map((b) => b.textContent).join(' | '));
 if (resume) rejoined.click(resume);
 
 const back = await rejoined.until('back in',

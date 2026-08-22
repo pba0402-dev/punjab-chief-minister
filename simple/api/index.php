@@ -1189,12 +1189,30 @@ switch (route()) {
 
     /* ------------------------------------------------------------- stats */
     case 'stats': {
-        // Everything the home screen shows, counted from games that actually
-        // finished. A new installation answers zero, and says so.
+        /*
+         * Everything the statistics screen shows, counted from what actually
+         * happened. A new installation answers zero, and says so.
+         *
+         * Two different sources, because they answer two different questions.
+         * `summary` comes from the counters a finished election writes, so it
+         * is about games; `totals` comes from the event log's running totals,
+         * so it is about activity — opens, elections created, rounds played.
+         * Neither is derived from the other and neither is invented.
+         */
+        $totals = $analytics->lifetime();
         send([
             'ok' => true,
             'summary' => $profiles->summary(),
             'leaderboard' => $profiles->leaderboard(10),
+            'totals' => [
+                'linkOpens' => $totals['opens'],
+                'visitors' => $totals['visitors'],
+                'gamesCreated' => $totals['game_created'],
+                'gamesJoined' => $totals['game_joined'],
+                'onlineGames' => $totals['game_started'],
+                'roundsPlayed' => $totals['round_started'],
+                'gamesCompleted' => $totals['game_completed'],
+            ],
         ]);
     }
 

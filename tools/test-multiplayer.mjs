@@ -200,9 +200,19 @@ function menuItem(c, label) {
 
 section('Host creates a game');
 const host = await openClient('host');
-check('home offers the ways in', /Election Time/i.test(host.text()) && /Play with friends/i.test(host.text()));
+/*
+ * 2. One way in, from either end.
+ *
+ * Creating and joining used to be two cards, which made them look like two
+ * games; they are the same game and the choice between them is one step in.
+ */
+check('home offers one way into an election',
+  /Election Time/i.test(host.text()) &&
+  /Play \/ Join Election/i.test(host.text()) &&
+  !/Play with friends/i.test(host.text()),
+  host.qq('.h-card-label').map((n) => n.textContent).join(' / '));
 
-host.click(host.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+host.click(host.q('.h-card.is-primary'));
 check('multiplayer screen opens', !!host.q('.screen-multiplayer'));
 check('CREATE GAME is offered', !!host.button('CREATE GAME'));
 check('JOIN GAME is offered', !!host.button('JOIN GAME'));
@@ -231,7 +241,7 @@ section('Three friends join with the code');
 const players = [host];
 for (const label of ['p2', 'p3', 'p4']) {
   const c = await openClient(label);
-  c.click(c.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+  c.click(c.q('.h-card.is-primary'));
   c.type(c.q('.code-input'), label === 'p3' ? code.toLowerCase() : code);
   c.click(c.button('JOIN GAME'));
   const ok = await c.until('lobby', () => !!c.q('.screen-lobby'));
@@ -939,10 +949,17 @@ players[1].close();
 const returning = await openClient('p2-return', p2Session);
 check(
   'the returning player is offered their game',
-  new RegExp('Rejoin game ' + rejoinCode).test(returning.text()),
-  returning.text().slice(0, 120)
+  !!returning.q('.h-card.is-continue') &&
+  new RegExp(rejoinCode).test(returning.q('.h-card.is-continue').textContent),
+  returning.q('.h-card.is-continue')
+    ? returning.q('.h-card.is-continue').textContent
+    : returning.text().slice(0, 120)
 );
-returning.click(returning.qq('.resume-link').find((b) => /Rejoin game/.test(b.textContent)));
+// 3. And it says where they left it, rather than just that something exists.
+check('and names the round they left it on',
+  /Round \d+ of \d+|lobby/i.test(returning.q('.h-card.is-continue').textContent),
+  returning.q('.h-card.is-continue').textContent);
+returning.click(returning.q('.h-card.is-continue'));
 // The lobby renders immediately; the poll then carries them into the election
 // that started while they were away. Wait for that, not just for any screen.
 // By this point the polls have closed, so a returning player should land on
@@ -972,7 +989,7 @@ check('their candidate survived', /Ravinder Singh Bajwa/.test(returningText()));
 
 section('A fifth player is turned away');
 const fifth = await openClient('p5');
-fifth.click(fifth.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+fifth.click(fifth.q('.h-card.is-primary'));
 fifth.type(fifth.q('.code-input'), code);
 fifth.click(fifth.button('JOIN GAME'));
 const refused = await fifth.until('notice', () => !!fifth.q('.notice'));
@@ -985,7 +1002,7 @@ check(
 );
 
 const badCode = await openClient('bad');
-badCode.click(badCode.qq('.h-play-btn').find((b) => /Play with friends/i.test(b.textContent)));
+badCode.click(badCode.q('.h-card.is-primary'));
 badCode.type(badCode.q('.code-input'), 'QQQQQ');
 badCode.click(badCode.button('JOIN GAME'));
 const badRefused = await badCode.until('notice', () => !!badCode.q('.notice'));
@@ -1090,16 +1107,46 @@ check('9. each with a score', host.qq('.lbd-score').length === host.qq('.lbd-row
 host.dom.window.CMP.app.goTo('home');
 await host.until('home', () => !!host.q('.screen-home'));
 await sleep(400);
-check('4. the home screen shows the live figures',
-  /1\s*election/i.test(host.text()), host.text().slice(0, 200));
+/*
+ * 4 + 5. The figures live on their own screen now.
+ *
+ * They used to be four blocks down the opening page, between somebody
+ * arriving and the button they came for. Home says nothing about them; Game
+ * Statistics says all of it, counted by the server from what happened.
+ */
+check('4. home carries no statistics of its own',
+  !host.q('.st-figs') && !host.q('.h-figures') &&
+  !/not a real-world poll/i.test(host.text()),
+  host.text().slice(0, 160));
+check('4. and offers the statistics screen instead',
+  host.qq('.h-nav .h-card-label').map((n) => n.textContent).join('/') ===
+    'Game Statistics/Leaderboard/My Profile',
+  host.qq('.h-nav .h-card-label').map((n) => n.textContent).join('/'));
+
+host.click(host.qq('.h-nav .h-card')[0]);
+await host.until('statistics screen', () => !!host.q('.st-figs'));
+
+check('5. the statistics screen counts the election that was played',
+  /1\s*election|elections/i.test(host.text()), host.text().slice(0, 240));
+check('5. it reports link opens, players and rounds apart',
+  ['Link opens', 'Players', 'Rounds played']
+    .every((label) => new RegExp(label, 'i').test(host.text())),
+  host.qq('.st-fig-label').map((n) => n.textContent).join(' / '));
 check('10. and labels party performance as game statistics',
   /not a real-world poll/i.test(host.text()));
+check('5. every figure on it is a number, not a guess',
+  host.qq('.st-fig-value').every((n) => /^\d+$/.test(n.textContent.trim())),
+  host.qq('.st-fig-value').map((n) => n.textContent).join(','));
+
+host.click(host.q('.st-back'));
+await host.until('home again', () => !!host.q('.screen-home'));
+check('5. and it goes back to home', !!host.q('.screen-home'));
 
 /* ---------------------------------------------------------------- solo */
 
 section('Solo mode still needs no server');
 const solo = await openClient('solo');
-solo.click(solo.qq('.h-play-btn')[0]);
+solo.click(solo.q('.h-card.is-solo'));
 await solo.dom.window.CMP.data.ensure();
 await sleep(60);
 check('solo setup opens', !!solo.q('.screen-setup'));
