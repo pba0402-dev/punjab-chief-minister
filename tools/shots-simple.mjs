@@ -325,6 +325,25 @@ const SCENES = {
     "  })();" +
     "},420);",
 
+  /* Who's leading, under the board: seats and what each campaign has left. */
+  'leading':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:''});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){window.scrollTo(0,900);},600);",
+
+  /* The district level, and the standing scoped to the chosen district. */
+  'map-district-level':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:''});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
+    "    .filter(function(x){return /District/.test(x.textContent);})[0];" +
+    "  if(b)b.click();" +
+    "  setTimeout(function(){" +
+    "    var c=document.querySelector('.map-scope-chip');" +
+    "    if(c)c.click();" +
+    "    setTimeout(function(){window.scrollTo(0,900);},300);" +
+    "  },260);" +
+    "},600);",
+
   /* The round overview: where every campaign stands, before the regions. */
   'results-overview':
     "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +

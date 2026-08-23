@@ -384,6 +384,37 @@ can weigh rounds, districts, alliances, campaign performance or anything else
 by asking for more context rather than by reaching into the game — and the
 screens that display it do not have to be rebuilt.
 
+## The board, and one thing under it
+
+**Map, then who's leading.** That is the whole screen.
+
+Three geographic levels rather than four buttons: **All Punjab · District ·
+Zone**. It used to be All Punjab, Majha, Doaba and Malwa in one row, which put
+the whole state and one third of it on the same footing and left no room for a
+district at all. The levels are what you are looking at; the row underneath is
+which one.
+
+The standing under the board follows the board. Choose a district and Who's
+Leading is about that district; choose a zone and it is about the zone. The
+map is the one that knows what it is framing, so it says — rather than the
+screen underneath guessing from a highlight.
+
+The line above the map used to carry a row of party counts. It is gone: those
+are the same four numbers Who's Leading carries directly under the board, and
+two answers to "who is winning" is one too many.
+
+### What each campaign has left
+
+Every row says how much that campaign can still spend. It is the **live
+balance** — not what they started with, not what they have spent, not what the
+districts have paid them — read off the same field the ledger and the round
+strip read, so spending a rupee moves all three together.
+
+Your own is always known. An opponent's is known when this client is running
+them, which it is when you play alone. In a game with other people the server
+does not send it and should not: what a rival has left is theirs. The row
+prints a dash and the block says why.
+
 ## Tapping a seat
 
 The board is the game, so the panel a seat opens on sits **over** the map

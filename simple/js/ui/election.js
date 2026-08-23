@@ -1666,6 +1666,100 @@ CMP.ui.election = (function () {
      * Faces and full candidate names moved to the player's own page, one tap
      * away, which is where somebody who wants them is going anyway.
      */
+    /*
+     * What the board is framing, so the standing underneath can agree with it.
+     *
+     * The map is the one that knows, so it says; this only remembers what it
+     * last said. All Punjab until somebody chooses otherwise.
+     */
+    var mapScope = { level: 'all', region: null, district: null };
+
+    /** Seats a party leads or holds, inside whatever is being looked at. */
+    function seatsInScope(partyId) {
+      var seats = seatNumbersInScope();
+      var won = game.wonSeats || {};
+      var n = 0;
+      for (var i = 0; i < seats.length; i++) {
+        var num = seats[i];
+        var w = won[String(num)];
+        if (w) {
+          if (w.party === partyId) n += 1;
+          continue;
+        }
+        var lead = CMP.ui.constituency.leaderOf(game.support[num] || {});
+        if (lead && lead.partyId === partyId) n += 1;
+      }
+      return n;
+    }
+
+    function seatNumbersInScope() {
+      if (mapScope.level === 'district' && mapScope.district) {
+        var d = CMP.getDistrict ? CMP.getDistrict(mapScope.district) : null;
+        return (d && d.seats) || [];
+      }
+      if (mapScope.level === 'zone' && mapScope.region) {
+        return (CMP.CONSTITUENCIES || []).filter(function (c) {
+          return CMP.regionOfSeat(c.number) === mapScope.region;
+        }).map(function (c) {
+          return c.number;
+        });
+      }
+      return (CMP.CONSTITUENCIES || []).map(function (c) {
+        return c.number;
+      });
+    }
+
+    /** What this part of the board is called, for the heading. */
+    function scopeName() {
+      if (mapScope.level === 'district' && mapScope.district) {
+        var d = CMP.getDistrict ? CMP.getDistrict(mapScope.district) : null;
+        return d ? d.name : null;
+      }
+      if (mapScope.level === 'zone' && mapScope.region) {
+        var r = CMP.getRegion ? CMP.getRegion(mapScope.region) : null;
+        return r ? r.name : null;
+      }
+      return null;
+    }
+
+    /**
+     * What a campaign has left to spend, right now.
+     *
+     * Your own is always known. An opponent's is known when this client is
+     * running them — playing alone, they are local objects — and not when a
+     * server is, because what a rival has left is theirs. Null means "not
+     * ours to show", and the row prints a dash rather than a figure.
+     *
+     * This is the live balance and nothing else: not what they started with,
+     * not what they have spent, not what the districts have paid them. It
+     * comes off the same field the ledger and the round strip read, so
+     * spending a rupee moves all three together.
+     */
+    function moneyOf(partyId) {
+      if (partyId === game.partyId) return CMP.campaign.heldTotal(game);
+      var others = game.opponents || [];
+      for (var i = 0; i < others.length; i++) {
+        if (others[i].partyId === partyId) {
+          return CMP.campaign.heldTotal(withBoardOf(others[i]));
+        }
+      }
+      return null;
+    }
+
+    /*
+     * An opponent carries its own purse but not the board, and heldTotal
+     * wants both — general cash plus whatever the region grants hold.
+     */
+    function withBoardOf(actor) {
+      var view = {};
+      Object.keys(actor).forEach(function (k) {
+        view[k] = actor[k];
+      });
+      view.support = game.support;
+      view.wonSeats = game.wonSeats;
+      return view;
+    }
+
     function leaderboardBlock(counts, people) {
       var rows = CMP.PLAYABLE_PARTIES.map(function (p) {
         var who = people.filter(function (r) {
@@ -1725,6 +1819,14 @@ CMP.ui.election = (function () {
               el('span', { class: 'lb-party', text: row.party.short }),
               el('strong', { class: 'lb-seats', text: '0' }),
               el('span', { class: 'lb-seats-label', text: 'seats' }),
+              // Nobody leads anything yet, but everybody already has money —
+              // and before round one that is the only thing to compare.
+              el('span', {
+                class: 'lb-money' + (moneyOf(row.party.id) === null ? ' is-hidden' : ''),
+                text: moneyOf(row.party.id) === null
+                  ? '—'
+                  : (money.words(moneyOf(row.party.id)) || '₹0'),
+              }),
               el('span', {
                 class: 'lb-tag' + (row.isYou ? ' is-leading' : ''),
                 text: row.isYou ? 'You' : '',
@@ -1742,12 +1844,43 @@ CMP.ui.election = (function () {
        * count says it. Tapping a row still opens that campaign, which is
        * where the detail lives.
        */
+      /*
+       * Scoped to whatever the map is framing.
+       *
+       * Choosing a district and then reading an all-Punjab standing under it
+       * is two screens disagreeing about what the player is looking at.
+       */
+      var where = scopeName();
+      var scoped = mapScope.level !== 'all';
+      var shown = scoped
+        ? CMP.PLAYABLE_PARTIES.map(function (p) {
+            return {
+              party: p,
+              seats: seatsInScope(p.id),
+              candidate: (people.filter(function (r) {
+                return r.partyId === p.id;
+              })[0] || {}).candidateName || null,
+              isYou: p.id === game.partyId,
+            };
+          }).sort(function (a, b) {
+            return b.seats - a.seats;
+          })
+        : rows;
+
+      var anyHidden = false;
+
       return el('section', { class: 'g-block' }, [
-        el('h2', { class: 'g-block-title', text: 'Who’s leading?' }),
-        el('ol', { class: 'lb' }, rows.map(function (row, i) {
+        el('h2', { class: 'g-block-title' }, [
+          'Who’s leading',
+          where ? el('span', { class: 'lb-where', text: where }) : null,
+        ]),
+        el('ol', { class: 'lb' }, shown.map(function (row, i) {
           var who = people.filter(function (r) {
             return r.partyId === row.party.id;
           })[0];
+          var purse = moneyOf(row.party.id);
+          if (purse === null) anyHidden = true;
+
           return el('li', {}, [el('button', {
             class: 'lb-row' + (i === 0 ? ' is-leading' : '') + (row.isYou ? ' is-you' : ''),
             type: 'button',
@@ -1761,12 +1894,27 @@ CMP.ui.election = (function () {
             el('span', { class: 'lb-party', text: row.party.short }),
             el('strong', { class: 'lb-seats', text: String(row.seats) }),
             el('span', { class: 'lb-seats-label', text: row.seats === 1 ? 'seat' : 'seats' }),
+            /*
+             * What they have left, small and secondary — it is the answer to
+             * "can they come after me here", which is a different question
+             * from "who is winning" and a quieter one.
+             */
+            el('span', {
+              class: 'lb-money' + (purse === null ? ' is-hidden' : ''),
+              text: purse === null ? '—' : (money.words(purse) || '₹0'),
+            }),
             el('span', {
               class: 'lb-tag' + (i === 0 ? ' is-leading' : ''),
               text: row.isYou ? 'You' : i === 0 ? 'Leading' : '',
             }),
           ])]);
         })),
+        anyHidden
+          ? el('p', {
+              class: 'lb-note',
+              text: 'What the other campaigns have left is their own.',
+            })
+          : null,
       ]);
     }
 
@@ -2457,6 +2605,16 @@ CMP.ui.election = (function () {
            */
           onSelect: function (num) {
             openSeatDetail(num);
+          },
+          /*
+           * The standing under the board follows the board.
+           *
+           * Choosing a district and then reading an all-Punjab standing under
+           * it is two screens disagreeing about what is being looked at.
+           */
+          onScope: function (next) {
+            mapScope = next;
+            paintBody();
           },
         });
       }

@@ -128,29 +128,125 @@ CMP.ui.map = (function () {
      * actually work. Choosing one frames it rather than hiding the rest.
      */
     var regionBar = el('div', { class: 'term-options map-regions' });
+    var scopeBar = el('div', { class: 'map-scope' });
+
+    /*
+     * Three levels, not four buttons.
+     *
+     * It used to be All Punjab, Majha, Doaba, Malwa in one row — which put
+     * the whole state and one third of it on the same footing, and left no
+     * room at all for a district. The levels are what you are looking at;
+     * the row underneath is which one.
+     *
+     * `level` is what the player chose. `region` and `district` are what the
+     * map is framing, and they are the map's own business — this only tells
+     * it where to look.
+     */
+    var level = 'all';
+    var district = null;
 
     function paintRegions() {
-      var options = [{ id: 'all', name: 'All Punjab' }].concat(
-        (CMP.REGIONS || []).map(function (r) {
-          return { id: r.id, name: r.name };
-        })
-      );
-      mount(regionBar, options.map(function (o) {
+      mount(regionBar, [
+        levelButton('all', 'All Punjab'),
+        levelButton('district', 'District'),
+        levelButton('zone', 'Zone'),
+      ]);
+      paintScope();
+    }
+
+    function levelButton(id, label) {
+      return el('button', {
+        class: 'term-option' + (level === id ? ' is-selected' : ''),
+        type: 'button',
+        text: label,
+        dataset: { level: id },
+        onclick: function () {
+          setLevel(id);
+        },
+      });
+    }
+
+    function setLevel(next) {
+      level = next;
+      if (level === 'all') {
+        district = null;
+        focusRegion('all');
+      } else if (level === 'zone') {
+        district = null;
+        // Keep whichever zone was already in view rather than snapping back
+        // to the whole state and making the player choose again.
+        focusRegion(region !== 'all' ? region : (CMP.REGIONS[0] || {}).id || 'all');
+      } else {
+        // A district level with no district chosen shows the whole state
+        // until one is picked. It is a question, not an empty screen.
+        if (district) focusDistrict(district);
+      }
+      paintRegions();
+      announceScope();
+    }
+
+    /**
+     * Which zone, or which district — the row under the levels.
+     *
+     * A scrolling row rather than a wrapped grid: twenty-three districts
+     * wrapped to four lines is most of a phone screen given over to a control.
+     */
+    function paintScope() {
+      if (level === 'all') {
+        mount(scopeBar, []);
+        scopeBar.hidden = true;
+        return;
+      }
+      scopeBar.hidden = false;
+
+      var options = level === 'zone'
+        ? (CMP.REGIONS || []).map(function (r) {
+            return { id: r.id, name: r.name, on: region === r.id };
+          })
+        : (CMP.DISTRICTS || []).map(function (d) {
+            return { id: d.id, name: d.name, on: district === d.id };
+          });
+
+      mount(scopeBar, options.map(function (o) {
         return el('button', {
-          class: 'term-option' + (region === o.id ? ' is-selected' : ''),
+          class: 'map-scope-chip' + (o.on ? ' is-on' : ''),
           type: 'button',
           text: o.name,
-          dataset: { region: o.id },
+          dataset: { scope: o.id },
           onclick: function () {
-            focusRegion(o.id);
+            if (level === 'zone') {
+              focusRegion(o.id);
+            } else {
+              district = o.id;
+              focusDistrict(o.id);
+              highlightDistrict(o.id);
+            }
             paintRegions();
+            announceScope();
           },
         });
       }));
     }
 
+    /**
+     * Tell whoever is listening what the player is looking at.
+     *
+     * The board and the standing underneath it have to agree about scope, and
+     * the map is the one that knows — so it says, rather than the screen
+     * underneath guessing from a highlight.
+     */
+    function announceScope() {
+      if (!opts.onScope) return;
+      opts.onScope({
+        level: level,
+        region: level === 'zone' ? region : null,
+        district: level === 'district' ? district : null,
+      });
+    }
+
     var root = el('div', { class: 'map-block' }, [
       regionBar,
+      scopeBar,
       summary,
       el('div', { class: 'map-toolbar' }, [modeToggle, zoomControls]),
       el('div', { class: 'map-frame' }, [svg]),
@@ -516,23 +612,19 @@ CMP.ui.map = (function () {
         return r.total > 0;
       });
 
+      /*
+       * The name, the size, and what the colours mean. Nothing else.
+       *
+       * A row of party counts used to sit here too — the same four numbers
+       * that are in Who's Leading directly under the board, which now also
+       * says what each campaign has left. Two answers to "who is winning" is
+       * one too many, and the one that scrolls with the map is the one worth
+       * keeping.
+       */
       mount(summary, [
         el('span', { class: 'map-summary-name', text: name }),
         live.length
-          ? el('span', { class: 'map-summary-rows' }, live.map(function (r) {
-              return el('span', {
-                class: 'map-summary-row' + (r.party.id === game.partyId ? ' is-you' : ''),
-                style: { '--party': r.party.colour },
-                title: r.party.name + ' — ' + r.won + ' won, ' + r.leading + ' leading',
-              }, [
-                el('span', { class: 'map-summary-dot' }),
-                el('span', { class: 'map-summary-short', text: r.party.short }),
-                el('span', { class: 'map-summary-n', text: String(r.total) }),
-                r.won
-                  ? el('span', { class: 'map-summary-won', text: '\u2713' + r.won })
-                  : null,
-              ]);
-            }))
+          ? null
           : el('span', {
               class: 'map-summary-none',
               text: 'Nobody has campaigned here yet.',
@@ -630,6 +722,15 @@ CMP.ui.map = (function () {
         : null;
       paint();
       if (notify && opts.onSelect) opts.onSelect(selected, selectedDistrict);
+    }
+
+    /** What the player is looking at, for whoever needs to agree with it. */
+    function scope() {
+      return {
+        level: level,
+        region: level === 'zone' ? region : null,
+        district: level === 'district' ? district : null,
+      };
     }
 
     /** Highlight a district without moving the selection off its seat. */
@@ -1108,6 +1209,7 @@ CMP.ui.map = (function () {
       getRegion: function () {
         return region;
       },
+      scope: scope,
     };
   }
 

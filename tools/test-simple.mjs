@@ -735,8 +735,9 @@ check('14. and the one you are on says so',
   q(dom, '.g-nav-item.is-on .g-nav-label').textContent === 'Home',
   q(dom, '.g-nav-item.is-on')
     ? q(dom, '.g-nav-item.is-on .g-nav-label').textContent : 'none marked');
-check('5. the map offers Punjab and its three regions',
-  qq(dom, '.map-regions .term-option').length === 4,
+// 5. Three levels — the whole state, a district, or a zone.
+check('5. the map offers three geographic levels',
+  qq(dom, '.map-regions .term-option').length === 3,
   qq(dom, '.map-regions .term-option').map((n) => n.textContent).join('/'));
 check('23. and says what the four appearances mean',
   !!q(dom, '.legend-key') &&
@@ -764,7 +765,29 @@ check('3. Punjab opens with the whole board in frame',
 check('1. and all 117 seats drawn',
   qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
 
-clickIt(dom, regionButton('Majha'));
+/*
+ * Three levels, not four buttons.
+ *
+ * All Punjab, Majha, Doaba and Malwa used to sit in one row, which put the
+ * whole state and one third of it on the same footing and left no room for a
+ * district at all. The levels are what you are looking at; the row underneath
+ * is which one.
+ */
+check('map: the levels are All Punjab, District and Zone',
+  qq(dom, '.map-regions .term-option').map((b) => b.textContent).join('/') ===
+    'All Punjab/District/Zone',
+  qq(dom, '.map-regions .term-option').map((b) => b.textContent).join('/'));
+check('map: and no zone sits in the level row',
+  !qq(dom, '.map-regions .term-option')
+    .some((b) => /Majha|Doaba|Malwa/.test(b.textContent)));
+
+clickIt(dom, regionButton('Zone'));
+await settle();
+check('map: choosing Zone offers the three zones',
+  qq(dom, '.map-scope-chip').map((b) => b.textContent).join('/') === 'Majha/Doaba/Malwa',
+  qq(dom, '.map-scope-chip').map((b) => b.textContent).join('/'));
+
+clickIt(dom, qq(dom, '.map-scope-chip').find((b) => b.textContent === 'Majha'));
 await settle();
 await new Promise((r) => setTimeout(r, 500));
 
@@ -794,7 +817,8 @@ check('18. the summary names the region on screen',
   /Majha/i.test(q(dom, '.map-summary').textContent),
   q(dom, '.map-summary').textContent.slice(0, 60));
 
-clickIt(dom, regionButton('Doaba'));
+// A zone is chosen from the row under the levels, not from the levels.
+clickIt(dom, qq(dom, '.map-scope-chip').find((b) => b.textContent === 'Doaba'));
 await settle();
 await new Promise((r) => setTimeout(r, 500));
 const doabaShown = qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside'));
@@ -1119,17 +1143,68 @@ check('20. and one with a leader takes that leader\u2019s colour',
   cellFills.filter((f) => /^#[0-9a-f]{6}$/i.test(f)).length + ' coloured');
 
 /*
- * The summary above the board counts seats that have a leader, so it can only
- * ever add up to what has actually been decided. It replaced the legend block
- * that used to sit under the map saying the same thing further away from it.
+ * Who's Leading counts seats that have a leader, so it can only ever add up
+ * to what has actually been decided.
+ *
+ * The line above the board used to carry the same four numbers. Two answers
+ * to "who is winning" is one too many, and the one directly under the map —
+ * which also says what each campaign has left — is the one worth keeping.
  */
-const summaryCounts = qq(dom, '.map-summary-n').map((n) => Number(n.textContent));
-const summaryTotal = summaryCounts.reduce((a2, b2) => a2 + b2, 0);
-const decidedNow = Object.keys(
-  dom.window.CMP.campaign.currentLeaders(dom.window.CMP.app.getGame().support)
-).length;
-check('the summary counts every decided seat and no others',
-  summaryTotal === decidedNow, summaryTotal + ' counted, ' + decidedNow + ' decided');
+// Who's Leading lives under the board on Home; the block above was reading
+// the Map section, which is the board on its own.
+// Who's Leading lives under the board on Home; the block above was reading
+// the Map section, which is the board on its own.
+goHome(dom);
+await settle();
+const leadingCounts = qq(dom, '.lb-seats').map((n) => Number(n.textContent));
+const leadingTotal = leadingCounts.reduce((a2, b2) => a2 + b2, 0);
+/*
+ * Counted against heldSeats, which is what the block itself reads.
+ *
+ * currentLeaders answers a slightly different question — every seat with a
+ * leader, including ones this campaign does not hold — so comparing against
+ * it was comparing two different counts and calling the difference a bug.
+ */
+const heldNow = dom.window.CMP.campaign.heldSeats(dom.window.CMP.app.getGame());
+const decidedNow = Object.keys(heldNow).reduce((a2, k) => a2 + heldNow[k], 0);
+check('who is leading counts every seat anybody holds, and no others',
+  leadingTotal === decidedNow, leadingTotal + ' counted, ' + decidedNow + ' held');
+check('and the party counts are no longer duplicated above the board',
+  qq(dom, '.map-summary-n').length === 0,
+  qq(dom, '.map-summary-n').length + ' still there');
+
+/*
+ * Every campaign says what it has left, and it is the live balance.
+ *
+ * Not what they started with, not what they have spent, not what the
+ * districts have paid them — the number the ledger and the round strip read,
+ * so spending a rupee moves all three together.
+ */
+check('who is leading shows what each campaign has left',
+  qq(dom, '.lb-money').length === qq(dom, '.lb-row').length,
+  qq(dom, '.lb-money').map((n) => n.textContent).join(' | '));
+{
+  const g = dom.window.CMP.app.getGame();
+  const mineRow = q(dom, '.lb-row.is-you .lb-money');
+  const real = dom.window.CMP.campaign.heldTotal(g);
+  check('and your own figure is the one the engine holds',
+    mineRow.textContent === (dom.window.CMP.ui.money.words(real) || '₹0'),
+    mineRow.textContent + ' vs ' + real);
+
+  // Spending has to move it, on the next paint and not later. The purse is
+  // put back afterwards: this suite goes on to spend for real, and a test
+  // that quietly emptied the campaign would starve the ones after it.
+  const before = mineRow.textContent;
+  const keptCash = g.cash;
+  g.cash = Math.max(0, (g.cash || 0) - 30000000);
+  dom.window.CMP.app.goTo('election');
+  goHome(dom);
+  const after = q(dom, '.lb-row.is-you .lb-money').textContent;
+  check('spending moves it', after !== before, before + ' -> ' + after);
+  g.cash = keptCash;
+  dom.window.CMP.app.goTo('election');
+  goHome(dom);
+}
 
 // 10. And what the shapes do not claim is still said — under More, where
 // people go to read rather than to campaign.
