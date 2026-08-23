@@ -202,6 +202,22 @@ for (let i = 0; i < humans.length; i++) {
   await sleep(250);
   c.type(c.q('.js-candidate-name'), NAMES[i]);
   await sleep(900);
+
+  /*
+   * The lobby is four steps now — candidate, party, round length for the
+   * host, then the waiting room — so READY is one walk in rather than always
+   * on screen. That is what a player does, so it is what this does.
+   */
+  for (let step = 0; step < 4; step += 1) {
+    const on = c.q('.setup-step.is-on .setup-step-label');
+    if (on && /waiting/i.test(on.textContent)) break;
+    const next = c.qq('.lobby-walk button')
+      .find((b) => /Continue|Waiting room/.test(b.textContent));
+    if (!next) break;
+    c.click(next);
+    await sleep(80);
+  }
+
   c.click(c.button('READY'));
   await sleep(250);
 }

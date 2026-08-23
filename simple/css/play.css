@@ -435,3 +435,23 @@
   text-align: right;
   color: var(--cream);
 }
+
+/* ------------------------------------------------------------------
+   The lobby, in steps.
+
+   Candidate, party, round length (host only), waiting room — the same order
+   the solo screen asks in, because they are the same decisions. The sections
+   are built once and shown one at a time, so the poll that repaints this
+   screen every couple of seconds cannot take the caret out of a half-typed
+   party name.
+   ------------------------------------------------------------------ */
+
+.lobby-steps { margin-bottom: 6px; }
+.lobby-step[hidden] { display: none; }
+
+.lobby-walk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lobby-walk .btn-quiet[hidden] { display: none; }

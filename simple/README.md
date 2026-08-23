@@ -280,6 +280,53 @@ Hierarchy is carried by weight and colour rather than size, which is why the
 title is 32-36px rather than 70 and a seat count reads as a number rather than
 a headline.
 
+## One selection experience, three ways in
+
+Playing alone and playing with friends are the same decisions, so they are the
+same screens. `js/ui/chooser.js` holds them — the candidate rail, the four
+measures, the three regions, the grant reading, the symbol rail, the colour
+swatches and the party-name generator — and both the solo setup screen and the
+multiplayer lobby use it.
+
+They had drifted a long way apart. Solo showed large candidate cards with
+statistics; the lobby showed no candidate at all and a grid of 26px symbols. A
+player who founded a party alone and then founded one with friends was doing
+the same thing twice, differently.
+
+The lobby walks the same order: **candidate → party → round length → waiting
+room**, with the round-length step for the host only. A guest is *told* what
+the host chose rather than asked, in the waiting room, and the host publishes
+it the moment they arrive rather than at the start — it applies to everybody,
+so everybody should be able to see it while deciding whether to be in the
+game.
+
+The lobby's sections are built once and shown one at a time rather than
+rebuilt. This screen is patched on a poll every couple of seconds, and
+anything rebuilt under a step change would take the caret out of a half-typed
+party name with it.
+
+## The rails keep their place
+
+A rail is created on first use and **never rebuilt**. Choosing something
+toggles a class on buttons that are already there; nothing is remounted and no
+scroll position is written.
+
+That is not a nicety. Rebuilding the rail on selection is what made picking the
+tenth candidate scroll back to the first: a new element starts at `scrollLeft`
+0, so the selection was right and the view was wrong — which reads as the click
+having failed. Keeping the element alive keeps *what is chosen* and *where the
+rail is scrolled* independent, which is the only arrangement in which neither
+can disturb the other.
+
+Cards are keyed by their own id rather than by position. The selected card is
+scrolled into view only when it is not already visible, because scrolling on
+every repaint would fight a player who had scrolled somewhere to look at
+something.
+
+`tools/test-carousel.mjs` guards it in a real headless Chrome, because jsdom
+has no layout: every element is zero by zero, nothing scrolls, and a rail that
+jumped back would look identical to one that did not.
+
 ## Founding a party, in four steps
 
 Candidate, party, round length, start. The candidate comes first because it is

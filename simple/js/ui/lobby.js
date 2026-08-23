@@ -33,6 +33,23 @@ CMP.ui.lobby = (function () {
       onclick: copyCode,
     });
 
+    /*
+     * The same rails the solo setup screen uses.
+     *
+     * Playing alone and playing with friends are the same decisions, so they
+     * are the same screens - see js/ui/chooser.js. This lobby used to show no
+     * candidate at all and a grid of 26px symbols, which meant a player who
+     * founded a party alone and then founded one with friends was doing the
+     * same thing twice, differently.
+     *
+     * They are built once and never rebuilt, which is also what keeps their
+     * scroll position through the poll that repaints this screen every couple
+     * of seconds.
+     */
+    var store = CMP.ui.chooser.rails();
+    var candidateNode = el('div', { class: 'lobby-candidate' });
+    var candidateDetailNode = el('div', { class: 'cd-detail-slot' });
+
     var countText = el('span', { class: 'lobby-count', text: '0 / 4' });
     var rosterNode = el('div', { class: 'roster' });
     var partyNode = el('div', { class: 'party-editor' });
@@ -53,6 +70,9 @@ CMP.ui.lobby = (function () {
       shortEdited: false,
       symbol: CMP.PARTY_SYMBOLS[0].id,
       colourId: CMP.PARTY_COLOURS[0].id,
+      // Optional, the same as it is on the solo screen: one is assigned until
+      // somebody picks, and the assigned one is shown so it is not a surprise.
+      colourChosen: false,
       slogan: '',
     };
     var partyTimer = null;
@@ -70,6 +90,8 @@ CMP.ui.lobby = (function () {
     // How long each round runs. The host chooses once, before the election
     // starts, and it applies to all twenty rounds.
     var roundSeconds = CMP.ROUNDS.seconds;
+    // Published once on arrival; see paintClock.
+    var clockPublished = false;
 
     var clockNode = el('div', { class: 'lobby-clock' });
 
@@ -89,7 +111,51 @@ CMP.ui.lobby = (function () {
     var startHint = el('p', { class: 'start-hint' });
     var hostBlock = el('div', { class: 'host-block' }, [startBtn, startHint]);
 
+    var backBtn = el('button', {
+      class: 'btn btn-quiet btn-wide',
+      type: 'button',
+      text: '',
+      onclick: function () {
+        goStep(step - 1);
+      },
+    });
+    var nextBtn = el('button', {
+      class: 'btn btn-primary btn-xl',
+      type: 'button',
+      text: 'Continue',
+      onclick: function () {
+        goStep(step + 1);
+      },
+    });
+    var walkBlock = el('div', { class: 'lobby-walk' }, [nextBtn, backBtn]);
+
     var footNode = el('div', { class: 'lobby-foot' }, [readyBtn]);
+
+    var codeCard = el('div', { class: 'code-card' }, [
+      el('span', { class: 'code-label', text: 'Your Game Code' }),
+      el('div', { class: 'code-row' }, [codeText, copyBtn]),
+      el('span', { class: 'code-note', text: 'Share this code with your friends' }),
+    ]);
+
+    /*
+     * The lobby, in steps.
+     *
+     * Candidate, then party, then - for the host only - the round length, and
+     * then the waiting room. The same order the solo screen asks in, because
+     * they are the same decisions; the difference is that this one ends in a
+     * room with other people in it rather than in an election.
+     *
+     * The sections are built once and shown one at a time rather than
+     * rebuilt. This screen is patched on a poll every couple of seconds, and
+     * anything rebuilt under a step change would take the caret out of a
+     * half-typed party name with it.
+     */
+    var stepperNode = el('ol', { class: 'setup-steps lobby-steps' });
+    var candidateSection = null;
+    var partySection = null;
+    var clockSection = null;
+    var waitingSection = null;
+    var step = 0;
 
     var root = el('section', { class: 'screen screen-lobby' }, [
       el('div', { class: 'lobby-inner' }, [
@@ -103,28 +169,31 @@ CMP.ui.lobby = (function () {
           el('h1', { class: 'title title-sm', text: 'Punjab Election' }),
         ]),
 
-        el('div', { class: 'code-card' }, [
-          el('span', { class: 'code-label', text: 'Your Game Code' }),
-          el('div', { class: 'code-row' }, [codeText, copyBtn]),
-          el('span', { class: 'code-note', text: 'Share this code with your friends' }),
-        ]),
+        codeCard,
 
         noticeNode,
 
-        el('div', { class: 'lobby-section' }, [
-          el('div', { class: 'lobby-section-head' }, [
-            el('h2', { class: 'block-title', text: 'Players' }),
-            countText,
+        stepperNode,
+
+        waitingSection = el('div', { class: 'lobby-step', dataset: { step: 'waiting' } }, [
+          el('div', { class: 'lobby-section' }, [
+            el('div', { class: 'lobby-section-head' }, [
+              el('h2', { class: 'block-title', text: 'Players' }),
+              countText,
+            ]),
+            rosterNode,
           ]),
-          rosterNode,
         ]),
 
+        candidateSection = el('div', { class: 'lobby-step', dataset: { step: 'candidate' } }, [
         el('div', { class: 'lobby-section' }, [
           el('h2', { class: 'block-title', text: 'Your Candidate' }),
           el('label', { class: 'field' }, [
             el('span', { class: 'field-label', text: 'Playing as' }),
             nameInput,
           ]),
+          candidateNode,
+          candidateDetailNode,
           el('p', { class: 'granted-note' }, [
             'Every campaign is funded ',
             el('strong', { text: money.words(CMP.CAMPAIGN.income.perRound) }),
@@ -132,17 +201,89 @@ CMP.ui.lobby = (function () {
             'spend, you keep.',
           ]),
 
-        el('div', { class: 'lobby-section' }, [
-          el('h2', { class: 'block-title', text: 'Your Party' }),
-          partyNode,
         ]),
         ]),
 
-        clockNode,
+        partySection = el('div', { class: 'lobby-step', dataset: { step: 'party' } }, [
+          el('div', { class: 'lobby-section' }, [
+            el('h2', { class: 'block-title', text: 'Your Party' }),
+            partyNode,
+          ]),
+        ]),
+
+        clockSection = el('div', { class: 'lobby-step', dataset: { step: 'clock' } }, [
+          clockNode,
+        ]),
 
         footNode,
       ]),
     ]);
+
+    /* -------------------------------------------------------- the steps */
+
+    /** Which steps this player actually has. A guest never sets the clock. */
+    function stepList() {
+      var mine = me();
+      var isHost = !!(mine && mine.isHost);
+      var out = [
+        { id: 'candidate', label: 'Your candidate', node: function () { return candidateSection; } },
+        { id: 'party', label: 'Your party', node: function () { return partySection; } },
+      ];
+      if (isHost) {
+        out.push({ id: 'clock', label: 'Round length', node: function () { return clockSection; } });
+      }
+      out.push({ id: 'waiting', label: 'Waiting room', node: function () { return waitingSection; } });
+      return out;
+    }
+
+    function paintSteps() {
+      var steps = stepList();
+      if (step >= steps.length) step = steps.length - 1;
+
+      steps.forEach(function (entry, i) {
+        var node = entry.node();
+        if (node) node.hidden = i !== step;
+      });
+      /*
+       * A guest has no clock step, but is still told what the host chose.
+       *
+       * The round length applies to everybody, so hiding it from a joiner
+       * would be hiding a rule of the game they are about to play. It rides
+       * in the waiting room, read-only, rather than as a control that would
+       * do nothing if they touched it.
+       */
+      if (clockSection && !steps.some(function (e) { return e.id === 'clock'; })) {
+        clockSection.hidden = steps[step].id !== 'waiting';
+      }
+
+      /*
+       * The game code stays put.
+       *
+       * It was going to live on the waiting room, on the grounds that the
+       * first thing on the screen should be the choice being asked for rather
+       * than a string of letters. But people join while the host is still
+       * choosing, and a host who wants to send the code should not have to
+       * walk three steps forward to find it.
+       */
+
+      mount(stepperNode, steps.map(function (entry, i) {
+        return el('li', {
+          class: 'setup-step' + (i === step ? ' is-on' : '') + (i < step ? ' is-done' : ''),
+        }, [
+          el('span', { class: 'setup-step-no', text: i < step ? '\u2713' : String(i + 1) }),
+          el('span', { class: 'setup-step-label', text: entry.label }),
+        ]);
+      }));
+    }
+
+    function goStep(next) {
+      var steps = stepList();
+      step = Math.max(0, Math.min(steps.length - 1, next));
+      if (CMP.audio) CMP.audio.play('tap');
+      paintSteps();
+      paintFoot();
+      if (root.scrollIntoView) root.scrollIntoView({ block: 'start' });
+    }
 
     /* ------------------------------------------------ actions */
 
@@ -213,6 +354,44 @@ CMP.ui.lobby = (function () {
     }
 
     /** Push the party up, debounced, so typing is not a request a keystroke. */
+    /**
+     * The cast, and what choosing one means.
+     *
+     * The candidate is not only a portrait: regional support multiplies what
+     * a campaign in that region buys, and the server applies it, so this has
+     * to reach the server. It rides on the details call, which already exists
+     * for the name.
+     */
+    function paintCandidate() {
+      if (!store.has('candidate')) {
+        mount(candidateNode, [
+          CMP.ui.chooser.candidateRail(store,
+            function () {
+              var me = CMP.profile.get();
+              return (me && me.avatar) || CMP.ui.avatars.list()[0];
+            },
+            function (id) {
+              if (CMP.profile.has()) CMP.profile.setAvatar(id);
+              else CMP.profile.create(nameInput.value.trim() || 'Player', id);
+              queueDetails();
+            },
+            {
+              locked: function () {
+                return view && view.phase !== 'lobby';
+              },
+              onPick: paintCandidateDetail,
+            }),
+        ]);
+      }
+      paintCandidateDetail();
+    }
+
+    function paintCandidateDetail() {
+      var me = CMP.profile.get();
+      var id = (me && me.avatar) || CMP.ui.avatars.list()[0];
+      mount(candidateDetailNode, [CMP.ui.chooser.candidateDetail(id, null)]);
+    }
+
     function queueParty() {
       partyTouched = true;
       if (partyTimer) window.clearTimeout(partyTimer);
@@ -273,10 +452,33 @@ CMP.ui.lobby = (function () {
 
       if (!isHost) {
         mount(clockNode, view && view.roundSeconds
-          ? [el('p', { class: 'lobby-note', text: 'Rounds run ' +
-              Math.round(view.roundSeconds / 60) + ' minutes.' })]
+          ? [el('div', { class: 'lobby-section lobby-clock-told' }, [
+              el('h2', { class: 'block-title', text: 'Round length' }),
+              el('p', { class: 'lobby-note' }, [
+                el('strong', {
+                  text: 'Rounds run ' + Math.round(view.roundSeconds / 60) + ' minutes.',
+                }),
+                ' Set by the host.',
+              ]),
+            ])]
           : []);
         return;
+      }
+
+      /*
+       * Publish the default, once.
+       *
+       * A host who is happy with two minutes never clicks anything, so
+       * publishing only on change left the other three unable to see the
+       * round length of the game they were joining. The server treats an
+       * unset length as "use the configured default" either way — this just
+       * says so out loud, so the lobby can show it.
+       */
+      if (view && !view.roundSeconds && !clockPublished) {
+        clockPublished = true;
+        CMP.net.setRoundLength(roundSeconds).then(function (res) {
+          if (res && res.game) update(res.game);
+        });
       }
 
       mount(clockNode, [
@@ -289,6 +491,11 @@ CMP.ui.lobby = (function () {
               onclick: function () {
                 roundSeconds = secs;
                 paintClock();
+                // Published now rather than at the start, so the other three
+                // can see what they are joining.
+                CMP.net.setRoundLength(secs).then(function (res) {
+                  if (res && res.game) update(res.game);
+                });
               },
             }, [
               el('strong', { class: 'clock-option-value', text: Math.round(secs / 60) + ' min' }),
@@ -329,7 +536,9 @@ CMP.ui.lobby = (function () {
       codeText.textContent = view.code;
       countText.textContent = view.connectedCount + ' / ' + view.maxPlayers;
 
+      paintSteps();
       paintRoster();
+      paintCandidate();
       paintParties();
       paintOwnFields();
       paintClock();
@@ -459,68 +668,61 @@ CMP.ui.lobby = (function () {
 
         el('div', { class: 'field' }, [
           el('span', { class: 'field-label', text: 'Symbol' }),
-          el('div', { class: 'sym-grid' }, CMP.PARTY_SYMBOLS.map(function (sym) {
-            var on = party.symbol === sym.id;
-            return el('button', {
-              class: 'sym-option' + (on ? ' is-on' : ''),
-              type: 'button',
-              title: sym.name,
-              'aria-label': sym.name,
-              'aria-pressed': on ? 'true' : 'false',
-              disabled: locked,
-              style: { color: on ? current.colour : 'var(--muted)' },
-              onclick: function () {
-                party.symbol = sym.id;
-                queueParty();
-                paintParties();
-              },
-            }, [CMP.ui.symbol.render(sym.id, 26)]);
-          })),
+          symbolRail(locked),
         ]),
 
         el('div', { class: 'field' }, [
-          el('span', { class: 'field-label', text: 'Colour' }),
-          el('div', { class: 'col-grid' }, CMP.PARTY_COLOURS.map(function (swatch) {
-            var on = party.colourId === swatch.id;
-            return el('button', {
-              class: 'col-option' + (on ? ' is-on' : ''),
-              type: 'button',
-              title: swatch.name,
-              'aria-label': swatch.name,
-              'aria-pressed': on ? 'true' : 'false',
-              disabled: locked,
-              style: { '--swatch': swatch.colour },
-              onclick: function () {
-                party.colourId = swatch.id;
-                queueParty();
-                paintParties();
-              },
-            });
-          })),
-        ]),
-
-        el('label', { class: 'field' }, [
-          el('span', { class: 'field-label', text: 'Slogan (optional)' }),
-          el('input', {
-            class: 'field-input',
-            type: 'text',
-            maxlength: '60',
-            autocomplete: 'off',
-            value: party.slogan,
-            disabled: locked,
-            placeholder: 'Progress for every village',
-            oninput: function (e) {
-              party.slogan = e.target.value;
+          el('span', { class: 'field-label', text: 'Colour (optional)' }),
+          CMP.ui.chooser.colourGrid(
+            party.colourChosen ? party.colourId : null,
+            assignedColour(),
+            function (id) {
+              party.colourId = id;
+              party.colourChosen = true;
               queueParty();
-              paintPreview();
+              paintParties();
             },
-          }),
+            { locked: function () { return locked; } }),
         ]),
 
         previewNode,
       ]);
 
       paintPreview();
+    }
+
+    function symbolRail(locked) {
+      var node = CMP.ui.chooser.symbolRail(store,
+        function () { return party.symbol; },
+        function (id) { party.symbol = id; },
+        {
+          locked: function () { return locked; },
+          onPick: function () {
+            queueParty();
+            paintParties();
+          },
+        });
+      node.style.setProperty('--party', currentColour());
+      return node;
+    }
+
+    /*
+     * A colour nobody chose, derived from what they did choose.
+     *
+     * Optional means optional here too: a player who never opens the swatches
+     * still gets a party that looks like a party, and not the same colour as
+     * everybody else who skipped it.
+     */
+    function assignedColour() {
+      return CMP.ui.chooser.assignedColour([party.symbol, (CMP.profile.get() || {}).avatar]);
+    }
+
+    function currentColour() {
+      var id = party.colourChosen ? party.colourId : assignedColour();
+      for (var i = 0; i < CMP.PARTY_COLOURS.length; i++) {
+        if (CMP.PARTY_COLOURS[i].id === id) return CMP.PARTY_COLOURS[i].colour;
+      }
+      return CMP.PARTY_COLOURS[0].colour;
     }
 
     /** The card, as it currently stands. Repainted without losing focus. */
@@ -553,9 +755,13 @@ CMP.ui.lobby = (function () {
               text: ((mine && mine.candidateName) || 'Your name').toUpperCase(),
             }),
             el('span', { class: 'pv-party', text: current.name.toUpperCase() }),
-            current.slogan
-              ? el('span', { class: 'pv-slogan', text: '\u201c' + current.slogan + '\u201d' })
-              : el('span', { class: 'pv-slogan is-empty', text: 'No slogan' }),
+            /*
+             * No slogan line.
+             *
+             * The player is never asked for one, so this could only ever
+             * have said "No slogan" - a field's absence announced as
+             * though it were a fact about their party.
+             */
           ]),
           el('div', { class: 'pv-badge' }, [
             CMP.ui.symbol.render(current.symbol, 26),
@@ -596,20 +802,57 @@ CMP.ui.lobby = (function () {
       }
     }
 
+    /**
+     * What to press, on whichever step this is.
+     *
+     * Everything before the waiting room offers one thing: carry on. The
+     * waiting room is where READY lives, and where the host's START ELECTION
+     * appears — because that is the only step on which the other players
+     * matter, and it is the only one where waiting for them makes sense.
+     */
     function paintFoot() {
       var mine = me();
       var locked = view.phase !== 'lobby';
+      var steps = stepList();
+      var here = steps[step] || steps[steps.length - 1];
+      var onWaiting = here.id === 'waiting';
 
       readyBtn.textContent = mine && mine.ready ? 'READY ✓' : 'READY';
       readyBtn.classList.toggle('is-ready', !!(mine && mine.ready));
       readyBtn.disabled = locked || !mine;
+      readyBtn.hidden = !onWaiting;
 
-      if (view.youAreHost) {
+      /*
+       * Back and Continue, and nothing else.
+       *
+       * Going back has to keep every choice — a player who steps back to look
+       * at their candidate and forward again must find the same candidate
+       * selected and the rail where they left it. Nothing here is rebuilt, so
+       * nothing here can lose it.
+       */
+      if (!onWaiting) {
+        if (!walkBlock.parentNode) footNode.appendChild(walkBlock);
+        backBtn.hidden = step === 0;
+        backBtn.textContent = step === 0 ? '' : '← ' + steps[step - 1].label;
+        nextBtn.textContent = steps[step + 1]
+          ? (steps[step + 1].id === 'waiting' ? 'Waiting room' : 'Continue')
+          : 'Continue';
+      } else if (walkBlock.parentNode) {
+        walkBlock.parentNode.removeChild(walkBlock);
+      }
+
+      if (view.youAreHost && onWaiting) {
         if (!hostBlock.parentNode) footNode.appendChild(hostBlock);
         startBtn.disabled = !!view.startBlockedReason || locked;
         startHint.textContent = view.startBlockedReason || 'Everyone is ready.';
       } else if (hostBlock.parentNode) {
         hostBlock.parentNode.removeChild(hostBlock);
+      }
+
+      // A step further back than a guest now has, after the host left.
+      if (step >= steps.length) {
+        step = steps.length - 1;
+        paintSteps();
       }
     }
 

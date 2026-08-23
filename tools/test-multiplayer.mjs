@@ -238,7 +238,28 @@ check('lobby shows 1 / 4', host.q('.lobby-count').textContent.trim() === '1 / 4'
 check('four roster rows are shown', host.qq('.roster-row').length === 4);
 check('three slots read Empty', host.qq('.roster-row.is-empty').length === 3);
 check('host is badged as host', /Host/.test(host.q('.roster-row').textContent));
-check('host sees START ELECTION', !!host.button('START ELECTION'));
+/*
+ * START lives in the waiting room, which is the last of the lobby's four
+ * steps. It is the only step on which the other players matter, so it is the
+ * only one where a button about them makes sense.
+ */
+check('the host lands on the candidate step first',
+  /candidate/i.test(host.q('.setup-step.is-on .setup-step-label').textContent),
+  host.q('.setup-step.is-on .setup-step-label').textContent);
+check('and START is not offered before the waiting room',
+  !host.button('START ELECTION'));
+for (let i = 0; i < 4 && !/waiting/i.test(
+  (host.q('.setup-step.is-on .setup-step-label') || {}).textContent || ''); i += 1) {
+  const next = host.qq('.lobby-walk button')
+    .find((b) => /Continue|Waiting room/.test(b.textContent));
+  if (!next) break;
+  host.click(next);
+  await sleep(60);
+}
+check('host sees START ELECTION in the waiting room', !!host.button('START ELECTION'));
+check('the host has a round-length step and a guest does not',
+  host.qq('.setup-step').length === 4,
+  host.qq('.setup-step-label').map((n) => n.textContent).join(' / '));
 
 console.log('  game code: ' + code);
 
@@ -374,9 +395,31 @@ players.forEach((c, i) => {
 check('the lobby asks for no budget', !host.q('.screen-lobby .field-money'));
 // 8. Name, then party, then a badge, then a line to run on — and nothing
 // else. The budget is granted; it has never been typed in.
-check('8. the lobby asks for a name, a party, a short name and a slogan',
-  host.qq('.screen-lobby .field-input').length === 4,
-  host.qq('.screen-lobby .field-input').length + ' fields');
+/*
+ * 8 + 9. The lobby asks for a name, a party and a short name — and never for
+ * a slogan, which the player is no longer asked for anywhere.
+ */
+check('8. the lobby asks for a name, a party and a short name',
+  host.qq('.field-input').length === 3,
+  host.qq('.field-input').length + ' fields');
+check('9. and never for a slogan',
+  !/slogan/i.test(host.q('.screen-lobby').textContent));
+/*
+ * 4. The same candidate cards the solo screen uses, not a simplified copy.
+ *
+ * Playing alone and playing with friends are the same decisions, so they are
+ * the same screens. This lobby used to show no candidate at all.
+ */
+check('4. the lobby offers the same candidate cards as solo play',
+  host.qq('.cd-card').length === host.dom.window.CMP.AVATARS.length,
+  host.qq('.cd-card').length + ' cards');
+check('4. with the same measures and regions under them',
+  host.qq('.cd-stat').length === 4 && host.qq('.cd-region').length > 0,
+  host.qq('.cd-stat').length + ' stats');
+check('4. and the same party symbol rail',
+  host.qq('.pick-rail .sym-option').length ===
+    host.dom.window.CMP.PARTY_SYMBOLS.length,
+  host.qq('.pick-rail .sym-option').length + ' symbols');
 check('8. and the name comes first',
   host.qq('.screen-lobby .field-input')[0].classList.contains('js-candidate-name'));
 check('7. the round allowance is stated in the lobby',
@@ -399,6 +442,57 @@ const namesLanded = await host.until('names', () =>
 check("everyone's candidate appears on the host's roster", namesLanded);
 
 // Ready up, host last.
+/*
+ * The lobby is four steps now — candidate, party, round length for the host,
+ * then the waiting room — so READY and START are one walk in rather than
+ * always on screen. That is what a player does, so it is what this does.
+ */
+async function toWaitingRoom(c) {
+  for (let i = 0; i < 4; i += 1) {
+    const on = c.q('.setup-step.is-on .setup-step-label');
+    if (on && /waiting/i.test(on.textContent)) return;
+    const next = c.qq('.lobby-walk button')
+      .find((b) => /Continue|Waiting room/.test(b.textContent));
+    if (!next) return;
+    c.click(next);
+    await sleep(60);
+  }
+}
+
+for (const c of players) {
+  await toWaitingRoom(c);
+}
+/*
+ * A guest has three steps, not four.
+ *
+ * The round length is the host's decision and applies to everybody, so a
+ * joiner is told what it is rather than asked — and never sees a control that
+ * would do nothing if they touched it.
+ */
+check('a guest gets candidate, party and the waiting room',
+  players[1].qq('.setup-step').length === 3,
+  players[1].qq('.setup-step-label').map((n) => n.textContent).join(' / '));
+check('and is never offered the round length',
+  !players[1].qq('.setup-step-label').some((n) => /round length/i.test(n.textContent)),
+  players[1].qq('.setup-step-label').map((n) => n.textContent).join(' / '));
+// The round length is told to a guest in the waiting room, where the rest of
+// what applies to everybody is.
+
+check('but is told what the host chose, in the waiting room',
+  /rounds run/i.test(players[1].q('.screen-lobby').textContent) &&
+    /set by the host/i.test(players[1].q('.screen-lobby').textContent),
+  players[1].q('.lobby-note') ? players[1].q('.lobby-note').textContent : 'no note');
+
+check('every player reaches the waiting room',
+  players.every((c) => {
+    const on = c.q('.setup-step.is-on .setup-step-label');
+    return on && /waiting/i.test(on.textContent);
+  }),
+  players.map((c) => {
+    const on = c.q('.setup-step.is-on .setup-step-label');
+    return on ? on.textContent : '?';
+  }).join(' / '));
+
 for (const c of [players[1], players[2], players[3]]) {
   c.click(c.button('READY'));
 }

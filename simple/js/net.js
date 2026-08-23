@@ -182,6 +182,18 @@ CMP.net = (function () {
   }
 
   /**
+   * Tell the server how long a round runs.
+   *
+   * The host's choice, published the moment they make it rather than kept
+   * until the start request — it applies to everybody in the game, so
+   * everybody should be able to see it while they are still deciding whether
+   * to be in it.
+   */
+  function setRoundLength(seconds) {
+    return request('roundlength', authed({ roundSeconds: seconds }));
+  }
+
+  /**
    * Play one campaign action. The server rolls the outcome, not us, and it
    * clamps the amount to what the action allows — a client cannot spend
    * outside the range by asking nicely.
@@ -408,6 +420,7 @@ CMP.net = (function () {
   }
 
   return {
+    setRoundLength: setRoundLength,
     POLL_MS: POLL_MS,
     create: create,
     join: join,

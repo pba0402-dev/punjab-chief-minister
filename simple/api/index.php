@@ -559,6 +559,40 @@ switch (route()) {
     }
 
     /* ------------------------------------------------------------- ready */
+    /*
+     * The round length, published as soon as the host picks it.
+     *
+     * It used to travel only with the start request, which meant everybody
+     * else sat in the lobby with no way of knowing how long a round would be
+     * until the election had already begun. It applies to all four of them,
+     * so all four should be able to see it.
+     *
+     * Host only, and checked against the offered options rather than trusted:
+     * a client asking for a five-second round should not get one.
+     */
+    case 'roundlength': {
+        [$game, $playerId] = authenticate($store);
+        $engineCfg = $GLOBALS['campaign']->rounds();
+        $options = array_map('intval', $engineCfg['durationOptions'] ?? []);
+        $wanted = (int) input('roundSeconds', 0);
+
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $wanted, $options) {
+            if (($g['phase'] ?? 'lobby') !== 'lobby') {
+                throw new LobbyError('The election has already started.');
+            }
+            // The host is whoever hostId names — `isHost` is a field of the
+            // per-viewer view, not of the stored player.
+            if (($g['hostId'] ?? null) !== $playerId) {
+                throw new LobbyError('Only the host sets the round length.', 'not_host', 403);
+            }
+            if (!in_array($wanted, $options, true)) {
+                throw new LobbyError('That round length is not offered.', 'bad_length');
+            }
+            $g['roundSeconds'] = $wanted;
+            return $g;
+        });
+    }
+
     case 'ready': {
         [$game, $playerId] = authenticate($store);
         $ready = filter_var(input('ready', true), FILTER_VALIDATE_BOOLEAN);
