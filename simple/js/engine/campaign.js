@@ -102,6 +102,119 @@ CMP.campaign = (function () {
     return false;
   }
 
+  /**
+   * Who is in this seat, and where each of them stands.
+   *
+   * One row per party, in the order the board ranks them, answering the four
+   * questions a player actually opens a seat to ask: is this party in it, how
+   * much have they put in this round, are they ahead, and is it settled.
+   *
+   * The share and the position come off the board, which every player can
+   * see. The rupee figure is different: it lives on the actor that spent it,
+   * and in a game with other people in it the server does not send anybody
+   * else's. So `spent` is a number where this client legitimately holds the
+   * answer and null where it does not, and `spendKnown` says which — the
+   * screen prints a dash rather than inventing one. Playing alone, the
+   * opponents are local objects and all four figures are real.
+   *
+   * Nothing here is stored or derived twice; it is a read of state that
+   * already exists.
+   */
+  function seatBids(game, seat) {
+    var number = Number(seat);
+    var support = (game.support || {})[number] || {};
+    var ranked = standings(support);
+    var won = wonBy(game, number);
+    var top = ranked.length ? ranked[0] : null;
+    var margin = top ? top.support - (ranked[1] ? ranked[1].support : 0) : 0;
+    var close = top ? ratingFor(margin) : null;
+
+    /* The actor that plays as this party, if this client holds it at all. */
+    function actorFor(partyId) {
+      if (partyId === game.partyId) return game;
+      var others = game.opponents || [];
+      for (var i = 0; i < others.length; i++) {
+        if (others[i].partyId === partyId) return others[i];
+      }
+      return null;
+    }
+
+    function spentThisRound(actor) {
+      if (!actor) return null;
+      var bids = (actor.areaBids || {})[String(number)];
+      if (!bids) return 0;
+      var sum = 0;
+      for (var i = 0; i < bids.length; i++) sum += bids[i].amount || 0;
+      return sum;
+    }
+
+    var byId = {};
+    ranked.forEach(function (row) {
+      byId[row.partyId] = row.support;
+    });
+
+    return CMP.getParties().map(function (party) {
+      var share = byId[party.id] || 0;
+      var actor = actorFor(party.id);
+      var spent = spentThisRound(actor);
+      var isTop = !!top && top.partyId === party.id;
+
+      /*
+       * Position, in the four words the map uses.
+       *
+       * "Contested" is the leader's word when the rating says the margin is
+       * not safe, not a fifth state of its own - a seat is either settled,
+       * being led comfortably, being led narrowly, behind, or empty.
+       */
+      var position = 'none';
+      if (won) position = won.party === party.id ? 'won' : 'lost';
+      else if (share <= 0) position = 'none';
+      else if (isTop) position = close && close.id === 'safe' ? 'leading' : 'contested';
+      else position = 'trailing';
+
+      return {
+        partyId: party.id,
+        isYou: party.id === game.partyId,
+        entered: share > 0,
+        share: share,
+        spent: spent,
+        spendKnown: spent !== null,
+        position: position,
+        won: !!won && won.party === party.id,
+      };
+    }).sort(function (a, b) {
+      return b.share - a.share;
+    });
+  }
+
+  /**
+   * The seat in one line: who leads it, by how much, and whether it is over.
+   *
+   * The panel and the map both want this and neither wants to work it out,
+   * because two answers to "who is winning here" is one too many.
+   */
+  function seatStatus(game, seat) {
+    var number = Number(seat);
+    var support = (game.support || {})[number] || {};
+    var ranked = standings(support);
+    var won = wonBy(game, number);
+    if (won) {
+      return { state: 'won', partyId: won.party, share: won.share || 0, round: won.round };
+    }
+    if (!ranked.length || ranked[0].support <= 0) {
+      return { state: 'open', partyId: null, share: 0 };
+    }
+    var margin = ranked[0].support - (ranked[1] ? ranked[1].support : 0);
+    var rating = ratingFor(margin);
+    return {
+      state: rating.id === 'safe' ? 'leading' : 'contested',
+      partyId: ranked[0].partyId,
+      share: ranked[0].support,
+      margin: margin,
+      rating: rating,
+    };
+  }
+
   /** One party's share of a seat, as a percentage. Zero if untouched. */
   function shareOf(support, partyId) {
     var ranked = standings(support);
@@ -2241,6 +2354,8 @@ CMP.campaign = (function () {
     wonReason: wonReason,
     settleWins: settleWins,
     isContested: isContested,
+    seatBids: seatBids,
+    seatStatus: seatStatus,
     shareOf: shareOf,
     reviewField: reviewField,
     weightedPick: weightedPick,

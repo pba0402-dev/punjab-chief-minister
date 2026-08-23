@@ -438,19 +438,36 @@
 /* --------------------------------------------------- final results */
 
 .final-board { margin-bottom: 4px; }
+/*
+ * Whoever formed the government, in gold.
+ *
+ * Gold means "this is the one" everywhere else in this game — the action
+ * worth taking, the seat you chose, the tab you are on — so the one card at
+ * the end of twenty rounds that says who won is the place it has been saving
+ * itself for. The party colour stays on the portrait ring and the rule at the
+ * foot, because who they are is not the same fact as that they won.
+ */
 .winner-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 18px;
   border-radius: var(--radius);
-  border: 1px solid var(--party);
+  border: 1px solid var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold), var(--shadow-card);
   background:
-    radial-gradient(500px 220px at 20% 0%, color-mix(in srgb, var(--party) 20%, transparent), transparent 70%),
-    var(--ink-2);
+    linear-gradient(168deg, var(--wash-gold) 0%, transparent 62%),
+    var(--paper-2);
 }
-@supports not (background: color-mix(in srgb, red 50%, blue)) {
-  .winner-card { background: var(--ink-2); }
+.winner-card::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  background: var(--party);
 }
 .winner-card .portrait { border: 3px solid var(--party); flex: none; }
 .winner-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

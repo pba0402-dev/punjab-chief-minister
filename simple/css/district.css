@@ -1,0 +1,537 @@
+/* ------------------------------------------------------------------
+   The seat panel, over the board.
+
+   A bottom sheet on a phone and a card beside the map on anything wider —
+   the same panel either way, because the difference is where a thumb is, not
+   what the player needs to read.
+
+   It sits in its own layer outside .g-inner, so the page's padding and the
+   sticky navigation have no say over it.
+   ------------------------------------------------------------------ */
+
+.g-panel-layer { display: none; }
+.g-panel-layer.is-open {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+/*
+ * The scrim is light, because the page is paper.
+ *
+ * A dark scrim over ivory reads as the lights going out. This is barely a
+ * tint — enough to say the board is not what you are looking at, not enough
+ * to stop you looking at it, which is the whole reason the panel opens over
+ * the map instead of replacing it.
+ */
+.g-panel-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 32, 54, 0.16);
+  backdrop-filter: blur(1px);
+}
+
+/* ------------------------------------------------------------ the panel */
+
+.dp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--paper-2);
+  box-shadow: 0 -8px 30px rgba(18, 32, 54, 0.14);
+  animation: dp-rise 0.22s ease-out;
+}
+
+@keyframes dp-rise {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dp { animation: none; }
+}
+
+/* --------------------------------------------------------------- head */
+
+.dp-head {
+  position: relative;
+  flex: none;
+  padding: 15px 52px 12px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--paper);
+}
+
+.dp-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.34rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+  text-wrap: balance;
+}
+.dp-where {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+
+.dp-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--navy-2);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.dp-close:hover { border-color: var(--gold); color: var(--navy); }
+.dp-close:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/*
+ * The seat in one line: what state it is in, and who is ahead.
+ *
+ * The word first and the party second, because "contested" is the thing that
+ * changes what you do and the name is the detail.
+ */
+.dp-state {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--rule-soft);
+}
+.dp-state-word {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-state-leading .dp-state-word { color: var(--warn-good); }
+.dp-state-contested .dp-state-word { color: var(--gold); }
+.dp-state-won .dp-state-word { color: var(--blue); }
+
+.dp-state-who {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.dp-state-who.is-quiet { font-weight: 400; color: var(--navy-3); }
+.dp-state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--party, var(--navy-3));
+  transform: translateY(-1px);
+}
+
+/* --------------------------------------------------------------- body */
+
+.dp-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dp-block { display: flex; flex-direction: column; gap: 8px; }
+.dp-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dp-block-note {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-block-title {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+
+/* ---------------------------------------------------------- the field */
+
+/*
+ * One row per party. Four columns and no chart.
+ *
+ * A tick or a ring says whether they are in it, the party says who, the
+ * figure says what they put in this round, and the last word says where they
+ * stand. It reads across in that order because that is the order the
+ * questions arrive in.
+ */
+.dp-field {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.dp-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--paper-2);
+}
+.dp-row + .dp-row { border-top: 1px solid var(--rule-soft); }
+
+/* Your own row is marked by a rule in your colour, not by a fill. */
+.dp-row.is-you {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--party);
+}
+
+.dp-mark {
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--navy-3);
+  text-align: center;
+}
+.dp-row.is-leading .dp-mark,
+.dp-row.is-contested .dp-mark,
+.dp-row.is-won .dp-mark { color: var(--party); }
+
+.dp-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dp-party {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+}
+.dp-name-small {
+  font-size: 0.7rem;
+  color: var(--navy-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dp-spend {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--navy-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * The position, as one word.
+ *
+ * Colour is doing real work here and is kept to three: the good green for a
+ * lead, gold for a seat still in play, and nothing at all for the rest —
+ * because "trailing" and "no bid" are not warnings, they are just facts.
+ */
+.dp-pos {
+  min-width: 68px;
+  text-align: right;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+  white-space: nowrap;
+}
+.dp-row.is-leading .dp-pos { color: var(--warn-good); }
+.dp-row.is-contested .dp-pos { color: var(--gold); }
+.dp-row.is-won .dp-pos { color: var(--blue); }
+
+/* --------------------------------------------------------- the money */
+
+/*
+ * The money, pinned below the scroll.
+ *
+ * A phone has room for about two thirds of a seat, and what fell off the end
+ * was the button. The field scrolls; what the player came to press does not
+ * move.
+ */
+.dp-actions {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.dp-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.dp-foot.is-locked { border-top-color: var(--rule-soft); }
+
+.dp-purse {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.dp-purse-fig { display: flex; flex-direction: column; gap: 1px; }
+.dp-purse-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-purse-value {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.dp-purse-value.is-grant { color: var(--gold); }
+
+.dp-spend-block {
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  gap: 12px;
+}
+
+/* The amounts the engine will actually accept, and no others. */
+/*
+ * One row, scrolling sideways if it has to.
+ *
+ * Wrapping made the pinned bar grow by a row every time the campaign got
+ * richer, which pushed the button down the screen — the exact problem pinning
+ * it was meant to solve.
+ */
+.dp-amounts {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.dp-amounts::-webkit-scrollbar { display: none; }
+.dp-amount { flex: 0 0 auto; }
+.dp-amount {
+  appearance: none;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--navy-2);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.dp-amount:hover { border-color: var(--gold); color: var(--navy); }
+.dp-amount:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.dp-amount.is-on {
+  border-color: var(--gold);
+  background: var(--wash-gold);
+  color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+.dp-amount[disabled] { opacity: 0.5; cursor: default; }
+
+/* Three figures, ruled apart, so the arithmetic is visible rather than told. */
+.dp-sums { display: flex; flex-direction: column; }
+.dp-sum {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+.dp-sum + .dp-sum { border-top: 1px solid var(--rule-soft); }
+.dp-sum-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--navy-2);
+}
+.dp-sum-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.dp-sum.is-spend .dp-sum-value { color: var(--gold); }
+.dp-sum.is-after { border-top-width: 1px; }
+.dp-sum.is-after .dp-sum-label { color: var(--navy); }
+
+.dp-go[disabled] { opacity: 0.55; cursor: default; }
+
+.dp-more {
+  appearance: none;
+  min-height: 40px;
+  border: 0;
+  background: none;
+  font-family: var(--font);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.dp-more:hover { color: var(--gold); }
+
+/* ---------------------------------------------------------- messages */
+
+.dp-note {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--navy-3);
+}
+.dp-note.is-bad { color: var(--warn-bad); }
+
+.dp-locked {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--blue);
+  background: var(--wash-blue);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--navy-2);
+}
+.dp-locked strong { color: var(--navy); }
+
+.dp-flash {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.dp-flash.is-good {
+  background: var(--wash-good);
+  color: var(--warn-good);
+}
+.dp-flash.is-bad {
+  background: var(--wash-bad);
+  color: var(--warn-bad);
+}
+
+/* ------------------------------------------------------------ wider */
+
+/*
+ * From a tablet up the panel stops being a sheet and becomes a card.
+ *
+ * A sheet across the bottom of a 1200px screen is a strip of paper with a
+ * hundred pixels of content in it; a card leaves the board next to it, which
+ * is the arrangement the panel exists for.
+ */
+@media (min-width: 760px) {
+  .dp {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: min(440px, calc(100vw - 48px));
+    max-height: min(80vh, 680px);
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    animation: dp-fade 0.18s ease-out;
+  }
+  @keyframes dp-fade {
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+  }
+}
+
+/* Narrow phones: the candidate name is the first thing that can go. */
+@media (max-width: 359px) {
+  .dp-head { padding-right: 48px; }
+  .dp-row { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; }
+  .dp-spend { display: none; }
+  .dp-name-small { font-size: 0.66rem; }
+}
+
+/*
+ * Available, this spend, remaining — one line, beside the button.
+ *
+ * They were three ruled rows in the scrolling half, which put the arithmetic
+ * above the fold and the button below it. Pinned together they are read as
+ * one thing, which is what they are.
+ */
+.dp-tally {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+}
+.dp-tally-fig { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dp-tally-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-tally-value {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dp-tally-fig.is-spend .dp-tally-value { color: var(--gold); }
+.dp-tally-fig.is-after .dp-tally-value { color: var(--navy); }
+
+@media (max-width: 359px) {
+  .dp-tally-value { font-size: 0.76rem; }
+}

@@ -221,6 +221,31 @@ const SCENES = {
     "CMP.app.setGame(g);CMP.app.goTo('election');",
 
   /*
+   * The seat panel, over the board: who is in it and what it would cost.
+   */
+  'seat-panel':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var c=document.querySelector('.map-cell[data-seat=\"17\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "},400);",
+
+  /*
+   * The same panel with the spend control open, which is the decision itself.
+   */
+  'seat-panel-spend':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var c=document.querySelector('.map-cell[data-seat=\"17\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "  setTimeout(function(){" +
+    "    var b=[].slice.call(document.querySelectorAll('.dp button'))" +
+    "      .filter(function(x){return /Spend money here/.test(x.textContent);})[0];" +
+    "    if(b)b.click();" +
+    "  },260);" +
+    "},400);",
+
+  /*
    * The More menu: four rows, and the way out set apart from them.
    */
   'more-menu':

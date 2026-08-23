@@ -364,6 +364,17 @@ async function act(c, label) {
   c.click(seat);
   await sleep(80);
 
+  /*
+   * The seat opens on the panel over the board. This run exercises all three
+   * kinds of move, and the panel offers only plain campaigning, so it takes
+   * the step through to the full seat screen where the other two live.
+   */
+  const toFull = c.qq('.dp button').find((b) => /Full seat detail/.test(b.textContent));
+  if (toFull) {
+    c.click(toFull);
+    await sleep(80);
+  }
+
   const open = c.qq('button').find((b) => /Campaign here/.test(b.textContent));
   if (!open) return false;
   c.click(open);

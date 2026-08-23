@@ -573,7 +573,7 @@
 
 .rr-runner {
   display: grid;
-  grid-template-columns: 30px 42px minmax(0, 1fr) 48px auto;
+  grid-template-columns: 30px 42px minmax(0, 1fr) 48px 26px auto;
   align-items: center;
   gap: 8px;
 }
@@ -626,11 +626,15 @@
 }
 .rr-runner.is-first .rr-runner-share { color: var(--cream); }
 .rr-runner-won {
+  grid-column: 5;
   font-size: 0.62rem;
   font-weight: 700;
   color: var(--good);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+/* The word always sits in the last track, badge or no badge. */
+.rr-runner-pos { grid-column: 6; }
 
 .rr-district-lead {
   margin: 0;
@@ -703,7 +707,7 @@
 
 @media (max-width: 379px) {
   .rr-bar-title { font-size: 1.7rem; }
-  .rr-runner { grid-template-columns: 26px 38px minmax(0, 1fr) 44px auto; gap: 6px; }
+  .rr-runner { grid-template-columns: 26px 34px minmax(0, 1fr) 40px 22px auto; gap: 5px; }
   .rr-card-seats { font-size: 1.8rem; }
 }
 
@@ -717,4 +721,30 @@
   .rr-district,
   .rr-card,
   .rr-runner-fill { animation: none; }
+}
+
+/*
+ * Where each party stands in a district, in one word.
+ *
+ * The same four words the seat panel uses, so a player who has learned what
+ * "contested" means on a seat does not have to learn it again on a result.
+ */
+.rr-runner-pos {
+  min-width: 62px;
+  text-align: right;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+  white-space: nowrap;
+}
+.rr-runner-pos.is-leading { color: var(--warn-good); }
+.rr-runner-pos.is-won { color: var(--blue); }
+
+/* A party that stayed out is a fact, not a warning: it recedes. */
+.rr-runner.is-none { opacity: 0.62; }
+
+@media (max-width: 379px) {
+  .rr-runner-pos { min-width: 0; font-size: 0.52rem; letter-spacing: 0.06em; }
 }

@@ -280,6 +280,55 @@ Hierarchy is carried by weight and colour rather than size, which is why the
 title is 32-36px rather than 70 and a seat count reads as a number rather than
 a headline.
 
+## Tapping a seat
+
+The board is the game, so the panel a seat opens on sits **over** the map
+rather than instead of it. Whether to spend in a seat is a question about its
+surroundings — who holds the district, what is next to it, how far the
+region's money stretches — and a panel that replaced the map made the player
+carry all of that in their head.
+
+It answers four questions in the order they get asked, and stops:
+
+1. **Which seat is this** — name, AC number, district, and the state it is in:
+   open, contested, leading or won.
+2. **Who is in it** — one row per party with a tick or a ring, so "nobody else
+   came" reads at a glance. Every party is listed, including the ones that
+   stayed out.
+3. **What they put in** — the spend *this round*, labelled as such, because a
+   party leading on 100% with "no spend" beside it reads as a contradiction
+   until you know what the column measures.
+4. **What you can put in** — the amounts the engine will actually accept, the
+   three figures that make up the decision, and one button.
+
+Tapping another seat points the same panel somewhere else rather than closing
+one thing and opening another. On a phone the field scrolls and the money does
+not: chips, arithmetic and button are pinned, because what fell off the bottom
+of the old layout was the button.
+
+**A rival's rupees are theirs.** `seatBids` returns a number where this client
+legitimately holds the answer and `null` where it does not — playing alone the
+opponents are local objects and all four figures are real, while in a game with
+other people the server sends nobody else's spending. The panel prints a dash
+and says why, rather than inventing a figure or leaving a blank that looks like
+a bug. Where each party *stands* is public either way: it comes off the board,
+which everybody can see.
+
+Nothing in the panel decides anything. Spending goes through the same
+`play()` the rest of the game uses, so the ₹1 crore entry cap, the region
+purse, the won-seat lock and — in a multiplayer game — the server's authority
+all still apply.
+
+The full seat screen, with the round-by-round history and the other two kinds
+of move, is one step further in and always reachable, including from a seat
+that is settled or a round that has closed.
+
+## Four words, one vocabulary
+
+`WON`, `LEADING`, `TRAILING`, `NO BID`. The seat panel, the district result
+cards and the map all use the same four, because a player who has learned what
+"contested" means on a seat should not have to learn it again on a result.
+
 ## The active screen is a heads-up display
 
 It does not repeat the game's own name at somebody nineteen rounds into
@@ -1312,6 +1361,7 @@ simple/
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: the race, or who won it and when
     ui/briefing.js           the Election Briefing: ten chapters and the tips
+    ui/district.js           the seat panel that opens over the board
     ui/oversight.js          rivals, reporting and your own record
     ui/result.js             result, hung assembly and coalition talks
     ui/election.js           the game screen — round strip, map, leaderboard

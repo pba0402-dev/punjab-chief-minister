@@ -201,6 +201,17 @@ const openCampaignSheet = async (d, seatIndex) => {
   if (!row) throw new Error('no areas listed');
   clickIt(d, row);
   await settle();
+  /*
+   * Opening a seat opens the panel over the board now. The panel spends by
+   * itself — plain campaigning, one button — and the full seat screen behind
+   * it is where the other two kinds of move live. This suite tests all three,
+   * so it takes the same step through that a player does.
+   */
+  const full = qq(d, 'button').find((b) => /Full seat detail/.test(b.textContent));
+  if (full) {
+    clickIt(d, full);
+    await settle();
+  }
   const go = qq(d, 'button').find((b) => /Campaign here/.test(b.textContent));
   if (!go) throw new Error('no campaign button on the constituency');
   clickIt(d, go);
@@ -958,30 +969,271 @@ check('the summary counts every decided seat and no others',
 check('10. the disclaimer is not on the game screen',
   !/not official constituency boundaries/i.test(text(dom)));
 
+/* ------------------------------------------------------- the seat panel */
+
 /*
- * 36. Tapping a seat opens the campaign panel over the map.
+ * 36 + 9. Tapping a seat opens a panel OVER the map, not instead of it.
  *
- * Not a page, and not a detour: pick a seat, put money in, come back to the
- * map. That loop is the game, and every screen transition in the middle of it
- * was a screen transition in the middle of it.
+ * Whether to spend in a seat is a question about its surroundings, so the
+ * board has to stay on screen while the question is being asked. It used to
+ * jump straight into the campaign sheet, which answered "how much" before
+ * anybody had been told who was in the seat.
  */
-const cell = qq(dom, '.map-cell').find((c) => c.dataset.seat === '17');
-clickIt(dom, cell);
+const seatCell = (n) => qq(dom, '.map-cell').find((c) => c.dataset.seat === String(n));
+
+clickIt(dom, seatCell(17));
 await settle();
 
-check('36. tapping a seat opens the campaign panel', !!q(dom, '.campaign-sheet'));
-check('12. it names the seat',
-  q(dom, '.campaign-sheet .sheet-title').textContent === 'Amritsar Central',
-  q(dom, '.campaign-sheet .sheet-title').textContent);
-check('12. and where it is',
-  /AC 17 · Amritsar/.test(q(dom, '.cs-where').textContent),
-  q(dom, '.cs-where').textContent);
-check('20. with the standings, or that nobody has been here',
-  !!q(dom, '.cs-positions') || /Nobody has campaigned/.test(q(dom, '.cs-open').textContent));
+check('panel: tapping a seat opens the seat panel', !!q(dom, '.dp'));
+check('panel: and the map is still on screen behind it', !!q(dom, '.punjab-map'));
+check('panel: it names the seat',
+  q(dom, '.dp-name').textContent === 'Amritsar Central',
+  q(dom, '.dp-name') ? q(dom, '.dp-name').textContent : 'no name');
+check('panel: with its number and district',
+  /AC 17 · Amritsar/.test(q(dom, '.dp-where').textContent),
+  q(dom, '.dp-where').textContent);
 
-clickIt(dom, qq(dom, '.campaign-sheet button').find((b) => b.textContent === 'Cancel'));
+/*
+ * 4 + 14.2. A seat nobody has touched.
+ *
+ * Every one of the 117 starts here. It must read as an invitation, not as a
+ * result: no leader, no percentages, and every party listed as out of it.
+ */
+check('panel: an untouched seat says nobody has campaigned',
+  /Nobody has campaigned/.test(q(dom, '.dp-state').textContent),
+  q(dom, '.dp-state').textContent.replace(/\s+/g, ' ').trim());
+check('panel: every party is listed', qq(dom, '.dp-row').length === 4,
+  qq(dom, '.dp-row').length + ' rows');
+check('panel: all of them marked as out of it',
+  qq(dom, '.dp-row').every((r) => r.querySelector('.dp-mark').textContent === '○'),
+  qq(dom, '.dp-row').map((r) => r.querySelector('.dp-mark').textContent).join(''));
+check('panel: and all of them reading No bid',
+  qq(dom, '.dp-pos').every((n) => /No bid/i.test(n.textContent)),
+  qq(dom, '.dp-pos').map((n) => n.textContent).join(' | '));
+
+/*
+ * 14.9. Tapping another seat switches the panel rather than closing it.
+ */
+clickIt(dom, seatCell(18));
 await settle();
-check('36. and cancelling puts the map back', !q(dom, '.campaign-sheet') && !!q(dom, '.punjab-map'));
+check('panel: tapping another seat switches straight to it',
+  !!q(dom, '.dp') && q(dom, '.dp-where').textContent.indexOf('AC 18') !== -1,
+  q(dom, '.dp-where').textContent);
+clickIt(dom, seatCell(17));
+await settle();
+
+/* 14.3 + 14.4. One bidder, then a contest, both read off the real board. */
+{
+  const g = dom.window.CMP.app.getGame();
+  const me = g.partyId;
+  const rival = dom.window.CMP.getParties()
+    .map((x) => x.id).filter((x) => x !== me)[0];
+
+  // One bidder: written onto the board the engine reads, not faked in the UI.
+  g.support[17] = {};
+  g.support[17][me] = 40;
+  dom.window.CMP.app.goTo('election');
+  menuItem(dom, 'Map');
+  clickIt(dom, seatCell(17));
+  await settle();
+
+  const rowFor = (id) => qq(dom, '.dp-row').find(
+    (r) => r.querySelector('.dp-party').textContent ===
+      dom.window.CMP.getParty(id).short);
+
+  check('panel: one bidder is marked as in the seat',
+    rowFor(me).querySelector('.dp-mark').textContent === '✓',
+    rowFor(me).textContent.replace(/\s+/g, ' ').trim());
+  check('panel: unopposed, that reads as leading',
+    /Leading/i.test(rowFor(me).querySelector('.dp-pos').textContent),
+    rowFor(me).querySelector('.dp-pos').textContent);
+  check('panel: and the others are still out of it',
+    rowFor(rival).querySelector('.dp-mark').textContent === '○');
+
+  // A contest: close enough that the rating says it is not settled.
+  g.support[17][rival] = 38;
+  dom.window.CMP.app.goTo('election');
+  menuItem(dom, 'Map');
+  clickIt(dom, seatCell(17));
+  await settle();
+
+  check('panel: a close race reads as contested, not as a lead',
+    /Contested/i.test(rowFor(me).querySelector('.dp-pos').textContent),
+    rowFor(me).querySelector('.dp-pos').textContent);
+  check('panel: and the rival as trailing',
+    /Trailing/i.test(rowFor(rival).querySelector('.dp-pos').textContent),
+    rowFor(rival).querySelector('.dp-pos').textContent);
+  check('panel: the header says so too',
+    /Contested/i.test(q(dom, '.dp-state').textContent),
+    q(dom, '.dp-state').textContent.replace(/\s+/g, ' ').trim());
+
+  /* 14.5. Spending, through the game's own play(). */
+  const cashBefore = dom.window.CMP.campaign.balanceOf(g);
+  clickIt(dom, qq(dom, '.dp button').find((b) => /Spend money here/.test(b.textContent)));
+  await settle();
+  check('panel: the spend control offers amounts', qq(dom, '.dp-amount').length > 0,
+    qq(dom, '.dp-amount').length + ' amounts');
+  // The three figures sit beside the button rather than above the scroll,
+  // because the arithmetic is the decision.
+  check('panel: and shows available, spend and remaining',
+    qq(dom, '.dp-tally-label').map((n) => n.textContent).join('/') ===
+      'Available/This spend/Remaining',
+    qq(dom, '.dp-tally-label').map((n) => n.textContent).join('/'));
+
+  clickIt(dom, qq(dom, '.dp-amount')[0]);
+  await settle();
+  const go = qq(dom, '.dp button').find((b) => /^Spend ₹/.test(b.textContent));
+  check('panel: with one button to do it', !!go,
+    qq(dom, '.dp button').map((b) => b.textContent).join(' | '));
+  clickIt(dom, go);
+  await settle();
+  await settle();
+
+  const cashAfter = dom.window.CMP.campaign.balanceOf(dom.window.CMP.app.getGame());
+  check('panel: spending actually takes the money',
+    cashAfter < cashBefore,
+    cashBefore + ' -> ' + cashAfter);
+  check('panel: and the seat records the spend',
+    (dom.window.CMP.app.getGame().areaBids || {})['17'] !== undefined);
+}
+
+  /*
+   * 14.7 + 14.8. Two campaigns in one seat, and the lead changing hands.
+   *
+   * This is the case the panel exists for: the player has to be able to see
+   * that somebody else is in the seat, what it would take to pass them, and
+   * then watch the words change when they do. Both campaigns spend through
+   * the engine, so the shares are the engine's arithmetic and not the
+   * screen's.
+   */
+  {
+    const g2 = dom.window.CMP.app.getGame();
+    const me2 = g2.partyId;
+    const rival2 = dom.window.CMP.getParties().map((x) => x.id)
+      .filter((x) => x !== me2)[0];
+    const rollsFor = { outcome: 0.4, consequence: 0.99, consequencePick: 0.5 };
+
+    // A rival takes a clear lead in an empty seat, through the real engine.
+    const rivalActor = (g2.opponents || []).find((o) => o.partyId === rival2);
+    g2.support[23] = {};
+    g2.cash = 60 * 10000000;
+    if (rivalActor) {
+      rivalActor.cash = 60 * 10000000;
+      dom.window.CMP.campaign.playAs(g2, rivalActor, 'invest', 23, rollsFor, 10000000);
+    }
+    dom.window.CMP.app.goTo('election');
+    menuItem(dom, 'Map');
+    clickIt(dom, seatCell(23));
+    await settle();
+
+    const posOf = (id) => {
+      const short = dom.window.CMP.getParty(id).short;
+      const row = qq(dom, '.dp-row').find(
+        (r) => r.querySelector('.dp-party').textContent === short);
+      return row ? row.querySelector('.dp-pos').textContent.trim() : 'missing';
+    };
+
+    check('panel: a rival in the seat shows as in it',
+      /Leading|Contested/i.test(posOf(rival2)), posOf(rival2));
+    check('panel: and you as out of it', /No bid/i.test(posOf(me2)), posOf(me2));
+
+    // Now outspend them, through the panel, and watch the words swap.
+    clickIt(dom, qq(dom, '.dp button').find((b) => /Spend money here/.test(b.textContent)));
+    await settle();
+    const biggest = qq(dom, '.dp-amount').slice(-1)[0];
+    clickIt(dom, biggest);
+    await settle();
+    clickIt(dom, qq(dom, '.dp button').find((b) => /^Spend ₹/.test(b.textContent)));
+    await settle();
+    await settle();
+
+    check('panel: after spending you are in the seat',
+      !/No bid/i.test(posOf(me2)), posOf(me2));
+    check('panel: and the panel repainted without being reopened',
+      !!q(dom, '.dp') && q(dom, '.dp-where').textContent.indexOf('AC 23') !== -1,
+      q(dom, '.dp-where').textContent);
+
+    /*
+     * The lead itself: the engine decides who is ahead, and the panel's
+     * header has to agree with it rather than keep its own answer.
+     */
+    const engineLeader = dom.window.CMP.campaign
+      .seatStatus(dom.window.CMP.app.getGame(), 23).partyId;
+    check('panel: the header names whoever the engine says is ahead',
+      q(dom, '.dp-state-who').textContent
+        .indexOf(dom.window.CMP.getParty(engineLeader).short) !== -1,
+      q(dom, '.dp-state-who').textContent + ' vs engine ' + engineLeader);
+  }
+
+/* 14.6. Insufficient funds: offered nothing, told why. */
+{
+  const g = dom.window.CMP.app.getGame();
+  const kept = g.cash;
+  g.cash = 0;
+  (g.grants || {}) && Object.keys(g.grants || {}).forEach((r) => { g.grants[r] = 0; });
+  dom.window.CMP.app.goTo('election');
+  menuItem(dom, 'Map');
+  clickIt(dom, seatCell(19));
+  await settle();
+  check('panel: with no money there is no spend button',
+    !qq(dom, '.dp button').some((b) => /Spend money here/.test(b.textContent)),
+    qq(dom, '.dp button').map((b) => b.textContent.slice(0, 20)).join(' | '));
+  check('panel: and it says how short you are',
+    /You need at least/.test(q(dom, '.dp').textContent),
+    q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(-90));
+  g.cash = kept;
+  dom.window.CMP.app.goTo('election');
+  menuItem(dom, 'Map');
+}
+
+/*
+ * A settled seat is finished, and the panel has to read that way.
+ *
+ * Offering a control the engine is going to refuse is worse than offering
+ * none — and the lock is on everybody, including whoever won it.
+ */
+{
+  const g3 = dom.window.CMP.app.getGame();
+  g3.wonSeats = g3.wonSeats || {};
+  g3.wonSeats['24'] = { party: g3.partyId, round: 3, share: 82 };
+  dom.window.CMP.app.goTo('election');
+  menuItem(dom, 'Map');
+  clickIt(dom, seatCell(24));
+  await settle();
+  check('panel: a won seat says who took it',
+    /has won this seat/.test(q(dom, '.dp').textContent),
+    q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(-110));
+  check('panel: and offers no way to spend in it',
+    !qq(dom, '.dp button').some((b) => /Spend/.test(b.textContent)),
+    qq(dom, '.dp button').map((b) => b.textContent.slice(0, 18)).join(' | '));
+  check('panel: the full seat screen is still reachable from it',
+    qq(dom, '.dp button').some((b) => /Full seat detail/.test(b.textContent)));
+  delete g3.wonSeats['24'];
+  clickIt(dom, q(dom, '.dp-close'));
+  await settle();
+}
+
+/* 9. Closing it leaves the board exactly where it was. */
+clickIt(dom, seatCell(17));
+await settle();
+clickIt(dom, q(dom, '.dp-close'));
+await settle();
+check('panel: closing puts the board back', !q(dom, '.dp') && !!q(dom, '.punjab-map'));
+
+/*
+ * The full seat screen — history, ratings, the other kinds of move — is still
+ * there, one step behind the panel rather than in front of it.
+ */
+clickIt(dom, seatCell(17));
+await settle();
+clickIt(dom, qq(dom, '.dp button').find((b) => /Full seat detail/.test(b.textContent)));
+await settle();
+check('panel: the full seat screen is still reachable',
+  !!q(dom, '.seat-detail') && !q(dom, '.dp'));
+clickIt(dom, q(dom, '.seat-detail .sd-back'));
+await settle();
+menuItem(dom, 'Map');
+
 
 /*
  * 4. No sitting member, anywhere.
@@ -1161,8 +1413,8 @@ const pickRow = qq(dom, '.area-row')[2];
 const pickedName = pickRow.querySelector('.area-name').textContent;
 clickIt(dom, pickRow);
 check('10. a constituency opens when clicked',
-  q(dom, '.sd-name') && q(dom, '.sd-name').textContent === pickedName,
-  q(dom, '.sd-name') ? q(dom, '.sd-name').textContent : 'nothing opened');
+  q(dom, '.dp-name') && q(dom, '.dp-name').textContent === pickedName,
+  q(dom, '.dp-name') ? q(dom, '.dp-name').textContent : 'nothing opened');
 
 /* --------------------------------------------- the campaign sheet */
 
@@ -1170,6 +1422,10 @@ section('9-13. Campaign here');
 // The affordability block above deliberately emptied the purse. Put a round's
 // allowance back, so the panel is exercised with real choices in it.
 dom.window.CMP.app.getGame().cash = 20 * 10000000;
+// Through the panel, which is what a seat opens on now. The sheet behind it
+// is where a negative campaign or a bribe is chosen.
+clickIt(dom, qq(dom, '.dp button').find((b) => /Full seat detail/.test(b.textContent)));
+await settle();
 clickIt(dom, qq(dom, 'button').find((b) => /Campaign here/.test(b.textContent)));
 await settle();
 check('9. one button opens the campaign controls', !!q(dom, '.campaign-sheet'));
@@ -1411,9 +1667,26 @@ check('6. the runners in a district are shown', runners.length > 0,
   runners.length + ' runners');
 check('6. each with a face', [...runners].every((n) => !!n.querySelector('.portrait')));
 check('6. a bar', [...runners].every((n) => !!n.querySelector('.rr-runner-fill')));
-check('6. and its calculated share',
-  [...runners].every((n) => /%$/.test(n.querySelector('.rr-runner-share').textContent)),
+/*
+ * A share where there is one, and a dash where there is not.
+ *
+ * The card lists every party now, including the ones that stayed out — and
+ * "0.0%" against a party that never campaigned is a number about nothing.
+ * A dash says the true thing, which is that they were not in it.
+ */
+check('6. and its calculated share, or a dash where there was no bid',
+  [...runners].every((n) => {
+    const shown = n.querySelector('.rr-runner-share').textContent;
+    const bid = !/No bid/i.test(n.querySelector('.rr-runner-pos').textContent);
+    return bid ? /%$/.test(shown) : shown === '—';
+  }),
   [...runners].map((n) => n.querySelector('.rr-runner-share').textContent).join(' '));
+check('6. every party is on the card, in or out of the race',
+  runners.length === 4, runners.length + ' runners');
+check('6. and each says where it stands',
+  [...runners].every((n) => /Won|Leading|Trailing|No bid/i
+    .test(n.querySelector('.rr-runner-pos').textContent)),
+  [...runners].map((n) => n.querySelector('.rr-runner-pos').textContent).join(' | '));
 check('6. the leader is first and marked',
   runners[0].classList.contains('is-first'));
 check('17. and the shares are the engine\'s own, not invented',

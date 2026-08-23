@@ -461,6 +461,20 @@ CMP.ui.scoreboard = (function () {
      */
     var REGION_ORDER = ['malwa', 'majha', 'doaba'];
 
+  /*
+   * The same four words the seat panel uses, for the same four states.
+   *
+   * They are declared here rather than imported so this file has no opinion
+   * about load order, but they are the words in CMP.ui.district.POSITION and
+   * they must stay the words in CMP.ui.district.POSITION.
+   */
+  var POSITION_WORD = {
+    won: 'Won',
+    leading: 'Leading',
+    trailing: 'Trailing',
+    none: 'No bid',
+  };
+
     var stage = REGION_ORDER[0];   // a region id, then 'overall'
 
     /*
@@ -606,18 +620,41 @@ CMP.ui.scoreboard = (function () {
       if (!touched) return null;
 
       var count = district.seats.length || 1;
-      var rows = Object.keys(totals).map(function (id) {
+
+      /*
+       * Every party, including the ones that stayed out.
+       *
+       * The card used to list only who had spent something, which made a
+       * district contested by two look identical to one contested by four —
+       * and "nobody else came" is a fact worth as much as any of the shares.
+       */
+      var rows = CMP.getParties().map(function (party) {
+        var id = party.id;
         return {
           partyId: id,
-          share: Math.round((totals[id] / count) * 10) / 10,
+          share: totals[id] ? Math.round((totals[id] / count) * 10) / 10 : 0,
           won: seatsWon[id] || 0,
           leading: seatsLed[id] || 0,
         };
       }).sort(function (a, b) {
-        return b.share - a.share;
+        return b.share - a.share || b.won - a.won;
       });
 
-      return { district: district, rows: rows.slice(0, 4) };
+      /*
+       * Where each of them stands, in the words the seat panel uses.
+       *
+       * One vocabulary across the game: a player who has learned what
+       * "contested" means on a seat should not have to learn it again here.
+       */
+      var settled = rows.reduce(function (n, r) { return n + r.won; }, 0);
+      rows.forEach(function (r, i) {
+        if (r.share <= 0 && !r.won) r.position = 'none';
+        else if (r.won >= district.seats.length) r.position = 'won';
+        else if (i === 0) r.position = settled >= district.seats.length ? 'won' : 'leading';
+        else r.position = 'trailing';
+      });
+
+      return { district: district, rows: rows, settled: settled };
     }
 
     /** Every district in a region that anybody has campaigned in. */
@@ -760,7 +797,7 @@ function regionScreen() {
           var mine = opts.you && opts.you() === r.partyId;
           return el('div', {
             class: 'rr-runner' + (place === 0 ? ' is-first' : '') +
-              (mine ? ' is-you' : ''),
+              (mine ? ' is-you' : '') + ' is-' + r.position,
             // The bars fill after their own card has settled, so a district
             // reads as one thing arriving rather than four racing.
             style: {
@@ -776,18 +813,26 @@ function regionScreen() {
                 style: { width: Math.max(2, r.share) + '%' },
               }),
             ]),
-            el('span', { class: 'rr-runner-share', text: r.share.toFixed(1) + '%' }),
+            el('span', {
+              class: 'rr-runner-share',
+              text: r.share > 0 ? r.share.toFixed(1) + '%' : '—',
+            }),
             r.won
               ? el('span', { class: 'rr-runner-won', text: '\u2713' + r.won })
               : null,
+            el('span', {
+              class: 'rr-runner-pos is-' + r.position,
+              text: POSITION_WORD[r.position] || '',
+            }),
           ]);
         })),
 
-        top
+        top && top.share > 0
           ? el('p', {
               class: 'rr-district-lead',
               style: { '--party': partyOf(top.partyId).colour },
-              text: partyOf(top.partyId).short + ' leading',
+              text: partyOf(top.partyId).short +
+                (row.settled >= row.district.seats.length ? ' has taken it' : ' leading'),
             })
           : null,
       ]);

@@ -580,6 +580,15 @@ async function openCampaignSheet(client) {
   await sleep(80);
   client.click(client.qq('.area-row')[0]);
   await sleep(80);
+  /*
+   * A seat opens on the panel over the board now. The panel spends by itself
+   * — plain campaigning, one button — and the full seat screen behind it is
+   * where a negative campaign or a bribe is chosen, which is what this suite
+   * is about to do.
+   */
+  const toFull = client.qq('.dp button').find((b) => /Full seat detail/.test(b.textContent));
+  if (toFull) client.click(toFull);
+  await sleep(80);
   client.click(client.qq('button').find((b) => /Campaign here/.test(b.textContent)));
   await sleep(120);
 }
@@ -702,9 +711,31 @@ check('my areas splits the board by how the race stands',
   host.qq('.area-status').length > 0,
   [...new Set(host.qq('.area-status').map((n) => n.textContent))].join('/'));
 host.click(host.q('.area-row'));
-await host.until('seat detail', () => !!host.q('.seat-detail'));
+await host.until('seat panel', () => !!host.q('.dp'));
 
-check('a constituency opens from the list', !!host.q('.seat-detail'));
+/*
+ * The panel first, then the full screen behind it.
+ *
+ * Opening a seat opens the panel over the board — who is in it, what they put
+ * in, what it would cost. This block is about the full screen, which is one
+ * step further in, so it takes that step.
+ */
+check('a constituency opens from the list', !!host.q('.dp'));
+check('and the panel names the seat and its AC number',
+  /AC \d+/.test(host.q('.dp-where').textContent), host.q('.dp-where').textContent);
+check('with every party in the game on it', host.qq('.dp-row').length === 4,
+  String(host.qq('.dp-row').length));
+/*
+ * A rival's rupees are theirs. The server does not send anybody else's
+ * spending and the panel must not invent it — it shows a dash and says why.
+ */
+check('and no rival spending is shown in a game with other people in it',
+  /their own/i.test(host.q('.dp').textContent),
+  host.q('.dp').textContent.replace(/\s+/g, ' ').slice(-120));
+
+host.click(host.qq('.dp button').find((b) => /Full seat detail/.test(b.textContent)));
+await host.until('seat detail', () => !!host.q('.seat-detail'));
+check('the full seat screen is one step further in', !!host.q('.seat-detail'));
 check('it names the seat and its AC number', /AC \d+/.test(host.q('.sd-where').textContent),
   host.q('.sd-where').textContent);
 // 4. No sitting member anywhere: the seat and its district are real Punjab

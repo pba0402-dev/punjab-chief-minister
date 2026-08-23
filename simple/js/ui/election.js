@@ -156,7 +156,8 @@ CMP.ui.election = (function () {
   function create(opts) {
     var game = null;
     var selected = null;      // the seat a campaign action would target
-    var openSeat = null;      // the seat whose detail panel is open
+    var openSeat = null;      // the seat whose panel is open over the board
+    var fullSeat = null;      // the seat whose full screen replaced the body
     var openParty = null;     // the candidate whose areas are open
     var section = openingSection();
     var lastReport = null;
@@ -317,6 +318,17 @@ CMP.ui.election = (function () {
     // a thing other code depends on.
     var navNode = el('nav', { class: 'g-nav', 'aria-label': 'Game sections' });
 
+    /*
+     * The seat panel opens over the board, not instead of it.
+     *
+     * Whether to spend in a seat is a question about its surroundings - who
+     * holds the district, what is next to it, how far the region's money
+     * stretches - and a panel that replaced the map made the player carry all
+     * of that in their head. It sits outside .g-inner so it can be pinned to
+     * the bottom of a phone without inheriting the page's own padding.
+     */
+    var panelNode = el('div', { class: 'g-panel-layer' });
+
     var root = el('section', { class: 'screen screen-election screen-game' }, [
       el('div', { class: 'g-inner' }, [
         headNode,
@@ -326,6 +338,7 @@ CMP.ui.election = (function () {
         resultsNode,
         bodyNode,
       ]),
+      panelNode,
     ]);
 
     /* --------------------------------------------------------- helpers */
@@ -402,6 +415,8 @@ CMP.ui.election = (function () {
       if (CMP.audio) CMP.audio.play('tap');
       section = next;
       openSeat = null;
+      fullSeat = null;
+      paintPanel();
       rememberSection(next);
       if (next === 'areas' && !openParty) openParty = game.partyId;
       if (next !== 'areas') openParty = null;
@@ -437,11 +452,96 @@ CMP.ui.election = (function () {
       toTop();
     }
 
+    /**
+     * The seat panel, made once and pointed at whichever seat is open.
+     *
+     * One panel rather than one per seat, because tapping around the map
+     * should feel like reading a board rather than opening and closing
+     * windows - and because the spend control inside it holds state that
+     * ought to reset when the seat changes and not when it repaints.
+     */
+    var districtView = CMP.ui.district.create({
+      players: function () {
+        return roster();
+      },
+      canSpend: function () {
+        return !isCounting() && CMP.campaign.roundIsLive(game);
+      },
+      /*
+       * Spending goes through the game's own play(), so the entry cap, the
+       * region purse, the won-seat lock and - in a game with other people in
+       * it - the server's authority all still apply. The panel asks; it never
+       * decides.
+       */
+      play: function (seat, amount) {
+        return Promise.resolve(opts.play('invest', Number(seat), amount))
+          .then(function (res) {
+            if (res && res.ok) {
+              notice = null;
+              lastReport = res.report || lastReport;
+              game = res.game || game;
+              render(game);
+            }
+            return res;
+          });
+      },
+      onFull: function (seat) {
+        fullSeat = Number(seat);
+        closeSeatPanel();
+        paintBody();
+        toTop();
+      },
+      onClose: function () {
+        closeSeatPanel();
+      },
+    });
+
+    function closeSeatPanel() {
+      openSeat = null;
+      if (mapView) mapView.select(null);
+      paintPanel();
+    }
+
+    /**
+     * Open a seat.
+     *
+     * The board stays where it is and the panel opens over it; tapping a
+     * different seat points the same panel somewhere else rather than closing
+     * one thing and opening another.
+     */
     function openSeatDetail(number) {
       openSeat = Number(number);
       selected = Number(number);
-      paintBody();
-      toTop();
+      fullSeat = null;
+      if (mapView) mapView.select(openSeat);
+      paintPanel();
+      // The board only needs repainting for the selection ring; the panel is
+      // its own layer and does not disturb the section underneath.
+      if (!mapView) paintBody();
+    }
+
+    function paintPanel() {
+      if (openSeat === null) {
+        mount(panelNode, []);
+        panelNode.classList.remove('is-open');
+        return;
+      }
+      districtView.show(game, openSeat);
+      mount(panelNode, [
+        /*
+         * The scrim is what makes the panel a panel rather than a card that
+         * happens to be on top. It is light because the page is paper: a dark
+         * scrim over ivory reads as the lights going out.
+         */
+        el('div', {
+          class: 'g-panel-scrim',
+          onclick: function () {
+            closeSeatPanel();
+          },
+        }),
+        districtView.root,
+      ]);
+      panelNode.classList.add('is-open');
     }
 
     function toTop() {
@@ -1253,7 +1353,13 @@ CMP.ui.election = (function () {
         mount(bodyNode, []);
         return;
       }
-      if (openSeat !== null) {
+      /*
+       * The full seat screen - history, ratings, the changed-hands note - is
+       * still a screen of its own, reached from the panel. The panel itself
+       * does not come through here at all: it is a layer over whatever this
+       * paints.
+       */
+      if (fullSeat !== null) {
         mount(bodyNode, [seatPanel()]);
         return;
       }
@@ -2341,8 +2447,16 @@ CMP.ui.election = (function () {
     function mapSection() {
       if (!mapView) {
         mapView = CMP.ui.map.create({
+          /*
+           * A tap on the board opens the seat, and nothing else.
+           *
+           * It used to go straight into the campaign sheet, which answered
+           * "how much" before the player had been told who was in the seat or
+           * what it would leave them. The panel is that missing step; the
+           * spend is one button inside it.
+           */
           onSelect: function (num) {
-            campaignHere(num);
+            openSeatDetail(num);
           },
         });
       }
@@ -2365,11 +2479,11 @@ CMP.ui.election = (function () {
     function seatPanel() {
       var canCampaign = !isCounting() && CMP.campaign.roundIsLive(game);
 
-      return CMP.ui.constituency.render(game, openSeat, {
+      return CMP.ui.constituency.render(game, fullSeat, {
         players: roster(),
-        history: historyFor(openSeat),
+        history: historyFor(fullSeat),
         onBack: function () {
-          openSeat = null;
+          fullSeat = null;
           paintBody();
           toTop();
         },
@@ -2379,7 +2493,7 @@ CMP.ui.election = (function () {
               type: 'button',
               text: 'Campaign here',
               onclick: function () {
-                campaignHere(openSeat);
+                campaignHere(fullSeat);
               },
             })
           : el('p', { class: 'g-block-note', text: 'The round is closed. Wait for the next one.' }),
@@ -2613,6 +2727,9 @@ CMP.ui.election = (function () {
 
       paintHead();
       paintNav();
+      // The panel is a layer over the board, so a board that moved - a rival
+      // spending, a round settling - has to reach it too.
+      if (openSeat !== null) districtView.update(game);
       roundView.render(game, secondsFromServer);
       mount(roundNode, [roundView.root]);
       paintPlayer();
