@@ -3071,6 +3071,47 @@ check('3. loan and grant are one tap from anywhere',
 
 /* ------------------------------------------------------------- the profile */
 
+/* ------------------------------------------------------ the display face */
+
+/*
+ * Fraunces, upright.
+ *
+ * Fraunces is a variable font with a WONK axis, and its default is on. Wonk
+ * swaps in the display alternates — a swashed, leaning J, a single-storey g —
+ * and it fires on some letters and not others, so "Play / Join Election" came
+ * out with one tilted character in the middle of an otherwise upright line.
+ * It reads as a rendering fault rather than as a typeface.
+ *
+ * Two things have to be true and neither is visible in a screenshot, which is
+ * why they are asserted here: the CSS has to ask for the axis, and the font
+ * request has to include it. The css2 API serves exactly the axes named in
+ * the URL, so `font-variation-settings: 'WONK' 0` had nothing to act on while
+ * the URL asked for opsz and wght alone.
+ */
+{
+  const css = fs.readFileSync(path.join(ROOT, 'css/styles.css'), 'utf8');
+
+  check('type: the display face is pinned upright',
+    /font-variation-settings:[^;]*'WONK'\s*0/.test(css),
+    (css.match(/font-variation-settings:[^;]*/) || ['none'])[0]);
+  check('type: and the font request actually carries the axis',
+    /fonts\.googleapis\.com[^']*Fraunces:[^@']*WONK/.test(css),
+    (css.match(/family=Fraunces:[^&']*/) || ['none'])[0]);
+  check('type: the soft axis is pinned too',
+    /font-variation-settings:[^;]*'SOFT'\s*0/.test(css));
+
+  /*
+   * And nothing on the opening screen leans on purpose. A slogan in italics
+   * elsewhere is fine; a tilted character in the middle of the one heading
+   * the whole page is built around is not.
+   */
+  const homeCss = fs.readFileSync(path.join(ROOT, 'css/home.css'), 'utf8') +
+    fs.readFileSync(path.join(ROOT, 'css/landing.css'), 'utf8');
+  check('type: nothing on the opening screen is italic, skewed or rotated',
+    !/font-style:\s*(italic|oblique)|transform:[^;]*(skew|rotate)/.test(homeCss),
+    (homeCss.match(/font-style:\s*\w+|transform:[^;]*/) || ['clean'])[0]);
+}
+
 /* ------------------------------------------------- the home background */
 
 section('The home background');

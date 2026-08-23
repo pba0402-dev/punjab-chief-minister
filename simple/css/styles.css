@@ -8,7 +8,16 @@
    Type: Fraunces carries the titles — a serif with enough character to feel
    like a campaign masthead rather than a form. Karla runs the interface.
    ------------------------------------------------------------------ */
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap');
+/*
+ * The axes are pinned in the request, not only in the CSS.
+ *
+ * The css2 API serves a variable font containing exactly the axes asked for,
+ * so `font-variation-settings: 'WONK' 0` had nothing to act on while the URL
+ * asked for opsz and wght alone — the file arrived with wonk baked at its
+ * default of 1, which is on. Naming SOFT and WONK here is what actually gets
+ * an upright J.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,600,0,0;9..144,700,0,0&family=Karla:wght@400;500;600;700&display=swap');
 
 :root {
   --ink: #f6f2e9;
@@ -31,6 +40,27 @@
   --radius-sm: 9px;
   --shadow: 0 10px 30px rgba(18, 32, 54, 0.1);
   --wrap: 860px;
+}
+
+/*
+ * Fraunces, upright.
+ *
+ * Fraunces is a variable font with a WONK axis, and its default is 1 — on.
+ * Wonk swaps in the display alternates: a swashed, leaning J, a single-storey
+ * g, a curled f. It is a lovely axis for a poster and wrong here, because it
+ * fires on some letters and not others, so "Play / Join Election" came out
+ * with one tilted character in the middle of an otherwise upright line. It
+ * reads as a rendering fault rather than as a typeface.
+ *
+ * SOFT is pinned for the same reason: left to its default the terminals
+ * soften unevenly at small sizes.
+ *
+ * font-variation-settings inherits, so setting it here reaches every element
+ * without any rule having to know about it — and the axes named do not exist
+ * in Karla, which ignores them.
+ */
+:root {
+  font-variation-settings: 'SOFT' 0, 'WONK' 0;
 }
 
 * { box-sizing: border-box; }
