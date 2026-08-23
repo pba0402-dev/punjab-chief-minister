@@ -380,6 +380,38 @@ The full seat screen, with the round-by-round history and the other two kinds
 of move, is one step further in and always reachable, including from a seat
 that is settled or a round that has closed.
 
+## End of round, in three screens
+
+**The overview** — where every campaign stands. Four cards: face, party,
+symbol, seats, popular vote, spend, grants, and one word for where they are.
+It used to open on Malwa, which asked the player to follow a district before
+anybody had told them whether they were winning. The regions are the evidence;
+this is the answer.
+
+**The regions** — Malwa, Majha, Doaba, each with a line saying who leads the
+whole region and by how much, above the district cards that are the evidence
+for it. Skip is on every screen.
+
+**The overall** — who is ahead, the others underneath, and four totals: seats
+decided, the leader's share, total spend, total grants. The majority line
+stays off it; that is on the leader's own screen and on the final count.
+
+### Popular vote, and what it actually is
+
+The average of a party's share across all 117 seats. A seat holds raw campaign
+influence and `standings` turns that into what each party is worth against the
+rest of that seat; `boardShare` averages those across the board.
+
+**It is not votes.** This game has no electorate — a constituency here is a
+number, a name and a district, and nothing in the data says how many people
+live in one. There is no ballot to count and nothing to estimate from. The
+screens call it the popular vote because that is what it measures in the
+game's own terms, and every party, share and result in this game is the game's
+own invention.
+
+`boardShare` exists in both engines and the campaign suite compares them, for
+the same reason the candidate table does.
+
 ## Four words, one vocabulary
 
 `WON`, `LEADING`, `TRAILING`, `NO BID`. The seat panel, the district result

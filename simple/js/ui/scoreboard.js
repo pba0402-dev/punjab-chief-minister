@@ -475,7 +475,7 @@ CMP.ui.scoreboard = (function () {
     none: 'No bid',
   };
 
-    var stage = REGION_ORDER[0];   // a region id, then 'overall'
+    var stage = 'overview';   // then a region id, then 'overall'
 
     /*
      * The results run themselves.
@@ -495,6 +495,15 @@ CMP.ui.scoreboard = (function () {
 
     /** What comes after this, or null at the end. */
     function nextStage(from) {
+      /*
+       * The overview comes before the regions, so it has to know what follows
+       * it. Without this it fell through to `return null`, and go() read that
+       * as "nothing after this" and queued the end of the whole sequence —
+       * which meant a round settled, showed the overview for a few seconds
+       * and then closed, and no region was ever read out.
+       */
+      if (from === 'overview') return firstRegion() || 'overall';
+
       var at = REGION_ORDER.indexOf(from);
       if (at !== -1) {
         // Regions nobody has campaigned in yet are skipped rather than shown
@@ -568,7 +577,18 @@ CMP.ui.scoreboard = (function () {
     }
 
     /** Long enough to watch the region read out, and to take in the last of it. */
+    /*
+     * The overview is read, not watched.
+     *
+     * Long enough for four cards and five figures each, and no longer: it
+     * used to fall through to the region rule, find no districts called
+     * "overview", and return zero — so the screen that answers "how did I do"
+     * was on screen for no time at all before the regions took over.
+     */
+    var OVERVIEW_DWELL = 5500;
+
     function regionDwell(region) {
+      if (region === 'overview') return OVERVIEW_DWELL;
       var rows = regionRows(region).length;
       if (!rows) return 0;
       // Capped: a fifteen-district region should not hold the game for a
@@ -689,6 +709,8 @@ CMP.ui.scoreboard = (function () {
         stage !== 'overall'
           ? el('button', {
               class: 'rr-skip',
+              // Skipping from the overview means skipping the whole read-out.
+
               type: 'button',
               text: 'Skip',
               onclick: function () {
@@ -700,6 +722,218 @@ CMP.ui.scoreboard = (function () {
             })
           : null,
       ]);
+    }
+
+    /**
+     * Where every campaign stands, before the regions are read out.
+     *
+     * The sequence used to open on Malwa, which is a detail — it asked the
+     * player to follow a district before telling them whether they were
+     * winning. This is the answer to "how did I do" in one screen: four
+     * cards, five figures each, and a word for where each of them stands.
+     *
+     * Every figure is the engine's. Seats and shares come off the board;
+     * spend and grant income come off the campaigns that own them. What is
+     * left in anybody's purse does not appear, because that is theirs.
+     */
+    function overviewScreen() {
+      var mine = opts.you && opts.you();
+      var rows = (result.standings || []).slice().sort(function (a, b) {
+        return (b.seats || 0) - (a.seats || 0);
+      });
+      var top = rows[0];
+
+      return [
+        resultsBar('End of round ' + result.round, 'How it stands'),
+
+        el('div', { class: 'ro-grid' }, rows.map(function (row, i) {
+          var id = row.partyId || row.party;
+          var party = partyOf(id);
+          var isYou = id === mine;
+
+          /*
+           * One word for where they are, from the same four the seat panel
+           * and the district cards use.
+           *
+           * "Won" is for a campaign that has already cleared the majority —
+           * not for one that merely leads, because leading twelve rounds out
+           * is not winning and a screen that said so would be lying.
+           */
+          var word = row.seats <= 0 ? 'No bid'
+            : (result.majority && row.seats >= result.majority) ? 'Won'
+            : (top && id === (top.partyId || top.party)) ? 'Leading'
+            : 'Trailing';
+
+          return el('article', {
+            class: 'ro-card is-' + word.toLowerCase().replace(' ', '-') +
+              (isYou ? ' is-you' : ''),
+            style: { '--party': party.colour, animationDelay: i * 90 + 'ms' },
+          }, [
+            el('header', { class: 'ro-card-head' }, [
+              CMP.ui.portrait.render(row.avatar || avatarFor(id), 46,
+                row.candidateName || party.name),
+              el('div', { class: 'ro-card-who' }, [
+                el('strong', { class: 'ro-card-party', text: party.name }),
+                el('span', {
+                  class: 'ro-card-cand',
+                  text: isYou ? 'You' : (row.candidateName || party.short),
+                }),
+              ]),
+              el('span', { class: 'ro-card-sym' }, [CMP.ui.symbol.render(party.symbol, 26)]),
+            ]),
+
+            el('div', { class: 'ro-card-seats' }, [
+              el('strong', { class: 'ro-seats-value', text: String(row.seats || 0) }),
+              el('span', {
+                class: 'ro-seats-label',
+                text: row.won
+                  ? (row.won + ' won · ' + row.leading + ' leading')
+                  : (row.seats === 1 ? 'seat' : 'seats'),
+              }),
+            ]),
+
+            el('div', { class: 'ro-figs' }, [
+              fig('Popular vote', share(row)),
+              fig('Spent', spend(row.spent)),
+              fig('Grants', spend(row.granted)),
+            ]),
+
+            el('span', { class: 'ro-card-state', text: word }),
+          ]);
+        })),
+
+        el('button', {
+          class: 'btn btn-primary btn-wide',
+          type: 'button',
+          text: firstRegion() ? 'Region results' : 'See who is leading',
+          onclick: function () {
+            go(firstRegion() || 'overall');
+          },
+        }),
+      ];
+    }
+
+    /**
+     * The region in one line, above the districts it is made of.
+     *
+     * Who is ahead across the whole region and by how much, so the districts
+     * underneath read as evidence rather than as an unordered pile. Counted
+     * from the same rows the cards are drawn from, so the two cannot
+     * disagree.
+     */
+    function regionSummary(regionId, rows) {
+      if (!rows.length) return null;
+
+      var totals = {};
+      var seats = 0;
+      rows.forEach(function (row) {
+        seats += row.district.seats.length;
+        row.rows.forEach(function (r) {
+          if (!totals[r.partyId]) totals[r.partyId] = { share: 0, won: 0, leading: 0 };
+          totals[r.partyId].share += r.share;
+          totals[r.partyId].won += r.won || 0;
+          totals[r.partyId].leading += r.leading || 0;
+        });
+      });
+
+      var ranked = Object.keys(totals).map(function (id) {
+        return {
+          id: id,
+          share: Math.round((totals[id].share / rows.length) * 10) / 10,
+          seats: totals[id].won + totals[id].leading,
+        };
+      }).sort(function (a, b) {
+        return b.share - a.share;
+      });
+
+      var top = ranked[0];
+      if (!top || top.share <= 0) return null;
+      var party = partyOf(top.id);
+      var standing = (result.standings || []).filter(function (r) {
+        return (r.partyId || r.party) === top.id;
+      })[0];
+
+      return el('div', {
+        class: 'rr-region-summary',
+        style: { '--party': party.colour },
+      }, [
+        el('div', { class: 'rr-region-lead' }, [
+          CMP.ui.portrait.render((standing && standing.avatar) || avatarFor(top.id), 34,
+            party.name),
+          el('div', { class: 'rr-region-who' }, [
+            el('span', { class: 'rr-region-kicker', text: 'Leading here' }),
+            el('strong', { class: 'rr-region-party', text: party.name }),
+          ]),
+        ]),
+        el('div', { class: 'rr-region-figs' }, [
+          fig('Seats', String(top.seats) + ' of ' + seats),
+          fig('Popular vote', top.share.toFixed(1) + '%'),
+          fig('Districts', String(rows.length)),
+        ]),
+      ]);
+    }
+
+    /** Whoever is ahead, as a share of the whole board. */
+    function leaderShare() {
+      var rows = (result.standings || []).slice().sort(function (a, b) {
+        return (b.seats || 0) - (a.seats || 0);
+      });
+      return rows.length ? share(rows[0]) : '—';
+    }
+
+    /** One figure summed across every campaign, or a dash if none carry it. */
+    function totalOf(key) {
+      var rows = result.standings || [];
+      var any = false;
+      var total = 0;
+      rows.forEach(function (r) {
+        if (typeof r[key] === 'number') {
+          any = true;
+          total += r[key];
+        }
+      });
+      return any ? total : null;
+    }
+
+    /** How much of the board is no longer in play. */
+    function decidedSeats() {
+      var rows = result.standings || [];
+      var won = 0;
+      rows.forEach(function (r) {
+        won += r.won || 0;
+      });
+      return won;
+    }
+
+    function fig(label, value) {
+      return el('div', { class: 'ro-fig' }, [
+        el('span', { class: 'ro-fig-label', text: label }),
+        el('strong', { class: 'ro-fig-value', text: value }),
+      ]);
+    }
+
+    /*
+     * A share the engine worked out, or a dash.
+     *
+     * A round settled before this field existed — an old save, a server that
+     * has not been updated — has no share to show, and a zero would be a
+     * claim rather than a gap.
+     */
+    function share(row) {
+      return typeof row.share === 'number' ? row.share.toFixed(1) + '%' : '—';
+    }
+
+    function spend(n) {
+      if (typeof n !== 'number') return '—';
+      return n > 0 ? CMP.ui.money.words(n) : '₹0';
+    }
+
+    /** The first region anybody actually campaigned in this round. */
+    function firstRegion() {
+      for (var i = 0; i < REGION_ORDER.length; i++) {
+        if (regionRows(REGION_ORDER[i]).length) return REGION_ORDER[i];
+      }
+      return null;
     }
 
     /** One region: its districts, and who is ahead in each. */
@@ -724,6 +958,7 @@ function regionScreen() {
 
       return [
         resultsBar(region ? region.name : stage, 'Round ' + result.round + ' results'),
+        regionSummary(stage, rows),
         feedNode,
         el('button', {
           class: 'btn btn-primary btn-wide',
@@ -879,6 +1114,28 @@ function regionScreen() {
             i === 0 ? el('span', { class: 'rr-card-badge', text: 'Leading' }) : null,
           ]);
         })),
+
+        /*
+         * What the round added up to, across everybody.
+         *
+         * Four totals rather than four more cards: the grid above already
+         * says who holds what, and this says how much of the board is settled
+         * and what the campaigns have cost between them.
+         */
+        el('div', { class: 'rr-totals' }, [
+          fig('Seats decided', decidedSeats() + ' of ' + (result.totalSeats || 117)),
+          /*
+           * The leader's share of the board, not the majority line.
+           *
+           * How many seats a majority needs is on the leader's own screen and
+           * on the final count; repeating it here would turn a summary of the
+           * round into arithmetic about the election, which is the thing this
+           * screen was built to stop doing.
+           */
+          fig('Popular vote', leaderShare()),
+          fig('Total spend', spend(totalOf('spent'))),
+          fig('Total grants', spend(totalOf('granted'))),
+        ]),
 
         milestoneKind()
           ? el('button', {
@@ -1095,13 +1352,14 @@ function regionScreen() {
         var fresh = !result || next.round !== result.round;
         result = next;
         if (fresh) {
-          var first = null;
-          for (var i = 0; i < REGION_ORDER.length && !first; i++) {
-            if (regionRows(REGION_ORDER[i]).length) first = REGION_ORDER[i];
-          }
-          // A round in which nobody campaigned anywhere goes straight to the
-          // standings rather than through three empty regions.
-          go(first || 'overall');
+          /*
+           * Every round opens on the overview.
+           *
+           * It used to open on Malwa, which asked the player to follow a
+           * district before anybody had told them whether they were winning.
+           * The regions are the evidence; this is the answer.
+           */
+          go('overview');
           return;
         }
       }
@@ -1117,7 +1375,9 @@ function regionScreen() {
         return;
       }
 
-      mount(root, stage === 'overall' ? overallScreen() : regionScreen());
+      mount(root, stage === 'overview' ? overviewScreen()
+        : stage === 'overall' ? overallScreen()
+        : regionScreen());
     }
 
     function stop() {

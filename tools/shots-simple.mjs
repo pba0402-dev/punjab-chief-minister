@@ -325,6 +325,25 @@ const SCENES = {
     "  })();" +
     "},420);",
 
+  /* The round overview: where every campaign stands, before the regions. */
+  'results-overview':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:''});" +
+    "for(var r=0;r<12;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);" +
+    "  if(r<11)CMP.campaign.startNextRound(g);" +
+    "}" +
+    "var d=CMP.getDistrict('ludhiana');" +
+    "(d?d.seats.slice(0,3):[]).forEach(function(n){" +
+    "  g.wonSeats[String(n)]={party:g.partyId,round:9,share:82};" +
+    "});" +
+    "g.intermissionLeft=CMP.campaign.intermissionLeft(g);" +
+    "CMP.app.setGame(g);CMP.app.goTo('election');",
+
   /*
    * Election night: a region, and then who is leading.
    *

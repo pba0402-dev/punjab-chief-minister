@@ -1838,7 +1838,87 @@ check('the scoreboard appears', !!q(dom, '.round-results'));
  * two campaigns burned on each other, all stacked — correct, and more than
  * anybody reads in the seconds between rounds.
  */
-check('4. the results open on a region, not a summary',
+/* ------------------------------------------------------ the overview */
+
+/*
+ * Every round opens on how it stands, then reads the regions out.
+ *
+ * It used to open on Malwa, which asked the player to follow a district
+ * before anybody had told them whether they were winning. The regions are the
+ * evidence; the overview is the answer.
+ */
+check('overview: the results open on the round overview',
+  /End of round \d+/i.test(q(dom, '.rr-bar-title').textContent),
+  q(dom, '.rr-bar-title').textContent);
+check('overview: one card per campaign',
+  qq(dom, '.ro-card').length === 4,
+  qq(dom, '.ro-card').length + ' cards');
+check('overview: each with a face, a party and a symbol',
+  qq(dom, '.ro-card').every((n) => !!n.querySelector('.portrait') &&
+    !!n.querySelector('.ro-card-party') && !!n.querySelector('.ro-card-sym .sym')));
+check('overview: seats, popular vote, spend and grants on every card',
+  qq(dom, '.ro-card').every((n) =>
+    !!n.querySelector('.ro-seats-value') &&
+    n.querySelectorAll('.ro-fig').length === 3),
+  qq(dom, '.ro-fig-label').slice(0, 3).map((n) => n.textContent).join(' / '));
+check('overview: and a word for where each of them stands',
+  qq(dom, '.ro-card-state').every((n) =>
+    /Won|Leading|Trailing|No bid/i.test(n.textContent)),
+  qq(dom, '.ro-card-state').map((n) => n.textContent).join(' | '));
+
+/*
+ * The figures are the engine's, not the screen's.
+ *
+ * Seats, share, spend and grant income all come off the standings the engine
+ * built when the round settled. This reads one card back and compares it with
+ * that row, so a screen quietly computing its own numbers fails here.
+ */
+{
+  const res = dom.window.CMP.app.getGame().lastResult;
+  const rows = (res.standings || []).slice()
+    .sort((a, b) => (b.seats || 0) - (a.seats || 0));
+  const card = qq(dom, '.ro-card')[0];
+  const top = rows[0];
+
+  check('overview: the seat count is the engine\'s',
+    card.querySelector('.ro-seats-value').textContent === String(top.seats || 0),
+    card.querySelector('.ro-seats-value').textContent + ' vs ' + top.seats);
+
+  const figs = [...card.querySelectorAll('.ro-fig-value')].map((n) => n.textContent);
+  check('overview: the popular vote is the engine\'s board share',
+    typeof top.share !== 'number' || figs[0] === top.share.toFixed(1) + '%',
+    figs[0] + ' vs ' + top.share);
+  check('overview: and the spend is what that campaign actually spent',
+    typeof top.spent !== 'number' ||
+      figs[1] === (top.spent > 0 ? dom.window.CMP.ui.money.words(top.spent) : '₹0'),
+    figs[1] + ' vs ' + top.spent);
+  check('overview: nobody\'s remaining cash is on this screen',
+    !/in hand|remaining|balance/i.test(q(dom, '.rr-bar').parentNode.textContent),
+    'ok');
+}
+
+/*
+ * The sequence walks itself, and does not end on the first screen.
+ *
+ * The overview is new in front of the regions, and go() decides what follows
+ * a stage by asking nextStage(). When that returned nothing for the overview,
+ * go() read it as "nothing after this" and queued the end of the whole
+ * read-out — a round settled, showed the overview, and closed without a
+ * single region ever appearing. It is worth a test because nothing on screen
+ * says it is broken; the results simply do not happen.
+ */
+check('overview: something follows the overview',
+  !!q(dom, '.rr-bar') &&
+    qq(dom, '.screen-election button')
+      .some((b) => /Region results|See who is leading/.test(b.textContent)),
+  qq(dom, '.screen-election button').map((b) => b.textContent.slice(0, 20)).join(' | '));
+
+// Then through to the regions.
+clickIt(dom, qq(dom, '.screen-election button')
+  .find((b) => /Region results|See who is leading/.test(b.textContent)));
+await settle();
+
+check('4. then the regions are read out one at a time',
   /Malwa|Majha|Doaba/i.test(q(dom, '.rr-bar-title').textContent),
   q(dom, '.rr-bar-title').textContent);
 check('4. and say which round they are for',
@@ -1846,6 +1926,19 @@ check('4. and say which round they are for',
   q(dom, '.rr-bar-kicker').textContent);
 check('5. the standings are not on the region screen',
   !q(dom, '.rr-grid') && !q(dom, '.board-row'));
+
+/*
+ * The region says who is ahead across the whole of it, above the districts
+ * that are the evidence for it.
+ */
+check('region: a summary names who leads the region',
+  !!q(dom, '.rr-region-summary') &&
+    !!q(dom, '.rr-region-party').textContent.length,
+  q(dom, '.rr-region-summary')
+    ? q(dom, '.rr-region-summary').textContent.replace(/\s+/g, ' ').trim() : 'none');
+check('region: with seats, popular vote and how many districts',
+  qq(dom, '.rr-region-figs .ro-fig').length === 3,
+  qq(dom, '.rr-region-figs .ro-fig-label').map((n) => n.textContent).join(' / '));
 
 check('7. it lists the districts of that region',
   qq(dom, '.rr-district').length > 0,
@@ -1954,6 +2047,17 @@ feedView.render({
 const feedNames = () => [...feedView.root.querySelectorAll('.rr-district-name')]
   .map((n) => n.textContent);
 
+/*
+ * Past the overview, which is where every round now opens.
+ *
+ * This block is about the district feed — how the cards arrive and how Skip
+ * flushes them — so it takes the one step through to the regions rather than
+ * asserting anything about the screen in front of them.
+ */
+clickIt(dom, [...feedView.root.querySelectorAll('button')]
+  .find((b) => /Region results|See who is leading/.test(b.textContent)));
+await settle();
+
 check('1. the results open with one district, not all of them',
   feedNames().length === 1, feedNames().join(' / '));
 const feedFirst = feedNames()[0];
@@ -2016,15 +2120,29 @@ check('9. and the leader is marked as leading',
   q(dom, '.rr-card.is-leading').textContent);
 
 /*
- * 12. And nothing technical on it. The majority, the distance from it and
- * the vote shares are all calculations somebody can go and make; putting
- * them here turns the one screen that answers a question into another
- * screen to read.
+ * 12. Four totals, and no arithmetic about the election.
+ *
+ * This screen used to carry nothing but who was ahead, on the grounds that
+ * the majority, the distance from it and the vote shares are all calculations
+ * somebody can go and make. Four of them are asked for now — how much of the
+ * board is decided, the leader's share of it, and what the campaigns have
+ * spent and earned between them — because they summarise the round rather
+ * than analysing the election.
+ *
+ * What stays off it is the majority line and the distance to it: those are on
+ * the leader's own screen and on the final count, and repeating them here is
+ * what turned this into another screen to read.
  */
 const overallText = q(dom, '.round-results').textContent;
 check('12. no majority arithmetic on the leader screen',
   !/needs \d+ more|of 59|Majority/i.test(overallText), overallText.slice(0, 120));
-check('12. and no percentages', !/%/.test(overallText), overallText.slice(0, 120));
+check('12. but the round is totalled',
+  qq(dom, '.rr-totals .ro-fig').length === 4,
+  qq(dom, '.rr-totals .ro-fig-label').map((n) => n.textContent).join(' / '));
+check('12. seats decided, popular vote, spend and grants',
+  qq(dom, '.rr-totals .ro-fig-label').map((n) => n.textContent).join('/') ===
+    'Seats decided/Popular vote/Total spend/Total grants',
+  qq(dom, '.rr-totals .ro-fig-label').map((n) => n.textContent).join('/'));
 
 check('15. one way onward, and it is not a trap',
   !!qq(dom, '.round-results button').find((b) => /Continue to next round/i.test(b.textContent)),
@@ -2448,10 +2566,12 @@ rr.root.querySelectorAll('.rr-skip').forEach(() => {});
 const wonRegion = lockedDistrict.region;
 rr.render(null, 30);
 const regionTitle = () => (rr.root.querySelector('.rr-bar-title') || {}).textContent || '';
-for (let i = 0; i < 4 && !new RegExp(wonWin.CMP.getRegion(wonRegion).name, 'i')
+// The sequence opens on the overview, so the walk is one step longer and the
+// first button is the one that leaves it.
+for (let i = 0; i < 5 && !new RegExp(wonWin.CMP.getRegion(wonRegion).name, 'i')
   .test(regionTitle()); i++) {
   const next = [...rr.root.querySelectorAll('button')]
-    .find((b) => /Next region|See who is leading/i.test(b.textContent));
+    .find((b) => /Region results|Next region|See who is leading/i.test(b.textContent));
   if (!next) break;
   next.click();
   rr.stop();

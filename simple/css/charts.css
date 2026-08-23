@@ -748,3 +748,211 @@
 @media (max-width: 379px) {
   .rr-runner-pos { min-width: 0; font-size: 0.52rem; letter-spacing: 0.06em; }
 }
+
+/* ------------------------------------------------------------------
+   The round overview.
+
+   Where every campaign stands, before the regions are read out. Four cards,
+   five figures each, and a word — the answer to "how did I do", so the
+   districts that follow read as evidence rather than as an unordered pile.
+   ------------------------------------------------------------------ */
+
+.ro-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ro-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 12px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-card);
+  animation: ro-in 0.4s ease-out both;
+}
+
+@keyframes ro-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Your own card is marked by a rule in your colour, not by a fill. */
+.ro-card.is-you { box-shadow: inset 3px 0 0 var(--party), var(--shadow-card); }
+
+/* Whoever is ahead gets the gold edge, and only them. */
+.ro-card.is-leading,
+.ro-card.is-won {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold), var(--shadow-card);
+}
+.ro-card.is-you.is-leading,
+.ro-card.is-you.is-won {
+  box-shadow: inset 3px 0 0 var(--party), 0 0 0 1px var(--gold), var(--shadow-card);
+}
+/* A campaign that never entered recedes. It is a fact, not a warning. */
+.ro-card.is-no-bid { opacity: 0.66; }
+
+.ro-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.ro-card-head .portrait { border: 1px solid var(--party); border-radius: 50%; }
+
+.ro-card-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ro-card-party {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ro-card-cand {
+  font-size: 0.68rem;
+  color: var(--navy-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ro-card-sym { display: grid; place-items: center; opacity: 0.85; }
+
+.ro-card-seats {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.ro-seats-value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.ro-seats-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--navy-3);
+}
+
+.ro-figs { display: flex; flex-direction: column; gap: 5px; }
+.ro-fig {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ro-fig-label {
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.ro-fig-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ro-card-state {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.ro-card.is-leading .ro-card-state,
+.ro-card.is-won .ro-card-state {
+  border-color: var(--gold);
+  background: var(--wash-gold);
+  color: var(--gold);
+}
+
+/* ------------------------------------------------- the region summary */
+
+/*
+ * Who is ahead across the whole region, above the districts that are the
+ * evidence for it.
+ */
+.rr-region-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--party);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+}
+.rr-region-lead { display: flex; align-items: center; gap: 10px; }
+.rr-region-lead .portrait { border: 1px solid var(--party); border-radius: 50%; }
+.rr-region-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rr-region-kicker {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.rr-region-party {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+.rr-region-figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+}
+.rr-region-figs .ro-fig { flex-direction: column; align-items: flex-start; gap: 1px; }
+
+/* --------------------------------------------------- the round totals */
+
+.rr-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.rr-totals .ro-fig { flex-direction: column; align-items: flex-start; gap: 1px; }
+.rr-totals .ro-fig-value { font-size: 0.92rem; }
+
+/* Under about 380px two cards across becomes one, and the figures stay
+   readable rather than shrinking to fit. */
+@media (max-width: 379px) {
+  .ro-grid { grid-template-columns: minmax(0, 1fr); }
+  .ro-seats-value { font-size: 1.45rem; }
+}
+
+@media (min-width: 720px) {
+  .ro-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rr-totals { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ro-card { animation: none; }
+}

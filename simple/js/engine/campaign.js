@@ -215,6 +215,39 @@ CMP.campaign = (function () {
     };
   }
 
+  /**
+   * A party's share of the whole board, as a percentage.
+   *
+   * WHAT THIS IS
+   *
+   * The average of a party's share across all 117 seats. A seat holds raw
+   * campaign influence; `standings` turns that into what each party is worth
+   * against the rest of that seat; this averages those across the board. A
+   * party leading everywhere approaches 100, a party nobody has heard of sits
+   * at 0, and the four always sum to the share of seats anybody has touched.
+   *
+   * WHAT THIS IS NOT
+   *
+   * It is not votes. This game has no electorate: a constituency here is a
+   * number, a name and a district, and nothing in the data says how many
+   * people live in one. So there is no ballot to count and nothing to
+   * estimate from — the screens call it the popular vote because that is what
+   * it measures in the game's own terms, and every party, share and result in
+   * this game is the game's own invention.
+   *
+   * Derived on read and never stored, for the same reason shares are: a
+   * number written into the board would start disagreeing with the board.
+   */
+  function boardShare(support, partyId) {
+    var seats = Object.keys(support || {});
+    if (!seats.length) return 0;
+    var total = 0;
+    for (var i = 0; i < seats.length; i++) {
+      total += shareOf(support[seats[i]], partyId);
+    }
+    return Math.round((total / seats.length) * 10) / 10;
+  }
+
   /** One party's share of a seat, as a percentage. Zero if untouched. */
   function shareOf(support, partyId) {
     var ranked = standings(support);
@@ -1464,6 +1497,23 @@ CMP.campaign = (function () {
         leading: Math.max(0, (counts[party.id] || 0) - (wonCount[party.id] || 0)),
         change: (counts[party.id] || 0) - before,
         heat: actor ? Math.round(actor.heat || 0) : 0,
+
+        /*
+         * What the campaign has been, as opposed to what it holds.
+         *
+         * Three figures the results screens ask for and nothing else could
+         * answer: the share of the board, what has been spent to get it, and
+         * what the districts have paid back. All three are read off the actor
+         * that owns them rather than recomputed, so they are the same numbers
+         * the ledger shows.
+         *
+         * Total spend and grant income are public; what is left in the purse
+         * is not, and is deliberately absent.
+         */
+        share: boardShare(game.support, party.id),
+        spent: actor ? Math.round(actor.spent || 0) : 0,
+        granted: actor ? Math.round(actor.granted || 0) : 0,
+
         disqualified: !!(actor && actor.disqualified),
         eliminated: !!(actor && actor.eliminated),
         moves: mine ? null : (aiMoves[party.id] || null),
@@ -2384,6 +2434,7 @@ CMP.campaign = (function () {
     seatStatus: seatStatus,
     regionalWeight: regionalWeight,
     shareOf: shareOf,
+    boardShare: boardShare,
     reviewField: reviewField,
     weightedPick: weightedPick,
     normalise: normalise,

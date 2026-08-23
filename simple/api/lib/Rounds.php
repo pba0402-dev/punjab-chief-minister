@@ -578,6 +578,35 @@ final class Rounds
      * Everything a client needs to draw the results screen without doing any
      * arithmetic of its own.
      */
+    /**
+     * A party's share of the whole board, as a percentage.
+     *
+     * The mirror of boardShare() in js/engine/campaign.js. The average of a
+     * party's share across all 117 seats: a seat holds raw campaign influence
+     * and Campaign::shares turns that into what each party is worth against
+     * the rest of that seat, so this averages those across the board.
+     *
+     * It is not votes. This game has no electorate - a constituency here is a
+     * number, a name and a district - so there is no ballot to count. The
+     * screens call it the popular vote because that is what it measures in
+     * the game's own terms.
+     */
+    private static function boardShare(array $game, string $partyId): float
+    {
+        $board = (array) ($game['board'] ?? []);
+        if (!$board) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+        foreach ($board as $seat) {
+            $shares = Campaign::shares((array) $seat);
+            $total += (float) ($shares[$partyId] ?? 0);
+        }
+
+        return round($total / count($board), 1);
+    }
+
     public static function buildResult(
         array $game,
         Campaign $engine,
@@ -632,6 +661,20 @@ final class Rounds
                 'leading' => max(0, (int) ($seats[$partyId] ?? 0) - (int) ($wonCount[$partyId] ?? 0)),
                 'change' => $summary !== null ? (int) $summary['seatsChange'] : 0,
                 'heat' => $player !== null ? round((float) $player['heat'], 0) : 0,
+
+                /*
+                 * What the campaign has been, as opposed to what it holds.
+                 *
+                 * The mirror of the three the JavaScript engine adds: the
+                 * share of the board, what has been spent to get it, and what
+                 * the districts have paid back. Total spend and grant income
+                 * are public; what is left in the purse is not, and is
+                 * deliberately absent from this row.
+                 */
+                'share' => self::boardShare($game, $partyId),
+                'spent' => $player !== null ? (int) round((float) ($player['spent'] ?? 0)) : 0,
+                'granted' => $player !== null ? (int) round((float) ($player['granted'] ?? 0)) : 0,
+
                 'disqualified' => !empty($player['record']['disqualified']),
                 'eliminated' => !empty($player['eliminated']),
                 'moves' => $pid !== null ? ($aiMoves[$pid] ?? null) : null,
