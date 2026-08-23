@@ -1436,38 +1436,82 @@ check('play is locked while the round is counted',
  * leading, not to be shown the next region.
  */
 /*
- * 1. The districts are counted out, not posted all at once.
+ * 1. The districts are read out one at a time, and they stay.
  *
  * Every card used to arrive within four hundred milliseconds of the one
- * before it, capped at six — which is a page loading rather than a result
- * being read out. The delay is per district and uncapped now, so the twelfth
- * card is genuinely the twelfth, and the screen is held open long enough for
- * the last of them to arrive.
+ * before it — a page loading rather than a result being announced. They come
+ * into a feed now: one arrives at the top, the one before it slides down and
+ * remains, and the region builds up the way a results programme does.
+ *
+ * Driven on its own board rather than the ambient one, because the round the
+ * suite is in has touched a single district and one card cannot show that a
+ * second follows it.
  */
-const revealDelays = qq(dom, '.rr-district')
-  .map((n) => Number((n.style.animationDelay || '0ms').replace('ms', '')));
-check('1. each district is delayed further than the one above it',
-  revealDelays.every((v, i, a) => i === 0 || v > a[i - 1]),
-  revealDelays.join(', '));
-check('1. and the gap between them is the same every time',
-  new Set(revealDelays.slice(1).map((v, i) => v - revealDelays[i])).size <= 1,
-  revealDelays.join(', '));
-check('1. the first arrives immediately', revealDelays[0] === 0, String(revealDelays[0]));
-check('1. no card is capped into arriving with an earlier one',
-  new Set(revealDelays).size === revealDelays.length,
-  revealDelays.length + ' districts, ' + new Set(revealDelays).size + ' distinct delays');
+const feedGame = dom.window.CMP.state.startElection({
+  candidateName: 'Simran Kaur Gill',
+  partyName: 'Punjab Development Party',
+});
+const feedDistricts = dom.window.CMP.DISTRICTS
+  .filter((d) => d.region === 'malwa').slice(0, 4);
+feedDistricts.forEach((d, i) => {
+  d.seats.forEach((n) => {
+    feedGame.support[n] = { [feedGame.partyId]: 10 + i, p2: 6 };
+  });
+});
 
-// 1. The pace is a pace: slow enough to read, and the same for everybody.
-const gap = revealDelays.length > 1 ? revealDelays[1] - revealDelays[0] : 0;
-check('1. at a deliberate pace rather than a flicker',
-  gap >= 400 && gap <= 700, gap + 'ms between districts');
+const feedView = dom.window.CMP.ui.scoreboard.create({
+  you: () => feedGame.partyId,
+  trend: () => [],
+  game: () => feedGame,
+  onFinished: () => {},
+});
+feedView.render({
+  round: 3,
+  standings: dom.window.CMP.getParties().map((party, i) => ({
+    partyId: party.id, seats: 20 - i, won: 0, leading: 20 - i, share: 25,
+  })),
+  changes: [], won: [], conflicts: [],
+}, 30);
 
-// 1. And the bars inside a card wait for their own card.
-const firstRunner = q(dom, '.rr-runner');
+const feedNames = () => [...feedView.root.querySelectorAll('.rr-district-name')]
+  .map((n) => n.textContent);
+
+check('1. the results open with one district, not all of them',
+  feedNames().length === 1, feedNames().join(' / '));
+const feedFirst = feedNames()[0];
+
+await new Promise((r) => setTimeout(r, 4200));
+const afterOne = feedNames();
+check('1. a second arrives on its own, a few seconds later',
+  afterOne.length === 2, afterOne.join(' / '));
+check('1. and the first is still there', afterOne.indexOf(feedFirst) !== -1,
+  afterOne.join(' / '));
+check('1. with the newest at the top',
+  afterOne.length === 2 && afterOne[0] !== feedFirst && afterOne[1] === feedFirst,
+  afterOne.join(' / '));
+
+await new Promise((r) => setTimeout(r, 4200));
+check('1. and the feed keeps building rather than replacing',
+  feedNames().length === 3, feedNames().join(' / '));
+
+// 1. The bars inside a card wait for their own card to settle.
+const feedRunner = feedView.root.querySelector('.rr-runner');
 check('1. the bars follow the card they are on',
-  Number((firstRunner.style.getPropertyValue('--runner-delay') || '0ms')
+  Number((feedRunner.style.getPropertyValue('--runner-delay') || '0ms')
     .replace('ms', '')) > 0,
-  firstRunner.style.getPropertyValue('--runner-delay'));
+  feedRunner.style.getPropertyValue('--runner-delay'));
+
+/*
+ * 8. And Skip reads the rest out at once rather than dropping what was
+ *    mid-arrival, then goes straight to the answer.
+ */
+feedView.root.querySelector('.rr-skip')
+  .dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+await settle();
+check('8. Skip goes to the overall leader',
+  /Overall leader/i.test(feedView.root.querySelector('.rr-bar-title').textContent),
+  feedView.root.querySelector('.rr-bar-title').textContent);
+feedView.stop();
 
 check('8. Skip is offered on a region screen', !!q(dom, '.rr-skip'),
   qq(dom, '.round-results button').map((b) => b.textContent).join(' | '));
@@ -1644,23 +1688,32 @@ check('and the board is back',
   qq(dom, '.g-nav-item').length + ' navigation items');
 check('the campaign log kept the round it happened in',
   solo.actions[0].round === 1, String(solo.actions[0].round));
-check('a summary card appears', !!q(dom, '.summary-card'));
-// 55. Territory changes hands slowly and pays every round it stays, so the
-// round it moves is the round worth reporting.
-check('55. the round summary reports districts held',
-  /Districts held/.test(q(dom, '.summary-card').textContent),
-  q(dom, '.summary-card').textContent.replace(/\s+/g, ' ').slice(0, 200));
-check('55. and the seats, cash and support that moved',
-  /Seats led/.test(q(dom, '.summary-card').textContent) &&
-  /Cash in hand/.test(q(dom, '.summary-card').textContent) &&
-  /Average support/.test(q(dom, '.summary-card').textContent));
-check('it says which round finished', /Round 1 complete/.test(q(dom, '.summary-card').textContent));
-check('it reports the money spent this round',
-  new RegExp(dom.window.CMP.ui.money.words(spentInRound1)).test(q(dom, '.summary-card').textContent),
-  q(dom, '.summary-card').textContent.slice(0, 120));
+/*
+ * Nothing goes in front of the results.
+ *
+ * There used to be a card here — "Round 1 complete", spend, support, seats
+ * led, districts held, heat — which arrived first and had to be dismissed by
+ * hand before anybody could see who had won anything. A summary of the round,
+ * ahead of the results of the round.
+ *
+ * The figures are all still computed and still stored: the money screen has
+ * the spending and the standings have the seats. What has gone is the
+ * interruption.
+ */
+check('no summary card comes in front of the results',
+  !q(dom, '.summary-card') && !/complete/i.test(text(dom)),
+  text(dom).slice(0, 120));
+check('and nothing has to be dismissed by hand', !q(dom, '.summary-close'));
+check('the round still recorded what it did',
+  typeof solo.summary === 'object' && solo.summary.round === 1,
+  JSON.stringify(solo.summary && solo.summary.round));
+check('55. including the districts held',
+  typeof solo.summary.districtsAfter === 'number',
+  String(solo.summary.districtsAfter));
+check('55. and the money spent in it',
+  solo.summary.spent === spentInRound1,
+  solo.summary.spent + ' vs ' + spentInRound1);
 check('history recorded the finished round', solo.history.length === 1);
-
-clickIt(dom, q(dom, '.summary-close'));
 check('the summary can be dismissed', !q(dom, '.summary-card'));
 
 /* 17. Borrowing, through the interface. */

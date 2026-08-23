@@ -22,7 +22,6 @@ CMP.app = (function () {
   var serverView = null; // the latest lobby/game view from the server
   var paintedScreen = null; // the screen the page is currently showing
   var soloTimer = null;  // solo round clock; multiplayer takes the server's
-  var shownRound = 0;    // the last round we showed a summary for
 
   function mount(node) {
     root = node;
@@ -95,16 +94,21 @@ CMP.app = (function () {
       // says they are finished — there is nobody else to wait for.
       if (CMP.campaign.secondsLeft(game) > 0 && !game.roundReady) return;
 
-      // The round settles and the scoreboard goes up. The player's own
-      // summary appears alongside it, because that is the moment they are
-      // reading what the round did.
+      /*
+       * The round settles and the results start. Nothing goes in front of
+       * them.
+       *
+       * There used to be a card here — "Round 4 complete", spend, support,
+       * seats led, districts held, heat — which arrived first and had to be
+       * dismissed by hand before anybody could see who had actually won
+       * anything. It was a summary of the round in front of the results of
+       * the round. The figures are all still computed and still on the money
+       * screen and the standings; what has gone is the interruption.
+       */
       CMP.campaign.endRound(game);
       game.intermissionLeft = CMP.campaign.intermissionLeft(game);
       CMP.storage.save(game);
-      if (electionView) {
-        electionView.render(game);
-        showSummary(game.summary);
-      }
+      if (electionView) electionView.render(game);
     }, 500);
   }
 
@@ -113,13 +117,6 @@ CMP.app = (function () {
       window.clearInterval(soloTimer);
       soloTimer = null;
     }
-  }
-
-  /** One summary per round, and never the same round twice. */
-  function showSummary(summary) {
-    if (!summary || summary.round === shownRound) return;
-    shownRound = summary.round;
-    if (electionView) electionView.showSummary(summary);
   }
 
   /**
@@ -341,9 +338,8 @@ CMP.app = (function () {
     if (screen === 'election' && electionView) {
       electionView.render(game, secondsFromServer());
 
-      // The server ends rounds, not us. When a round it finished shows up in
-      // our own record, that is the cue to say what it did.
-      if (mine && mine.summary) showSummary(mine.summary);
+      // The server ends rounds, not us. What it did is the results screen,
+      // which the render above puts up on its own.
     }
   }
 
@@ -582,7 +578,6 @@ CMP.app = (function () {
       stopSoloClock();
       if (electionView) electionView.stop();
       electionView = null;
-      shownRound = 0;
     }
     if (name !== 'result') resultView = null;
     if (name !== 'election' && name !== 'result') {

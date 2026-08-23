@@ -497,18 +497,26 @@
 .rr-skip:hover { color: var(--cream); border-color: var(--muted-2); }
 .rr-skip:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
 
-.rr-districts {
+/*
+ * The feed the districts arrive in.
+ *
+ * Newest at the top: a card is inserted above the one before it, which slides
+ * down and stays. The districts already declared remain on screen the way
+ * they would on a results programme, rather than each one replacing the last.
+ */
+.rr-feed {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 /*
- * A district arrives on its own, in order, from the top.
+ * A card arriving at the top of the feed.
  *
- * The duration and the gap between cards come from the script as custom
- * properties, so the wait that holds the screen open and the animation that
- * fills it cannot drift apart.
+ * It comes down from above and settles; the cards under it are pushed down by
+ * the layout, which is the movement the eye follows. The duration comes from
+ * the script as a custom property, so the timer that waits for it and the
+ * animation that fills the wait cannot drift apart.
  */
 .rr-district {
   display: flex;
@@ -518,12 +526,26 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--ink-2);
-  animation: rr-in var(--reveal-in, 620ms) cubic-bezier(0.16, 0.84, 0.3, 1) both;
+  animation: rr-in var(--reveal-in, 1500ms) cubic-bezier(0.16, 0.86, 0.28, 1) both;
 }
 @keyframes rr-in {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(-26px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
+
+/*
+ * The card at the top is the one being read; the ones under it are the
+ * record. They stay legible and stop competing for attention.
+ */
+.rr-feed .rr-district:not(:first-child) {
+  opacity: 0.72;
+  transform: scale(0.985);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+/* Everything the skip button flushes in arrives without the ceremony. */
+.rr-district.is-instant { animation: none; }
+.rr-district.is-instant .rr-runner-fill { animation: none; }
 
 .rr-district-head {
   display: flex;

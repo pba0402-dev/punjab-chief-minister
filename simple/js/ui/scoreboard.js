@@ -495,6 +495,7 @@ CMP.ui.scoreboard = (function () {
 
     function go(next) {
       stopAdvance();
+      stopReveal();
       stage = next;
       render();
 
@@ -516,32 +517,49 @@ CMP.ui.scoreboard = (function () {
     }
 
     /*
-     * How a result is counted out.
+     * How a result is read out.
      *
-     * A district takes about six-tenths of a second to arrive and the next
-     * one starts half a second later, which is the pace of a results
-     * programme reading them off: slow enough to look at each one, quick
-     * enough that a fifteen-district region does not become a wait.
+     * A card takes a second and a half to arrive at the top of the feed, and
+     * the one before it slides down and stays: the districts already declared
+     * remain on screen the way they would on a results programme, rather than
+     * each one replacing the last.
      *
-     * Both are read by the stylesheet as well, so the animation and the
-     * timing that waits for it cannot drift apart.
+     * It then holds long enough to actually read. A district name, four faces,
+     * four bars and four percentages is not something anybody takes in at half
+     * a second, which is what the first version of this gave it.
+     *
+     * The entrance is read by the stylesheet too, so the animation and the
+     * timer that waits for it cannot drift apart.
      */
-    var REVEAL_IN = 620;      // one card's entrance
-    var REVEAL_GAP = 520;     // and the pause before the next starts
+    var REVEAL_IN = 1500;      // a card arriving at the top
+    var REVEAL_HOLD = 2100;    // and how long before the next one starts
+    var REVEAL_STEP = REVEAL_IN + REVEAL_HOLD;
 
-    /** Districts arrive one at a time, so the dwell has to cover all of them. */
-    function revealTime(count) {
-      if (!count) return 0;
-      return (count - 1) * REVEAL_GAP + REVEAL_IN;
+    /*
+     * Where the feed has got to, and the timer walking it.
+     *
+     * Held out here rather than inside the render so a repaint — a poll
+     * landing, the clock ticking — carries on from where the reveal was
+     * instead of starting it again from the first district.
+     */
+    var feedNode = el('div', { class: 'rr-feed' });
+    var revealAt = 0;
+    var revealFor = null;
+    var revealTimer = null;
+
+    function stopReveal() {
+      if (revealTimer !== null) window.clearTimeout(revealTimer);
+      revealTimer = null;
     }
 
-    /** Long enough to watch the region counted out, and to read the last of it. */
+    /** Long enough to watch the region read out, and to take in the last of it. */
     function regionDwell(region) {
       var rows = regionRows(region).length;
-      // Capped, because a region of fifteen districts should not hold the
-      // game for fifteen seconds; past the cap the tail is still arriving
-      // and Skip is there for anybody who has seen enough.
-      return Math.min(14000, revealTime(rows) + 1800);
+      if (!rows) return 0;
+      // Capped: a fifteen-district region should not hold the game for a
+      // minute. Past the cap the rest of the feed is still arriving, and Skip
+      // is there for anybody who has seen enough.
+      return Math.min(26000, rows * REVEAL_STEP + 1400);
     }
 
     var LEADER_DWELL = 6000;
@@ -636,6 +654,9 @@ CMP.ui.scoreboard = (function () {
               type: 'button',
               text: 'Skip',
               onclick: function () {
+                // Finish reading this region out before leaving it, so a card
+                // caught mid-arrival is not simply dropped.
+                revealRest();
                 go('overall');
               },
             })
@@ -644,82 +665,28 @@ CMP.ui.scoreboard = (function () {
     }
 
     /** One region: its districts, and who is ahead in each. */
-    function regionScreen() {
+function regionScreen() {
       var region = CMP.getRegion ? CMP.getRegion(stage) : null;
       var rows = regionRows(stage);
       var after = nextStage(stage);
 
+      /*
+       * The feed the districts arrive in.
+       *
+       * Kept across repaints rather than rebuilt, so a poll landing or the
+       * clock ticking does not restart the reveal from the first district.
+       */
+      if (revealFor !== stage) {
+        revealFor = stage;
+        revealAt = 0;
+        mount(feedNode, []);
+      }
+      feedNode.style.setProperty('--reveal-in', REVEAL_IN + 'ms');
+      scheduleReveal(rows);
+
       return [
         resultsBar(region ? region.name : stage, 'Round ' + result.round + ' results'),
-
-        el('div', {
-          class: 'rr-districts',
-          // The pace, given to the stylesheet rather than duplicated in it.
-          style: {
-            '--reveal-in': REVEAL_IN + 'ms',
-            '--reveal-gap': REVEAL_GAP + 'ms',
-          },
-        }, rows.map(function (row, i) {
-          var top = row.rows[0];
-          return el('section', {
-            class: 'rr-district',
-            /*
-             * Counted out from the top, one at a time.
-             *
-             * Every district used to arrive within four hundred milliseconds
-             * of the one before it, capped at six — which is a page loading,
-             * not a result being read out. The delay is per district and
-             * uncapped, so the twelfth is genuinely the twelfth.
-             */
-            style: { animationDelay: i * REVEAL_GAP + 'ms' },
-          }, [
-            el('header', { class: 'rr-district-head' }, [
-              el('h3', { class: 'rr-district-name', text: row.district.name }),
-              el('span', {
-                class: 'rr-district-seats',
-                text: row.district.seats.length +
-                  (row.district.seats.length === 1 ? ' seat' : ' seats'),
-              }),
-            ]),
-
-            el('div', { class: 'rr-runners' }, row.rows.map(function (r, place) {
-              var party = partyOf(r.partyId);
-              var mine = opts.you && opts.you() === r.partyId;
-              return el('div', {
-                class: 'rr-runner' + (place === 0 ? ' is-first' : '') +
-                  (mine ? ' is-you' : ''),
-                // The bars fill after their own card has arrived, so a
-                // district reads as one thing settling rather than four.
-                style: {
-                  '--party': party.colour,
-                  '--runner-delay': (i * REVEAL_GAP + 180 + place * 90) + 'ms',
-                },
-              }, [
-                CMP.ui.portrait.render(avatarFor(r.partyId), 30, party.name),
-                el('span', { class: 'rr-runner-name', text: party.short }),
-                el('span', { class: 'rr-runner-track' }, [
-                  el('span', {
-                    class: 'rr-runner-fill',
-                    style: { width: Math.max(2, r.share) + '%' },
-                  }),
-                ]),
-                el('span', { class: 'rr-runner-share', text: r.share.toFixed(1) + '%' }),
-                r.won
-                  ? el('span', { class: 'rr-runner-won', text: '\u2713' + r.won })
-                  : null,
-              ]);
-            })),
-
-            top
-              ? el('p', {
-                  class: 'rr-district-lead',
-                  style: { '--party': partyOf(top.partyId).colour },
-                  text: partyOf(top.partyId).short + ' leading',
-                })
-              : null,
-          ]);
-        })),
-
+        feedNode,
         el('button', {
           class: 'btn btn-primary btn-wide',
           type: 'button',
@@ -731,6 +698,101 @@ CMP.ui.scoreboard = (function () {
       ];
     }
 
+    /**
+     * Read the next district out, then queue the one after it.
+     *
+     * Newest at the top: the card that just arrived is inserted above the one
+     * before it, which slides down and stays. The districts already declared
+     * remain on screen the way they would on a results programme, rather than
+     * each one replacing the last.
+     */
+    function scheduleReveal(rows) {
+      stopReveal();
+      if (revealAt >= rows.length) return;
+
+      var next = function () {
+        revealTimer = null;
+        if (revealFor !== stage || revealAt >= rows.length) return;
+
+        var card = districtCard(rows[revealAt], revealAt);
+        revealAt += 1;
+        if (feedNode.firstChild) feedNode.insertBefore(card, feedNode.firstChild);
+        else feedNode.appendChild(card);
+
+        scheduleReveal(rows);
+      };
+
+      // The first arrives at once; the rest wait their turn.
+      if (revealAt === 0) next();
+      else revealTimer = window.setTimeout(next, REVEAL_STEP);
+    }
+
+    /** Everything left to read out, at once. Used when somebody skips. */
+    function revealRest() {
+      stopReveal();
+      var rows = regionRows(stage);
+      while (revealAt < rows.length) {
+        var card = districtCard(rows[revealAt], revealAt);
+        card.classList.add('is-instant');
+        revealAt += 1;
+        if (feedNode.firstChild) feedNode.insertBefore(card, feedNode.firstChild);
+        else feedNode.appendChild(card);
+      }
+    }
+
+    /** One district: who is ahead in it, by how much, and where it stands. */
+    function districtCard(row, i) {
+      var top = row.rows[0];
+
+      return el('section', { class: 'rr-district' }, [
+        el('header', { class: 'rr-district-head' }, [
+          el('h3', { class: 'rr-district-name', text: row.district.name }),
+          el('span', {
+            class: 'rr-district-seats',
+            text: row.district.seats.length +
+              (row.district.seats.length === 1 ? ' seat' : ' seats'),
+          }),
+        ]),
+
+        el('div', { class: 'rr-runners' }, row.rows.map(function (r, place) {
+          var party = partyOf(r.partyId);
+          var mine = opts.you && opts.you() === r.partyId;
+          return el('div', {
+            class: 'rr-runner' + (place === 0 ? ' is-first' : '') +
+              (mine ? ' is-you' : ''),
+            // The bars fill after their own card has settled, so a district
+            // reads as one thing arriving rather than four racing.
+            style: {
+              '--party': party.colour,
+              '--runner-delay': (REVEAL_IN * 0.45 + place * 140) + 'ms',
+            },
+          }, [
+            CMP.ui.portrait.render(avatarFor(r.partyId), 34, party.name),
+            el('span', { class: 'rr-runner-name', text: party.short }),
+            el('span', { class: 'rr-runner-track' }, [
+              el('span', {
+                class: 'rr-runner-fill',
+                style: { width: Math.max(2, r.share) + '%' },
+              }),
+            ]),
+            el('span', { class: 'rr-runner-share', text: r.share.toFixed(1) + '%' }),
+            r.won
+              ? el('span', { class: 'rr-runner-won', text: '\u2713' + r.won })
+              : null,
+          ]);
+        })),
+
+        top
+          ? el('p', {
+              class: 'rr-district-lead',
+              style: { '--party': partyOf(top.partyId).colour },
+              text: partyOf(top.partyId).short + ' leading',
+            })
+          : null,
+      ]);
+    }
+
+    
     /**
      * Who is leading, and nothing else.
      *
@@ -1012,7 +1074,12 @@ CMP.ui.scoreboard = (function () {
       mount(root, stage === 'overall' ? overallScreen() : regionScreen());
     }
 
-    return { root: root, render: render, stop: stopAdvance };
+    function stop() {
+      stopAdvance();
+      stopReveal();
+    }
+
+    return { root: root, render: render, stop: stop };
   }
 
   return {

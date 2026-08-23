@@ -112,7 +112,6 @@ CMP.ui.election = (function () {
     var noticeNode = el('div', { class: 'g-notice' });
     var bodyNode = el('div', { class: 'g-body' });
     var resultsNode = el('div', { class: 'g-results' });
-    var summaryNode = el('div', { class: 'summary-slot' });
 
     var roundView = CMP.ui.round.create({
       readyCount: function () {
@@ -261,7 +260,6 @@ CMP.ui.election = (function () {
         navNode,
         roundNode,
         noticeNode,
-        summaryNode,
         resultsNode,
         bodyNode,
       ]),
@@ -342,6 +340,9 @@ CMP.ui.election = (function () {
       openSeat = null;
       if (next === 'areas' && !openParty) openParty = game.partyId;
       if (next !== 'areas') openParty = null;
+      // The bar has to follow the view. Every route into a section comes
+      // through here, so this is the one place that has to remember.
+      paintNav();
       paintBody();
     }
 
@@ -357,6 +358,7 @@ CMP.ui.election = (function () {
       openParty = partyId;
       openSeat = null;
       section = 'candidate';
+      paintNav();
       paintBody();
       toTop();
     }
@@ -365,6 +367,7 @@ CMP.ui.election = (function () {
       openParty = partyId;
       openSeat = null;
       section = 'areas';
+      paintNav();
       paintBody();
       toTop();
     }
@@ -459,9 +462,24 @@ CMP.ui.election = (function () {
       { id: 'loan', label: 'Loan', glyph: '\u25d1' },
     ];
 
+    /**
+     * Which tab the current view belongs to.
+     *
+     * The four are destinations; everything else — a candidate, their seats,
+     * the money ledger, all 117 — is somewhere you got to from the board, so
+     * Home stays lit while you are down there. Exactly one is always on.
+     */
+    function navFor(current) {
+      for (var i = 0; i < NAV.length; i++) {
+        if (NAV[i].id === current) return current;
+      }
+      return 'home';
+    }
+
     function paintNav() {
+      var here = navFor(section);
       mount(navNode, NAV.map(function (item) {
-        var on = section === item.id;
+        var on = here === item.id;
         return el('button', {
           class: 'g-nav-item' + (on ? ' is-on' : ''),
           type: 'button',
@@ -2367,10 +2385,6 @@ CMP.ui.election = (function () {
     return {
       root: root,
       render: render,
-      showSummary: function (summary) {
-        var card = CMP.ui.round.summary(game, summary);
-        mount(summaryNode, card ? [card] : []);
-      },
       stop: function () {
         roundView.stop();
       },

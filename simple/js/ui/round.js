@@ -398,147 +398,20 @@ CMP.ui.round = (function () {
     ]);
   }
 
-  /* ---------------------------------------------------- round summary */
-
-  /**
-   * What the round did to you, shown when a round turns over so a changed
-   * number always comes with a reason.
+  /*
+   * The round summary card used to be built here.
    *
-   * It sits in the page rather than over it. The next round is already
-   * running by the time this appears, and a modal that had to be dismissed
-   * would spend a player's seconds for them.
+   * "Round 4 complete", spend, support, seats led, districts held, heat — it
+   * arrived in front of the results and had to be dismissed by hand before
+   * anybody could see who had won anything. A summary of the round, ahead of
+   * the results of the round.
+   *
+   * Every figure in it is still computed and still stored on the game: the
+   * money screen shows the spending and the standings show the seats. What
+   * has gone is the interruption.
    */
-  function summary(game, s, onClose) {
-    if (!s) return null;
 
-    function delta(value, suffix, invert) {
-      var good = invert ? value < 0 : value > 0;
-      var bad = invert ? value > 0 : value < 0;
-      var sign = value > 0 ? '+' : '';
-      return el('span', {
-        class: 'sum-delta' + (good ? ' is-good' : bad ? ' is-bad' : ''),
-        text: sign + (Math.round(value * 10) / 10) + (suffix || ''),
-      });
-    }
-
-    function row(label, value, change) {
-      return el('div', { class: 'sum-row' }, [
-        el('span', { class: 'sum-label', text: label }),
-        el('span', { class: 'sum-value' }, [value, change || null]),
-      ]);
-    }
-
-    var card = el('div', { class: 'summary-card', role: 'status' }, [
-      el('div', { class: 'summary-head' }, [
-        el('div', {}, [
-          el('span', { class: 'dialog-eyebrow', text: 'Round ' + s.round + ' complete' }),
-          el('h2', {
-            class: 'summary-title',
-            text: s.seatsChange > 0
-              ? 'A good round'
-              : s.seatsChange < 0
-                ? 'Ground lost'
-                : 'The board holds',
-          }),
-        ]),
-        el('button', {
-          class: 'summary-close',
-          type: 'button',
-          'aria-label': 'Dismiss the round summary',
-          text: '×',
-          onclick: function () {
-            dismiss();
-          },
-        }),
-      ]),
-
-      el('div', { class: 'sum-grid' }, [
-        row('Money spent', el('strong', { text: money.words(s.spent) || '₹0' })),
-        row('Money raised', el('strong', { text: money.words(s.gained) || '₹0' })),
-        row('Cash in hand', el('strong', { text: money.words(s.cashAfter) || '₹0' }),
-          s.cashChange ? delta(s.cashChange / 100000, 'L') : null),
-        s.debtAfter
-          ? row('Debt outstanding', el('strong', { class: 'is-debt', text: money.words(s.debtAfter) }))
-          : null,
-        row('Average support', el('strong', { text: (s.supportAfter || 0).toFixed(1) + '%' }),
-          delta(s.supportChange || 0, '%')),
-        row('Seats led', el('strong', { text: String(s.seatsAfter) }),
-          delta(s.seatsChange || 0)),
-
-        // Territory changes hands slowly and pays every round it stays, so
-        // the round it moves is the round worth telling somebody about.
-        typeof s.districtsAfter === 'number'
-          ? row('Districts held', el('strong', { text: String(s.districtsAfter) }),
-              delta(s.districtsChange || 0))
-          : null,
-        s.grantIncome
-          ? row('Grant income', el('strong', { class: 'is-grant', text: money.words(s.grantIncome) }),
-              el('span', { class: 'sum-change', text: 'a round' }))
-          : null,
-
-        row('Political heat', el('strong', { text: String(Math.round(s.heatAfter || 0)) }),
-          delta(s.heatChange || 0, '', true)),
-      ]),
-
-      (s.repayments || []).length
-        ? el('div', { class: 'sum-block' }, [
-            el('h3', { class: 'sum-block-title', text: 'The bank' }),
-            el(
-              'ul',
-              { class: 'sum-list' },
-              s.repayments.map(function (r) {
-                return el('li', { class: r.defaulted ? 'is-bad' : '' }, [
-                  el('strong', { text: r.defaulted ? 'Default. ' : 'Repaid. ' }),
-                  r.text +
-                    (r.defaulted
-                      ? ' Short by ' + money.words(r.shortfall) + '.'
-                      : ' ' + money.words(r.paid) + ' including ' + money.words(r.interest) + ' interest.'),
-                ]);
-              })
-            ),
-          ])
-        : null,
-
-      (s.events || []).length
-        ? el('div', { class: 'sum-block' }, [
-            el('h3', { class: 'sum-block-title', text: 'This round' }),
-            el(
-              'ul',
-              { class: 'sum-list' },
-              s.events.map(function (e) {
-                return el('li', { class: e.kind === 'bad' ? 'is-bad' : 'is-good' }, [
-                  el('strong', { text: e.label + '. ' }),
-                  e.text,
-                  e.seats && e.seats.length
-                    ? el('span', { class: 'sum-seats', text: ' ' + seatNames(e.seats) })
-                    : null,
-                ]);
-              })
-            ),
-          ])
-        : null,
-    ]);
-
-    function dismiss() {
-      if (card.parentNode) card.parentNode.removeChild(card);
-      if (onClose) onClose();
-    }
-
-    return card;
-  }
-
-  function seatNames(numbers) {
-    var names = numbers.slice(0, 3).map(function (n) {
-      for (var i = 0; i < CMP.CONSTITUENCIES.length; i++) {
-        if (CMP.CONSTITUENCIES[i].number === Number(n)) return CMP.CONSTITUENCIES[i].name;
-      }
-      return '#' + n;
-    });
-    if (numbers.length > 3) names.push('and ' + (numbers.length - 3) + ' more');
-    return names.join(', ');
-  }
-
-  return { create: create, projection: projection, summary: summary };
+  return { create: create, projection: projection };
 })();
 
 /* ------------------------------------------------------------- the bank */

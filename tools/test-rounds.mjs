@@ -423,7 +423,7 @@ let desyncs = 0;
 let roundsSeen = 0;
 let checkpoint = null;
 let checkpointAgreed = false;
-let summariesSeen = 0;
+let summaryCards = 0;
 let boardsSeen = 0;
 let lockFailures = 0;
 let newLeaders = 0;
@@ -542,7 +542,9 @@ for (let round = 1; round <= 20; round++) {
   }
 
   roundsSeen++;
-  if (clients.some((c) => !!c.q('.summary-card'))) summariesSeen++;
+  // Nothing goes in front of the results any more: the round summary card
+  // used to arrive first and had to be dismissed by hand.
+  if (clients.some((c) => !!c.q('.summary-card'))) summaryCards++;
   const lastBoard = host.game().lastResult;
   if (lastBoard && lastBoard.newLeader) newLeaders++;
   if (lastBoard && !Object.keys(openingSeeds).length) {
@@ -588,7 +590,14 @@ if (checkpoint && checkpoint.eliminated) {
     JSON.stringify(row && { party: row.party, eliminated: row.eliminated, seats: row.seats }));
 }
 check('all four clients stayed in step throughout', desyncs === 0, desyncs + ' rounds out of step');
-check('round summaries were shown', summariesSeen > 0, summariesSeen + ' rounds reported');
+check('no summary card came in front of the results',
+  summaryCards === 0, summaryCards + ' rounds interrupted');
+check('and the rounds still recorded what they did',
+  clients.every((c) => {
+    const g = c.game();
+    return !g.summary || typeof g.summary.round === 'number';
+  }),
+  JSON.stringify(clients.map((c) => (c.game().summary || {}).round)));
 check('the scoreboard appeared between rounds', boardsSeen >= roundsSeen - 1,
   boardsSeen + ' of ' + roundsSeen + ' breaks');
 check('nobody could act while the round was being counted', lockFailures === 0,
