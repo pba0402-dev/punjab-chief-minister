@@ -464,6 +464,12 @@ CMP.app = (function () {
       });
     } else if (screen === 'profile') {
       view = CMP.ui.profile.render({
+        // A player who has just deleted themselves has no profile to go back
+        // to, so they go to the opening screen as a new arrival would.
+        onDeleted: function () {
+          game = null;
+          goTo('home');
+        },
         onBack: function () {
           goTo('home');
         },

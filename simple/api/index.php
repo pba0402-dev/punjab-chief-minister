@@ -1236,6 +1236,30 @@ switch (route()) {
         ]);
     }
 
+    /* --------------------------------------------------- delete a profile */
+    case 'deleteprofile': {
+        /*
+         * A player deleting their own record.
+         *
+         * There are no accounts and no passwords here, so what proves the
+         * request is knowing the id — which only the browser that created it
+         * has. That is the same proof every other profile call uses.
+         *
+         * The elections that profile played are not touched: an election is a
+         * shared record between four people, and rewriting it would rewrite
+         * everybody else's game.
+         */
+        $id = Profiles::cleanId((string) input('profileId', ''));
+        if ($id === '') {
+            fail('No profile id.', 400, 'bad_profile');
+        }
+        $gone = $profiles->deleteProfile($id);
+        if (!$gone) {
+            fail('That profile could not be deleted.', 500, 'delete_failed');
+        }
+        send(['ok' => true, 'deleted' => true]);
+    }
+
     /* ------------------------------------------------------------ record */
     case 'record': {
         // A solo game runs in the browser, so this is the player's own account

@@ -853,3 +853,91 @@
   border: 2px solid var(--ink);
   background: var(--wheat);
 }
+
+/* ------------------------------------------ who stands where, on the panel */
+
+/*
+ * A face, a bar and a share. It was a rank, an abbreviation and a percentage
+ * — three columns of text for the one thing this panel is opened to find out.
+ */
+.cs-positions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-position {
+  display: grid;
+  grid-template-columns: 28px 42px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+.cs-position .portrait { border: 1px solid var(--party); }
+.cs-position-party {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-position.is-first .cs-position-party { color: var(--party); }
+.cs-position.is-you .cs-position-party {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cs-position-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.cs-position-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--party);
+}
+.cs-position:not(.is-first) .cs-position-fill { opacity: 0.6; }
+.cs-position-share {
+  text-align: right;
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cs-position.is-first .cs-position-share { color: var(--cream); }
+.cs-position-tag { display: none; }
+
+/*
+ * Four counts rather than a paragraph: what there is, what is yours, what
+ * somebody else holds, and what nobody has been to.
+ */
+.cs-district {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.cs-district-fig { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cs-district-value {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+}
+.cs-district-fig.is-mine .cs-district-value { color: var(--wheat); }
+.cs-district-fig.is-open .cs-district-value { color: var(--river); }
+.cs-district-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}

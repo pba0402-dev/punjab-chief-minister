@@ -1,0 +1,77 @@
+/* ------------------------------------------------------------------
+   The privacy, terms and support pages.
+
+   These load without the game, so they carry their own layout rather than
+   relying on anything the game screens set up.
+   ------------------------------------------------------------------ */
+
+.legal {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  padding: 26px 20px 64px;
+  color: var(--cream);
+  font-family: var(--font);
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.legal-back {
+  display: inline-block;
+  margin-bottom: 22px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+}
+.legal-back:hover { color: var(--wheat); }
+
+.legal h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.legal-sub {
+  margin: 6px 0 24px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+
+/* The first paragraph answers the question people arrived with. */
+.legal-lede {
+  margin: 0 0 26px;
+  padding: 15px 17px;
+  border-left: 3px solid var(--wheat);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--ink-2);
+  font-size: 1rem;
+}
+
+.legal h2 {
+  margin: 30px 0 8px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.legal p { margin: 0 0 12px; color: var(--muted); }
+.legal p strong { color: var(--cream); }
+.legal ul { margin: 0 0 14px; padding-left: 20px; color: var(--muted); }
+.legal li { margin-bottom: 5px; }
+.legal a { color: var(--river); }
+
+.legal-date {
+  margin-top: 34px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.76rem;
+  color: var(--muted-2);
+}

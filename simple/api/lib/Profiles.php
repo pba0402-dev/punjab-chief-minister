@@ -386,6 +386,33 @@ final class Profiles
         ];
     }
 
+    /**
+     * Delete a profile, for good.
+     *
+     * The file goes. What does not go is the games it played: an election is
+     * a shared record between four people, and removing one player's rows
+     * from it would rewrite everybody else's game. The counters are totals
+     * with no identifiers in them and are left alone for the same reason a
+     * shop does not un-count a sale when a customer closes their account.
+     *
+     * Returns true when there is nothing left to delete, which includes the
+     * case where there never was anything — a caller asking twice should not
+     * get an error the second time.
+     */
+    public function deleteProfile(string $id): bool
+    {
+        $id = self::cleanId($id);
+        if ($id === '') {
+            return false;
+        }
+
+        $file = $this->dir . '/' . $id . '.json';
+        if (!is_file($file)) {
+            return true;
+        }
+        return @unlink($file) || !is_file($file);
+    }
+
     /* ------------------------------------------------- global counters */
 
     private function countersPath(): string

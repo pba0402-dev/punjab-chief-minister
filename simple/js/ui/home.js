@@ -106,6 +106,16 @@ CMP.ui.home = (function () {
           card('My Profile', 'Your record, your face and your name',
             opts.onProfile, 'is-quiet'),
         ]),
+
+        /*
+         * The three pages a store review and a privacy request both need to
+         * be able to find. Small, at the foot, and always there.
+         */
+        el('footer', { class: 'h-foot' }, [
+          el('a', { class: 'h-foot-link', href: 'privacy.html', text: 'Privacy' }),
+          el('a', { class: 'h-foot-link', href: 'terms.html', text: 'Terms' }),
+          el('a', { class: 'h-foot-link', href: 'support.html', text: 'Support' }),
+        ]),
       ]),
     ]);
 

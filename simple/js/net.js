@@ -236,6 +236,17 @@ CMP.net = (function () {
     return request('stats', {}, 'GET');
   }
 
+  /**
+   * Delete a profile from the server, for good.
+   *
+   * There are no accounts here, so knowing the id is what proves the request
+   * — it is the same proof every other profile call uses, and only the
+   * browser that made it has it.
+   */
+  function deleteProfile(profileId) {
+    return request('deleteProfile', { profileId: profileId });
+  }
+
   /** Fetch a profile, creating it on first contact. */
   function profile(profileId, name, avatar) {
     return request('profile', {
@@ -393,6 +404,7 @@ CMP.net = (function () {
     state: state,
     setParty: setParty,
     setDetails: setDetails,
+    deleteProfile: deleteProfile,
     playAction: playAction,
     loanQuote: loanQuote,
     takeLoan: takeLoan,

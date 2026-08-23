@@ -481,6 +481,45 @@ check('lifetime totals are stored apart from the daily log',
   fs.existsSync(path.join(DATA, 'analytics', 'totals.json')),
   fs.readdirSync(path.join(DATA, 'analytics')).join(', '));
 
+section('Deleting a profile');
+
+/*
+ * A delete control that does not delete is worse than no control at all: it
+ * is a promise the app cannot keep, and the sort of thing an App Store review
+ * checks by hand. So this deletes one and then goes looking for the file.
+ */
+const GONE_ID = 'f0e1d2c3b4a59687';
+await call('profile', { profileId: GONE_ID, name: 'Leaving Player', avatar: 'a2' });
+
+const profileDir = path.join(DATA, 'profiles');
+const fileFor = (id) => path.join(profileDir, id + '.json');
+
+check('the profile was created', fs.existsSync(fileFor(GONE_ID)),
+  fs.existsSync(profileDir) ? fs.readdirSync(profileDir).join(', ') : 'no directory');
+
+const del = await call('deleteProfile', { profileId: GONE_ID });
+check('deleting it succeeds', del.ok === true && del.deleted === true,
+  JSON.stringify(del));
+check('and the file is actually gone', !fs.existsSync(fileFor(GONE_ID)),
+  fs.readdirSync(profileDir).join(', '));
+
+// Asking again is not an error: a client that retries should not be punished.
+const again = await call('deleteProfile', { profileId: GONE_ID });
+check('deleting it twice is not an error', again.ok === true, JSON.stringify(again));
+
+// And it cannot be used to delete something that is not a profile id.
+const bad = await call('deleteProfile', { profileId: '../counters' });
+check('a malformed id is refused rather than obeyed',
+  bad.ok !== true, JSON.stringify(bad).slice(0, 120));
+check('and the counters are untouched',
+  fs.existsSync(path.join(DATA, 'counters.json')));
+
+// The elections that profile played are left alone: an election is a shared
+// record between four people.
+check('games are not deleted with a profile',
+  fs.readdirSync(DATA).some((f) => f.startsWith('game-')),
+  fs.readdirSync(DATA).join(', '));
+
 section('Server log');
 check('no PHP warnings or fatals', phpErrors.length === 0, phpErrors.slice(0, 2).join(' | '));
 

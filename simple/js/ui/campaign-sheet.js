@@ -216,23 +216,85 @@ CMP.ui.campaignSheet = (function () {
         return def ? 'AC ' + def.number + ' · ' + def.district : '';
       }
 
-      /** Who stands where, or that nobody has been here. */
+      /**
+       * Who stands where, with a face and a bar each.
+       *
+       * It was a rank, an abbreviation and a percentage — three columns of
+       * text for the one thing a player looks at this panel to find out. A
+       * face says who without being read, and a bar says by how much without
+       * being compared.
+       */
       function positions() {
         var rows = standing();
         if (!rows.length) {
           return el('p', { class: 'cs-open', text: 'Nobody has campaigned here yet.' });
         }
+
+        var most = Math.max(1, rows[0].support);
+        var people = opts.players || [];
+
         return el('ol', { class: 'cs-positions' }, rows.slice(0, 4).map(function (row, i) {
           var party = CMP.getParty(row.partyId);
+          var who = people.filter(function (r) {
+            return r.partyId === row.partyId;
+          })[0];
+
           return el('li', {
-            class: 'cs-position' + (row.partyId === game.partyId ? ' is-you' : ''),
+            class: 'cs-position' + (row.partyId === game.partyId ? ' is-you' : '') +
+              (i === 0 ? ' is-first' : ''),
             style: { '--party': party.colour },
           }, [
-            el('span', { class: 'cs-position-rank', text: String(i + 1) }),
+            CMP.ui.portrait.render(who && who.avatar, 28, party.name),
             el('span', { class: 'cs-position-party', text: party.short }),
+            el('span', { class: 'cs-position-track' }, [
+              el('span', {
+                class: 'cs-position-fill',
+                style: { width: Math.max(3, (row.support / most) * 100) + '%' },
+              }),
+            ]),
             el('span', { class: 'cs-position-share', text: row.support.toFixed(1) + '%' }),
+            i === 0 ? el('span', { class: 'cs-position-tag', text: 'Leading' }) : null,
           ]);
         }));
+      }
+
+      /**
+       * How the district stands, when the district is what is being targeted.
+       *
+       * Four counts rather than a paragraph: what there is, what is yours,
+       * what somebody else holds, and what nobody has been to. It is the
+       * shape of the decision — a district with four open seats is a
+       * different proposition from one with four contested ones.
+       */
+      function districtSummary() {
+        if (target !== 'district' || !district) return null;
+
+        var won = game.wonSeats || {};
+        var leaders = CMP.campaign.currentLeaders(game.support);
+        var mine = 0;
+        var theirs = 0;
+        var open = 0;
+
+        district.seats.forEach(function (n) {
+          var owner = (won[String(n)] || {}).party || leaders[n];
+          if (!owner) open += 1;
+          else if (owner === game.partyId) mine += 1;
+          else theirs += 1;
+        });
+
+        return el('div', { class: 'cs-district' }, [
+          fig(String(district.seats.length), 'Seats'),
+          fig(String(mine), 'Yours', mine ? 'is-mine' : null),
+          fig(String(theirs), 'Rivals'),
+          fig(String(open), 'Open', open ? 'is-open' : null),
+        ]);
+      }
+
+      function fig(value, label, cls) {
+        return el('div', { class: 'cs-district-fig' + (cls ? ' ' + cls : '') }, [
+          el('strong', { class: 'cs-district-value', text: value }),
+          el('span', { class: 'cs-district-label', text: label }),
+        ]);
       }
 
       /** Seats in this district already finished, if any. */
@@ -384,6 +446,7 @@ CMP.ui.campaignSheet = (function () {
 
         mount(body, [
           head(),
+          districtSummary(),
           positions(),
           wonNote(),
           targetToggle(),

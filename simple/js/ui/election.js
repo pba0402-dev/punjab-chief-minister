@@ -2265,6 +2265,8 @@ CMP.ui.election = (function () {
       CMP.ui.campaignSheet
         .open(game, seat, {
           district: districtId || CMP.campaign.areaOf(seat),
+          // So the standings can show a face rather than an abbreviation.
+          players: roster(),
           /*
            * The board follows the panel.
            *

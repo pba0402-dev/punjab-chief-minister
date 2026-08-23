@@ -749,3 +749,20 @@
   .h-card.is-primary .h-card-label { font-size: 1.34rem; }
   .h-card-label { font-size: 1.18rem; }
 }
+
+/* The three pages a store review and a privacy request both need to find. */
+.h-foot {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding-top: 6px;
+}
+.h-foot-link {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  text-decoration: none;
+}
+.h-foot-link:hover { color: var(--wheat); }

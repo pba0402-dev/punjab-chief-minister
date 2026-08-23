@@ -270,7 +270,64 @@ CMP.ui.profile = (function () {
               })),
             ])
           : null,
+
+        /*
+         * Settings, and the one that cannot be undone.
+         *
+         * There is no account here — no email, no password — so "delete my
+         * account" is the profile file on the server and everything this
+         * browser kept. It asks first, and it says what it will and will not
+         * remove, because an election is a shared record between four people
+         * and taking one player's rows out of it would rewrite everybody
+         * else's game.
+         */
+        el('section', { class: 'pf-block pf-danger' }, [
+          el('h2', { class: 'h-block-title', text: 'Settings' }),
+          el('button', {
+            class: 'btn btn-quiet btn-wide',
+            type: 'button',
+            text: 'Delete my profile',
+            onclick: function () {
+              confirmDelete();
+            },
+          }),
+          el('p', {
+            class: 'h-note',
+            text: 'Removes your name, your face and your record from the ' +
+              'server, and everything this browser has kept. Elections you ' +
+              'played stay as they are, because other people played them too.',
+          }),
+        ]),
       ]);
+    }
+
+    /** Ask, then actually delete. */
+    function confirmDelete() {
+      CMP.ui.dialog
+        .confirm({
+          title: 'Delete your profile?',
+          body: 'Your name, your face and your record will be removed from ' +
+            'the server, and this browser will forget you. This cannot be ' +
+            'undone.',
+          confirmLabel: 'Delete my profile',
+          danger: true,
+        })
+        .then(function (yes) {
+          if (!yes) return;
+          CMP.profile.erase().then(function (res) {
+            if (res && res.ok) {
+              if (opts.onDeleted) opts.onDeleted();
+              else if (opts.onBack) opts.onBack();
+              return;
+            }
+            CMP.ui.dialog.confirm({
+              title: 'Not deleted',
+              body: (res && res.error) ||
+                'Your profile could not be deleted. Nothing has been removed.',
+              confirmLabel: 'Close',
+            });
+          });
+        });
     }
 
     paint(CMP.profile.stats());

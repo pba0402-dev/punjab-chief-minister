@@ -197,6 +197,59 @@ CMP.profile = (function () {
     remote = null;
   }
 
+  /**
+   * Delete everything about this player, here and on the server.
+   *
+   * The server file goes first: if that fails there is no point forgetting
+   * the id locally, because it would leave a record nobody can ever reach to
+   * delete. Once it is gone, so is everything this browser kept — the
+   * profile, the saved game, and the multiplayer session.
+   */
+  function erase() {
+    var me = get();
+    if (!me || !me.id) {
+      clearLocal();
+      return Promise.resolve({ ok: true, deleted: false });
+    }
+
+    return CMP.net.deleteProfile(me.id).then(function (res) {
+      if (res && res.ok) {
+        clearLocal();
+        return { ok: true, deleted: true };
+      }
+      return {
+    erase: erase,
+        ok: false,
+        error: (res && res.error) ||
+          'Your profile could not be deleted. Nothing has been removed.',
+      };
+    });
+  }
+
+  /** Everything this browser remembers about the player. */
+  function clearLocal() {
+    local = null;
+    remote = null;
+    try {
+      window.localStorage.removeItem(KEY);
+    } catch (e) {
+      /* nothing stored is nothing to remove */
+    }
+    if (CMP.storage && CMP.storage.clear) CMP.storage.clear();
+    try {
+      window.localStorage.removeItem('cmp.punjab.session.v1');
+    } catch (e) {
+      /* likewise */
+    }
+    listeners.forEach(function (fn) {
+      try {
+        fn(null);
+      } catch (e) {
+        /* one bad listener does not stop the others */
+      }
+    });
+  }
+
   return {
     get: read,
     forget: forget,

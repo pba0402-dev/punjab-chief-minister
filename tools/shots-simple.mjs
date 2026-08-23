@@ -292,6 +292,31 @@ const SCENES = {
     "  window.scrollTo(0,700);" +
     "},250);",
 
+  /*
+   * The district panel over a board with a campaign behind it, so the
+   * standings have faces and real bars in them.
+   */
+  'map-district-panel':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front'," +
+    "  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});" +
+    "for(var r=0;r<8;r++){" +
+    "  for(var m=0;m<6;m++){" +
+    "    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1," +
+    "      {outcome:0.35,consequence:0.99,consequencePick:0.5});" +
+    "  }" +
+    "  CMP.campaign.endRound(g);CMP.campaign.startNextRound(g);" +
+    "}" +
+    "g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var c=document.querySelector('.map-cell[data-seat=\"95\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "  setTimeout(function(){" +
+    "    var b=[].slice.call(document.querySelectorAll('.cs-target .term-option'))" +
+    "      .filter(function(x){return x.textContent==='District';})[0];" +
+    "    if(b)b.click();" +
+    "  },80);" +
+    "},250);",
+
   'home-saved':
     "CMP.storage.save(CMP.state.startElection({partyName:'Punjab Development Party',partyShort:'PDP'," +
     "candidateName:'Simran Kaur Gill',slogan:'Naya Punjab, Sacha Punjab'," +
