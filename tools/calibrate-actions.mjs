@@ -42,7 +42,9 @@ function loadEngine() {
   const win = dom.window;
   for (const f of [
     'js/data/parties.js', 'js/data/assets.js', 'js/data/asset-map.js',
-    'js/data/avatars.js', 'js/data/constituencies.js',
+    'js/data/avatars.js',
+  'js/data/candidates.js',
+  'js/data/grants-config.js', 'js/data/constituencies.js',
     'js/data/regions.js', 'js/data/actions.js', 'js/engine/rng.js',
     'js/engine/campaign.js', 'js/engine/ai.js', 'js/state.js',
   ]) {

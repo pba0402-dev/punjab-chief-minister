@@ -1915,6 +1915,31 @@ CMP.campaign = (function () {
     return { ok: true, report: record };
   }
 
+  /**
+   * How much a campaign here is worth to this candidate.
+   *
+   * The one place the candidate's regional support touches the board. A
+   * candidate strong in Malwa gets more out of every rupee spent in Malwa and
+   * less out of one spent where they are weak, which is what makes "where is
+   * my candidate strong" and "where is my money worth more" the same
+   * question — and the reason the setup screen shows it before an election
+   * starts rather than after.
+   *
+   * It applies to whoever is campaigning, player or opponent, because an
+   * advantage only one side can have is not an advantage, it is a handicap on
+   * the other three. See js/data/candidates.js for the numbers and the swing.
+   *
+   * Anything missing is neutral. A game saved before candidates had stats, an
+   * opponent dealt a face from a future list, a seat outside every region —
+   * all of them multiply by one rather than by a guess.
+   */
+  function regionalWeight(game, number) {
+    if (!CMP.regionalMultiplier || !CMP.regionOfSeat) return 1;
+    var region = CMP.regionOfSeat(Number(number));
+    if (!region) return 1;
+    return CMP.regionalMultiplier(game.avatar, region);
+  }
+
   /** Move support in the target seat, keeping every seat normalised to 100. */
   function applySupport(game, number, outcome) {
     var applied = { player: 0, opponent: 0 };
@@ -1923,7 +1948,8 @@ CMP.campaign = (function () {
     var support = game.support[number];
 
     if (outcome.support) {
-      applied.player = shift(support, game.partyId, outcome.support);
+      applied.player = shift(support, game.partyId,
+        outcome.support * regionalWeight(game, number));
     }
     if (outcome.opponentSupport) {
       // Aim at whoever is actually ahead of the player in this seat.
@@ -2356,6 +2382,7 @@ CMP.campaign = (function () {
     isContested: isContested,
     seatBids: seatBids,
     seatStatus: seatStatus,
+    regionalWeight: regionalWeight,
     shareOf: shareOf,
     reviewField: reviewField,
     weightedPick: weightedPick,

@@ -1,0 +1,377 @@
+/* ------------------------------------------------------------------
+   Founding a party, in four steps.
+
+   The candidate is the only choice on this screen with consequences, so it
+   gets the room: large cards in a rail you swipe, and underneath them the
+   four measures and the three regions that decide where the money is worth
+   spending. Everything after it is identity, and identity is a short form.
+   ------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------- the stepper */
+
+.setup-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.setup-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding-top: 10px;
+  border-top: 2px solid var(--rule);
+  text-align: center;
+}
+.setup-step.is-on { border-top-color: var(--gold); }
+.setup-step.is-done { border-top-color: var(--blue); }
+
+.setup-step-no {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--navy-3);
+  font-variant-numeric: tabular-nums;
+}
+.setup-step.is-on .setup-step-no {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #fffdf6;
+}
+.setup-step.is-done .setup-step-no {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.setup-step-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+  line-height: 1.2;
+}
+.setup-step.is-on .setup-step-label { color: var(--navy); }
+
+/* Under about 380px the labels stop fitting and the numbers carry it. */
+@media (max-width: 379px) {
+  .setup-step-label { display: none; }
+  .setup-step { padding-top: 8px; }
+}
+
+/* ------------------------------------------------------- playing as ... */
+
+/*
+ * Said once, quietly.
+ *
+ * A returning player's name is already known, so this is a fact rather than a
+ * field — and it appeared three times on the old screen, which made it read
+ * as something the game kept needing to check.
+ */
+.setup-playing {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 4px;
+  padding: 9px 12px;
+  border-left: 2px solid var(--blue);
+  background: var(--wash-blue);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.setup-playing-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.setup-playing-name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* ------------------------------------------------------ candidate cards */
+
+.cd-rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.cd-rail::-webkit-scrollbar { display: none; }
+
+.cd-card {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+.cd-card:hover { border-color: var(--gold); }
+.cd-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Gold edge, a tick and a little lift. Three signals for one state, because
+   this is the choice the rest of the screen is about. */
+.cd-card.is-on {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold), var(--shadow);
+  transform: translateY(-2px);
+}
+
+.cd-card-art { display: block; }
+.cd-card-art .portrait { border-radius: 50%; }
+
+.cd-card-body { display: flex; flex-direction: column; gap: 3px; }
+.cd-card-name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+  line-height: 1.15;
+}
+.cd-card-blurb {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--navy-2);
+}
+
+.cd-card-tick {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #fffdf6;
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.cd-card-state {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  min-height: 0.8em;
+}
+
+/* -------------------------------------------------- candidate detail */
+
+.cd-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.cd-stats { display: flex; flex-direction: column; gap: 9px; }
+
+.cd-stat {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 10px;
+}
+.cd-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--navy-2);
+}
+.cd-stat-track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+.cd-stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+}
+/* Less is better here, so it is drawn as a warning rather than as progress. */
+.cd-stat.is-bad .cd-stat-fill { background: var(--warn-bad); }
+.cd-stat-value {
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-block { display: flex; flex-direction: column; gap: 8px; }
+.cd-block-title {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+
+.cd-regions { display: flex; flex-direction: column; gap: 8px; }
+.cd-region {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 10px;
+}
+.cd-region-name {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+.cd-region-track {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+.cd-region-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold);
+}
+/* Grant potential is an opportunity, not a holding, so it reads in the
+   second voice rather than in the accent. */
+.cd-region.is-grant .cd-region-fill { background: var(--blue); }
+.cd-region-value {
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-note {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--navy-3);
+}
+
+.cd-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.cd-summary.is-even {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--navy-2);
+}
+.cd-summary-part { display: flex; flex-direction: column; gap: 1px; }
+.cd-summary-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.cd-summary-value {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--warn-good);
+}
+.cd-summary-part.is-weak .cd-summary-value { color: var(--warn-bad); }
+
+/* ----------------------------------------------------------- the clock */
+
+.clock-option-word {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* ----------------------------------------------------------- the recap */
+
+.setup-recap {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.setup-recap-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 14px;
+}
+.setup-recap-line + .setup-recap-line { border-top: 1px solid var(--rule-soft); }
+.setup-recap-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.setup-recap-value {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--navy);
+  text-align: right;
+}
+
+/* A colour nobody chose still shows which one they got. */
+.col-option.is-assigned {
+  box-shadow: 0 0 0 2px var(--paper-2), 0 0 0 3px var(--rule);
+}
+
+@media (min-width: 760px) {
+  .cd-card { width: 210px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-card { transition: none; }
+  .cd-card.is-on { transform: none; }
+}

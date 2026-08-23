@@ -225,6 +225,54 @@ CMP.ui.district = (function () {
 
     /* --------------------------------------------------------- the money */
 
+    /**
+     * What the grants look like here, as opposed to what is in the purse.
+     *
+     * Kept apart from the money above it on purpose: available cash is a
+     * balance and grant potential is a judgement about opportunity, and a
+     * player who confused the two would spend against a number that was never
+     * money. It reads js/data/grants-config.js and nothing else, because the
+     * grant rules are going to be replaced and this panel should not have to
+     * be rebuilt when they are.
+     */
+    function grantBlock() {
+      var region = CMP.regionOfSeat ? CMP.regionOfSeat(Number(seat)) : null;
+      if (!region) return null;
+
+      var value = CMP.grantPotential(CMP.grantContextFor(game, region, game.avatar));
+      var band = CMP.grantBand(value);
+      var held = CMP.campaign.grantIn ? CMP.campaign.grantIn(game, region) : 0;
+      var name = (CMP.getRegion && CMP.getRegion(region) || {}).name || region;
+
+      return el('section', { class: 'dp-block' }, [
+        el('div', { class: 'dp-block-head' }, [
+          el('h3', { class: 'dp-block-title', text: 'Grant' }),
+          el('span', { class: 'dp-block-note', text: name }),
+        ]),
+        el('div', { class: 'dp-grant' }, [
+          el('div', { class: 'dp-grant-fig' }, [
+            el('span', { class: 'dp-grant-label', text: 'Potential here' }),
+            el('strong', {
+              class: 'dp-grant-value is-' + band.id,
+              text: band.label + ' · ' + value + '%',
+            }),
+          ]),
+          el('div', { class: 'dp-grant-fig' }, [
+            el('span', { class: 'dp-grant-label', text: 'Grant in hand' }),
+            el('strong', {
+              class: 'dp-grant-value',
+              text: held > 0 ? money.words(held) : '₹0',
+            }),
+          ]),
+        ]),
+        el('p', {
+          class: 'dp-note',
+          text: 'Potential is an opportunity, not money. Grant in hand is ' +
+            'real and can only be spent in ' + name + '.',
+        }),
+      ]);
+    }
+
     function purse(a) {
       return el('div', { class: 'dp-purse' }, [
         el('div', { class: 'dp-purse-fig' }, [
@@ -461,6 +509,7 @@ CMP.ui.district = (function () {
           note
             ? el('p', { class: 'dp-flash is-' + note.tone, text: note.text })
             : null,
+          grantBlock(),
           spendOpen ? spendPanel(a) : null,
           blocked(status, a),
           more(),

@@ -44,6 +44,8 @@ for (const f of [
   'js/data/assets.js',
   'js/data/asset-map.js',
   'js/data/avatars.js',
+  'js/data/candidates.js',
+  'js/data/grants-config.js',
   'js/data/constituencies.js',
   'js/data/regions.js',
   'js/data/actions.js',
@@ -140,6 +142,10 @@ const target = 73;
 
 const phpPlayer = {
   partyId: jsGame.partyId,
+  // The same candidate on both sides. startElection always deals a face, and
+  // a face is a multiplier, so leaving it off here would be comparing two
+  // different players and calling the difference a parity failure.
+  avatar: jsGame.avatar,
   budget: jsGame.budget,
   cash: jsGame.cash,
   spent: 0,
@@ -169,6 +175,136 @@ check(
   Math.abs(jsGame.support[target][jsGame.partyId] - phpPlay.support[String(target)][jsGame.partyId]) < 0.05,
   jsGame.support[target][jsGame.partyId] + ' vs ' + phpPlay.support[String(target)][jsGame.partyId]
 );
+
+/* ------------------------------------------ the candidate, on both sides */
+
+/*
+ * The regional multiplier has to be the same multiplier in both engines.
+ *
+ * A candidate strong in Malwa gets more out of every rupee spent there. A
+ * solo game works that out in the browser and a multiplayer game works it out
+ * in PHP, so if the two tables of numbers — or the two formulas — ever
+ * stopped matching, the same move would build a different board depending on
+ * who you happened to be playing with.
+ *
+ * The parity block above deliberately founds a party with no face, which is
+ * the neutral case and exercises none of this. These play the same move as a
+ * named candidate, in a seat in the region they are strongest, and in one
+ * where they are weakest.
+ */
+section('Candidate parity');
+
+const STRONG_ID = 'a4';   // strongest in Malwa, weakest in Majha
+
+function seatInRegion(region) {
+  for (const c of CMP.CONSTITUENCIES) {
+    if (CMP.regionOfSeat(c.number) === region) return c.number;
+  }
+  return null;
+}
+
+const summary = CMP.regionalSummary(STRONG_ID);
+check('the candidate table is readable',
+  !!summary.ranked.length && summary.ranked[0].value > 0,
+  summary.ranked.map((r) => r.id + ':' + r.value).join(' '));
+
+const bestRegion = summary.ranked[0].id;
+const worstRegion = summary.ranked[summary.ranked.length - 1].id;
+check('strongest and weakest are not the same region', bestRegion !== worstRegion,
+  bestRegion + ' vs ' + worstRegion);
+
+for (const [label, region] of [['strongest', bestRegion], ['weakest', worstRegion]]) {
+  const seat = seatInRegion(region);
+  const jg = freshGame();
+  jg.avatar = STRONG_ID;
+
+  const pp = {
+    partyId: jg.partyId,
+    avatar: STRONG_ID,
+    budget: jg.budget,
+    cash: jg.cash,
+    spent: 0,
+    heat: 0,
+    granted: 0,
+    raised: 0,
+    actions: [],
+  };
+  const pb = JSON.parse(JSON.stringify(jg.support));
+  const pr = php('play', JSON.stringify({
+    player: pp, board: pb, actionId: 'invest', target: seat, rolls,
+  }));
+  CMP.campaign.play(jg, 'invest', seat, rolls);
+
+  const jsGot = jg.support[seat][jg.partyId];
+  const phpGot = pr.support[String(seat)][jg.partyId];
+  check('both engines agree in the ' + label + ' region (' + region + ')',
+    Math.abs(jsGot - phpGot) < 0.05, jsGot + ' vs ' + phpGot);
+}
+
+/*
+ * And the multiplier is actually doing something.
+ *
+ * A stat that is displayed on the setup screen and changes nothing on the
+ * board would be a decoration dressed up as a decision. This spends the same
+ * money on the same action in both regions and asserts the strong one buys
+ * more — which is the whole claim the candidate screen makes.
+ */
+{
+  const best = seatInRegion(bestRegion);
+  const worst = seatInRegion(worstRegion);
+  const a = freshGame();
+  a.avatar = STRONG_ID;
+  CMP.campaign.play(a, 'invest', best, rolls);
+  const b = freshGame();
+  b.avatar = STRONG_ID;
+  CMP.campaign.play(b, 'invest', worst, rolls);
+
+  const gotBest = a.support[best][a.partyId];
+  const gotWorst = b.support[worst][b.partyId];
+  check('the same money buys more where the candidate is strong',
+    gotBest > gotWorst, gotBest + ' in ' + bestRegion + ' vs ' + gotWorst + ' in ' + worstRegion);
+
+  /*
+   * A save from before candidates had stats is neutral, not an error.
+   *
+   * startElection always deals a face, so every new game has a multiplier —
+   * but a game object that predates this table, or one whose face is an id
+   * from a later list, must multiply by one rather than by a guess. That is
+   * the property worth guarding, and it is the one an old save depends on.
+   */
+  const old = freshGame();
+  delete old.avatar;
+  check('a game with no candidate on it is neither helped nor hurt',
+    CMP.campaign.regionalWeight(old, best) === 1,
+    String(CMP.campaign.regionalWeight(old, best)));
+
+  const stranger = freshGame();
+  stranger.avatar = 'a999-not-in-the-table';
+  check('and so is a face this table has never heard of',
+    CMP.campaign.regionalWeight(stranger, best) === 1,
+    String(CMP.campaign.regionalWeight(stranger, best)));
+}
+
+/*
+ * The generated PHP table is the JavaScript table.
+ *
+ * It is generated by tools/sync-candidates.mjs, so the only way it goes wrong
+ * is somebody editing the JavaScript and not running the tool. That is a
+ * failing build here rather than a quiet divergence in a live game.
+ */
+{
+  let synced = true;
+  let why = '';
+  try {
+    execFileSync('node', [path.join(HERE, 'sync-candidates.mjs'), '--check'],
+      { encoding: 'utf8' });
+  } catch (e) {
+    synced = false;
+    why = (e.stdout || '') + (e.stderr || '');
+  }
+  check('the PHP candidate table is in step with the JavaScript one', synced,
+    why.trim().slice(0, 120));
+}
 
 /* ------------------------------------------------------------ budget */
 
@@ -1240,7 +1376,11 @@ check('the report says what was actually spent',
   bigRes.report.cost === range.max && bigRes.report.baseCost === scaled.cost);
 
 const phpSmall = php('play', JSON.stringify({
-  player: { partyId: ME, budget: 0, cash: CMP.CAMPAIGN.income.perRound,
+  // Same candidate as the JavaScript side, for the same reason as above: a
+  // face is a multiplier, and comparing two different players would measure
+  // the candidate rather than the scaling this block is about.
+  player: { partyId: ME, avatar: small.avatar, budget: 0,
+    cash: CMP.CAMPAIGN.income.perRound,
     spent: 0, heat: 0, granted: 0, raised: 0, actions: [] },
   board: JSON.parse(JSON.stringify(freshGame().support)),
   actionId: 'invest',

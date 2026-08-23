@@ -535,3 +535,38 @@
 @media (max-width: 359px) {
   .dp-tally-value { font-size: 0.76rem; }
 }
+
+/*
+ * Grant, kept visibly apart from the purse.
+ *
+ * Available cash is a balance; grant potential is a judgement about
+ * opportunity. A player who read the second as the first would be spending
+ * against a number that was never money, so they do not share a row.
+ */
+.dp-grant {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+.dp-grant-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dp-grant-label {
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-grant-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dp-grant-value.is-high { color: var(--warn-good); }
+.dp-grant-value.is-medium { color: var(--gold); }
+.dp-grant-value.is-low { color: var(--navy-3); }

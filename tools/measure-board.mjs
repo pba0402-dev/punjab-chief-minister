@@ -30,6 +30,8 @@ for (const f of [
   'js/data/assets.js',
   'js/data/asset-map.js',
   'js/data/avatars.js',
+  'js/data/candidates.js',
+  'js/data/grants-config.js',
   'js/data/constituencies.js',
   'js/data/regions.js',
   'js/data/actions.js',

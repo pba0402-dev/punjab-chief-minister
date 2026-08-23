@@ -166,6 +166,16 @@ CMP.net = (function () {
     return request('details', authed({
       candidateName: candidateName,
       slogan: slogan,
+      /*
+       * The face, because it is not only a picture.
+       *
+       * A candidate's regional support multiplies what a campaign in that
+       * region buys, and in a multiplayer game the server is the one applying
+       * it. Without this the server would deal a portrait of its own and
+       * every player would campaign at neutral, while their setup screen sat
+       * there promising them a strong region.
+       */
+      avatar: (profile && profile.avatar) || '',
       profileId: profile ? profile.id : '',
       profileName: profile ? profile.name : '',
     }));

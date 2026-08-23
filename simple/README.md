@@ -280,6 +280,63 @@ Hierarchy is carried by weight and colour rather than size, which is why the
 title is 32-36px rather than 70 and a seat count reads as a number rather than
 a headline.
 
+## Founding a party, in four steps
+
+Candidate, party, round length, start. The candidate comes first because it is
+the only choice on the screen with consequences; everything after it is
+identity.
+
+Nothing is required except a candidate and a symbol. A blank party name is
+generated, an unchosen colour is assigned, and a returning player's name is
+already known and shown once rather than asked for three times. There is no
+slogan field — the player is never asked for one.
+
+## A candidate is a strategy, not a portrait
+
+`js/data/candidates.js` is the one place a candidate's numbers live:
+popularity, corruption, leadership, campaign strength, and — the one that
+matters — **regional support**.
+
+Regional support is not decoration. 50 is neutral; above it a campaign in that
+region buys more influence and below it less, bounded at ±20% at the extremes.
+So "where is my candidate strong" and "where is my money worth more" are the
+same question, which is why the setup screen answers it before the election
+starts rather than after.
+
+One function applies it — `regionalWeight` in `js/engine/campaign.js` — and
+the PHP engine has the same function, because a solo game rolls in the browser
+and a multiplayer game rolls on the server. `api/lib/Candidates.php` is
+**generated** from the JavaScript by `tools/sync-candidates.mjs`, and the
+campaign suite fails if it is out of date, so two hand-kept copies can never
+drift apart. The suite also plays the same move through both engines as a
+named candidate, in the region they are strongest and the one they are
+weakest, and asserts the two boards match.
+
+Strongest and weakest regions are derived from the numbers on every render,
+never written down: change a value and the labels follow.
+
+Anything missing is neutral rather than a guess — a save older than the table,
+or a face from a future list, multiplies by one.
+
+## Grant potential, deliberately at arm's length
+
+`js/data/grants-config.js` answers one question — how promising does this
+region look for grants, out of a hundred — and it is **not** today's grant
+rules. Those live in the engine: a district you lead outright pays its grant
+every round, and the money is locked to the region that earned it.
+`CMP.campaign.grantIn()` is still the only answer to "how much grant money do
+I actually have", and the screens ask it directly.
+
+The two are shown side by side and labelled as different things, because a
+player who read an opportunity as a balance would be spending against money
+that was never there.
+
+When the grant system is redesigned, replace `CMP.GRANT_CONFIG.potential` and
+nothing else. It takes a context object rather than a game, so a future rule
+can weigh rounds, districts, alliances, campaign performance or anything else
+by asking for more context rather than by reaching into the game — and the
+screens that display it do not have to be rebuilt.
+
 ## Tapping a seat
 
 The board is the game, so the panel a seat opens on sits **over** the map
@@ -1362,6 +1419,9 @@ simple/
     ui/constituency.js       one seat: the race, or who won it and when
     ui/briefing.js           the Election Briefing: ten chapters and the tips
     ui/district.js           the seat panel that opens over the board
+  js/data/
+    candidates.js            what each candidate is like, and where they are strong
+    grants-config.js         grant potential, replaceable without touching the UI
     ui/oversight.js          rivals, reporting and your own record
     ui/result.js             result, hung assembly and coalition talks
     ui/election.js           the game screen — round strip, map, leaderboard

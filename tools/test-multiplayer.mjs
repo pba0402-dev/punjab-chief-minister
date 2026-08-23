@@ -1234,11 +1234,36 @@ solo.click(solo.q('.h-card.is-solo'));
 await solo.dom.window.CMP.data.ensure();
 await sleep(60);
 check('solo setup opens', !!solo.q('.screen-setup'));
-const soloFields = solo.qq('.field-input');
-solo.type(soloFields[0], 'Solo Candidate');
-solo.type(solo.qq('.field-input')[1], 'Solo Party');
 check('solo asks for no budget either', !solo.q('.field-money'));
-solo.click(solo.q('.btn-start'));
+
+/*
+ * Setup is four steps now: candidate, party, round length, start.
+ *
+ * The candidate comes first because it is the only choice with consequences —
+ * regional support multiplies what a campaign in that region buys — and
+ * everything after it is identity. Walked the way a player walks it.
+ */
+{
+  const nameField = solo.q('.screen-setup .field-input');
+  if (nameField && !solo.q('.setup-playing')) solo.type(nameField, 'Solo Candidate');
+  solo.click(solo.q('.screen-setup .btn-start'));
+  await sleep(60);
+
+  check('solo step two is the party', !!solo.q('.sym-option'));
+  const partyField = solo.q('.screen-setup .field-input');
+  if (partyField) solo.type(partyField, 'Solo Party');
+  solo.click(solo.q('.screen-setup .btn-start'));
+  await sleep(60);
+
+  check('solo step three is the round length',
+    solo.qq('.screen-setup .clock-option').length === 3,
+    String(solo.qq('.screen-setup .clock-option').length));
+  solo.click(solo.q('.screen-setup .btn-start'));
+  await sleep(60);
+
+  solo.click(solo.q('.screen-setup .btn-start'));
+  await sleep(80);
+}
 check('solo election starts', !!solo.q('.screen-election'));
 check('solo game is saved locally', !!solo.dom.window.CMP.storage.load());
 check('solo save is marked solo', solo.dom.window.CMP.storage.load().mode === 'solo');

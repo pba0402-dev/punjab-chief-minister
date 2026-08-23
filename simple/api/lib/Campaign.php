@@ -1171,7 +1171,8 @@ final class Campaign
              */
             if (!empty($outcome['support'])) {
                 $before = (float) ($seat[$player['partyId']] ?? 0);
-                $seat[$player['partyId']] = max(0.0, round($before + (float) $outcome['support'], 1));
+                $gain = (float) $outcome['support'] * $this->regionalWeight($player, $key);
+                $seat[$player['partyId']] = max(0.0, round($before + $gain, 1));
                 $applied['player'] = round($seat[$player['partyId']] - $before, 1);
             }
             if (!empty($outcome['opponentSupport'])) {
@@ -1271,6 +1272,42 @@ final class Campaign
      * the ones they have campaigned in, then the ones they are strongest in.
      * Returns [board, seats hit].
      */
+    /**
+     * How much a campaign in this seat is worth to this candidate.
+     *
+     * The mirror of regionalWeight() in js/engine/campaign.js, and it has to
+     * stay one: a solo game rolls locally and a multiplayer game rolls here,
+     * so the two engines disagreeing about what a rupee buys would mean the
+     * same move produced different boards depending on who you played with.
+     * tools/test-campaign.mjs runs both against the same seed for exactly
+     * this reason.
+     *
+     * Anything missing is neutral, not a guess: a player with no candidate
+     * stats - a game saved before they existed, a face from a future list -
+     * multiplies by one.
+     */
+    private function regionalWeight(array $player, string $seatKey): float
+    {
+        $avatar = $player['avatar'] ?? null;
+        if (!$avatar) {
+            return 1.0;
+        }
+
+        $stats = Candidates::statsFor((string) $avatar);
+        $region = $this->territory()->regionOfSeat((int) $seatKey);
+        if (!$region || !isset($stats['regionalSupport'][$region])) {
+            return 1.0;
+        }
+
+        $value = (float) $stats['regionalSupport'][$region];
+        if ($value < 0 || $value > 100) {
+            return 1.0;
+        }
+
+        $neutral = Candidates::REGION_NEUTRAL;
+        return 1.0 + (($value - $neutral) / $neutral) * Candidates::REGION_SWING;
+    }
+
     private function applyAcross(
         array $board,
         string $partyId,

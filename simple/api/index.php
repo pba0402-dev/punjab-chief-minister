@@ -39,6 +39,7 @@ require __DIR__ . '/lib/Store.php';
 require __DIR__ . '/lib/Code.php';
 require __DIR__ . '/lib/Lobby.php';
 require __DIR__ . '/lib/Analytics.php';
+require __DIR__ . '/lib/Candidates.php';
 require __DIR__ . '/lib/Territory.php';
 require __DIR__ . '/lib/Alliances.php';
 require __DIR__ . '/lib/Campaign.php';
@@ -523,18 +524,35 @@ switch (route()) {
         [$game, $playerId] = authenticate($store);
         $name = clean((string) input('candidateName', ''), 60);
         $slogan = clean((string) input('slogan', ''), 80);
+
+        /*
+         * The candidate, if the client picked one this server has heard of.
+         *
+         * It is not only a portrait: regional support multiplies what a
+         * campaign buys, and this side is the one that applies it. Anything
+         * unrecognised is ignored and the seat keeps the portrait it was
+         * dealt, so a client cannot invent a candidate - or a multiplier -
+         * by sending a name that is not in the table.
+         */
+        $avatar = clean((string) input('avatar', ''), 24);
+        if ($avatar !== '' && !in_array($avatar, Candidates::ids(), true)) {
+            $avatar = '';
+        }
         // Budget is granted, not submitted — a client cannot set its own purse.
 
         // A player's profile is usually started here rather than at create or
         // join, because this is the first moment they have typed a name to
         // put on it. Attaching it again is harmless and it is what makes a
         // finished election creditable.
-        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan, $profiles) {
+        mutate($store, $game, $playerId, static function (array $g) use ($playerId, $name, $slogan, $avatar, $profiles) {
             if ($g['phase'] !== 'lobby') {
                 throw new LobbyError('The election has already started.');
             }
             $g['players'][$playerId]['candidateName'] = $name;
             $g['players'][$playerId]['slogan'] = $slogan;
+            if ($avatar !== '') {
+                $g['players'][$playerId]['avatar'] = $avatar;
+            }
             $g['players'][$playerId] = attachProfile($g['players'][$playerId], $profiles);
             return $g;
         });

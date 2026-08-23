@@ -223,6 +223,41 @@ const openCampaignSheet = async (d, seatIndex) => {
  * which is what a player does, so the test should do it too.
  */
 /**
+ * Found a party and start playing, the way the setup screen works now.
+ *
+ * Four steps: candidate, party, round length, start. The suite used to fill
+ * one long form and press the button; walking the steps is what a player
+ * does, and it means a step that stops working fails a test rather than
+ * quietly changing what the suite is exercising.
+ */
+const startSolo = async (d, who, party) => {
+  const advance = async () => {
+    clickIt(d, q(d, '.screen-setup .btn-start'));
+    await settle();
+  };
+
+  // Step 1: a player the game has never met types a name.
+  const nameField = q(d, '.screen-setup .field-input');
+  if (nameField && !q(d, '.setup-playing')) typeInto(d, nameField, who);
+  await advance();
+
+  // Step 2: the party. A blank name is generated, so this only types one
+  // where the test cares what it is called.
+  if (party) {
+    const partyField = q(d, '.screen-setup .field-input');
+    if (partyField) typeInto(d, partyField, party);
+    await settle();
+  }
+  await advance();
+
+  // Step 3: whatever round length is already selected.
+  await advance();
+
+  // Step 4: start.
+  await advance();
+};
+
+/**
  * Play one move the way a player does: through a constituency's campaign
  * sheet, choosing an amount, and confirming.
  */
@@ -369,79 +404,211 @@ check('   setup screen opens', !!q(dom, '.screen-setup'));
  */
 check('5. no party is offered to be picked', qq(dom, '.party-card').length === 0,
   qq(dom, '.party-card').length + ' cards');
-check('8. setup asks for a name, a party, a short name and a slogan',
-  qq(dom, '.screen-setup .field-input').length === 4,
-  qq(dom, '.screen-setup .field-input').length + ' fields');
-check('9. and offers every symbol the game has',
-  qq(dom, '.sym-option').length === dom.window.CMP.PARTY_SYMBOLS.length,
-  qq(dom, '.sym-option').length + ' of ' + dom.window.CMP.PARTY_SYMBOLS.length);
-check('9. enough of them for a table of four',
+check('1. the budget is granted, not entered', !q(dom, '.field-money'));
+check('9. enough symbols for a table of four',
   dom.window.CMP.PARTY_SYMBOLS.length >= 4,
   dom.window.CMP.PARTY_SYMBOLS.length + ' symbols');
-check('10. and colours', qq(dom, '.col-option').length >= 8,
-  qq(dom, '.col-option').length + ' colours');
-check('1. the budget is granted, not entered', !q(dom, '.field-money'));
-check('7. the round allowance is stated on the setup screen',
-  /5 crore/i.test(text(dom)), text(dom).slice(0, 120));
 check('12. and offers every face the game has',
-  qq(dom, '.av-option').length === dom.window.CMP.AVATARS.length,
-  qq(dom, '.av-option').length + ' of ' + dom.window.CMP.AVATARS.length);
+  qq(dom, '.cd-card').length === dom.window.CMP.AVATARS.length,
+  qq(dom, '.cd-card').length + ' of ' + dom.window.CMP.AVATARS.length);
 check('12. enough of them for a table of four',
   dom.window.CMP.AVATARS.length >= 4, dom.window.CMP.AVATARS.length + ' faces');
+
 /*
  * 12. Every face is an image file, found by the id the save stores.
  *
  * The portraits used to be drawn inline; they are PNGs now, loaded from
- * assets/portraits/ and keyed by id, so what has to hold is that each option
+ * assets/portraits/ and keyed by id, so what has to hold is that each card
  * asks for a picture and asks for it under the right name. jsdom fetches
  * nothing, so this is about the request rather than the result — the result
  * is what the fallback below is for.
  */
-check('12. every face is an image, one per option',
-  qq(dom, '.av-option .portrait img').length === qq(dom, '.av-option').length,
-  qq(dom, '.av-option .portrait img').length + ' of ' + qq(dom, '.av-option').length);
+check('12. every face is an image, one per card',
+  qq(dom, '.cd-card .portrait img').length === qq(dom, '.cd-card').length,
+  qq(dom, '.cd-card .portrait img').length + ' of ' + qq(dom, '.cd-card').length);
 check('12. and each is fetched by its own id',
-  qq(dom, '.av-option .portrait').every((n) => {
-    const img = n.querySelector('img');
+  qq(dom, '.cd-card').every((n) => {
+    const img = n.querySelector('.portrait img');
     return img && img.getAttribute('src') ===
       dom.window.CMP.assetUrl('portraits', n.dataset.avatar);
   }),
-  (q(dom, '.av-option .portrait img') || {}).src);
+  (q(dom, '.cd-card .portrait img') || { src: 'none' }).src);
 check('12. from a relative path, so it works wherever the game is served',
-  qq(dom, '.av-option .portrait img')
+  qq(dom, '.cd-card .portrait img')
     .every((n) => /^assets\//.test(n.getAttribute('src'))),
-  (q(dom, '.av-option .portrait img') || {}).getAttribute('src'));
+  qq(dom, '.cd-card .portrait img').length
+    ? q(dom, '.cd-card .portrait img').getAttribute('src') : 'none');
 
 // 12. A picture that never arrives leaves a labelled circle, not a hole and
 // not the browser's broken-image glyph.
 check('12. with something legible behind it while it loads',
-  qq(dom, '.av-option .portrait-fallback').length === qq(dom, '.av-option').length);
-check('16. and the round length',
-  qq(dom, '.screen-setup .clock-option').length === 3);
-check('16. two minutes by default',
-  /2 min/.test(q(dom, '.screen-setup .clock-option.is-active').textContent));
+  qq(dom, '.cd-card .portrait-fallback').length === qq(dom, '.cd-card').length);
 
-const inputs = qq(dom, '.screen-setup .field-input');
-typeInto(dom, inputs[0], 'Simran Kaur Gill');
-typeInto(dom, qq(dom, '.screen-setup .field-input')[1], 'Punjab Development Party');
+/* ------------------------------------------------ the candidate matters */
+
+/*
+ * A candidate is a strategy, not a portrait.
+ *
+ * The card carries four measures and three regions, and the regional numbers
+ * are the ones that change the game: they multiply what a campaign in that
+ * region buys. This asserts the screen is reading the same table the engine
+ * reads, rather than showing numbers of its own.
+ */
+check('candidate: the four measures are shown as bars',
+  qq(dom, '.cd-stat').length === 4,
+  qq(dom, '.cd-stat-label').map((n) => n.textContent).join(' | '));
+check('candidate: and regional support for every region',
+  qq(dom, '.cd-region:not(.is-grant)').length === dom.window.CMP.REGIONS.length,
+  qq(dom, '.cd-region:not(.is-grant)').length + ' regions');
+
+{
+  const first = qq(dom, '.cd-card')[0];
+  const id = first.dataset.avatar;
+  const real = dom.window.CMP.candidateStats(id);
+  clickIt(dom, first);
+  await settle();
+  const shown = qq(dom, '.cd-stat').map((n) => n.querySelector('.cd-stat-value').textContent);
+  check('candidate: the figures come from the candidate table',
+    shown[0] === real.popularity + '%' && shown[1] === real.corruption + '%' &&
+      shown[2] === real.leadership + '%' && shown[3] === real.campaignStrength + '%',
+    shown.join(' ') + ' vs table ' + [real.popularity, real.corruption,
+      real.leadership, real.campaignStrength].join(' '));
+
+  /*
+   * Strongest and weakest are derived, not written down.
+   *
+   * Change a number in the table and the words have to follow on the next
+   * render — a label that could drift away from the bar above it would be
+   * worse than no label.
+   */
+  const summary = dom.window.CMP.regionalSummary(id);
+  const strongShown = q(dom, '.cd-summary-part:not(.is-weak) .cd-summary-value');
+  check('candidate: the strongest region is derived from the numbers',
+    summary.even ||
+      (strongShown && strongShown.textContent ===
+        summary.strongest.map((r) => r.name).join(' · ')),
+    strongShown ? strongShown.textContent : 'even');
+
+  // And it is the same table the engine multiplies campaigns by.
+  const best = summary.ranked[0];
+  check('candidate: and the engine agrees the strong region is worth more',
+    summary.even ||
+      dom.window.CMP.regionalMultiplier(id, best.id) > 1,
+    String(dom.window.CMP.regionalMultiplier(id, best.id)));
+}
+
+/*
+ * Grant potential is a reading, not an amount — and it comes from the grant
+ * configuration rather than from today's grant rules, because those are going
+ * to be replaced.
+ */
+check('candidate: grant potential is shown per region',
+  qq(dom, '.cd-region.is-grant').length === dom.window.CMP.REGIONS.length,
+  qq(dom, '.cd-region.is-grant').length + ' regions');
+check('candidate: and it is read from the replaceable grant config',
+  typeof dom.window.CMP.GRANT_CONFIG.potential === 'function' &&
+    dom.window.CMP.GRANT_CONFIG.version >= 1);
+check('candidate: it says it is an opportunity, not money',
+  /opportunity, not an amount/i.test(q(dom, '.screen-setup').textContent));
+
+/* --------------------------------------------------- through the steps */
+
+/*
+ * Setup is four steps now, not one long form.
+ *
+ * The candidate comes first because it is the only choice with consequences;
+ * everything after it is identity. So the suite walks it the way a player
+ * does rather than reaching into a page that no longer exists all at once.
+ */
+const nextStep = async () => {
+  clickIt(dom, q(dom, '.screen-setup .btn-start'));
+  await settle();
+};
+
+check('setup: four steps, and the first is the candidate',
+  qq(dom, '.setup-step').length === 4 &&
+    q(dom, '.setup-step.is-on .setup-step-label').textContent === 'Your candidate',
+  qq(dom, '.setup-step-label').map((n) => n.textContent).join(' / '));
+
+/*
+ * A returning player is told their name once, not asked for it three times.
+ */
+check('setup: a known player is not asked who they are again',
+  !!q(dom, '.setup-playing') || qq(dom, '.screen-setup .field-input').length > 0);
+
+// A player the game has never met types a name; a returning one does not.
+if (!q(dom, '.setup-playing')) {
+  typeInto(dom, q(dom, '.screen-setup .field-input'), 'Simran Kaur Gill');
+  await settle();
+}
+
+await nextStep();
+check('setup: step two is the party', !!q(dom, '.sym-option'),
+  q(dom, '.setup-step.is-on .setup-step-label')
+    ? q(dom, '.setup-step.is-on .setup-step-label').textContent : 'none');
+
+// 8 + 9 + 10. Everything a party is made of, and nothing else.
+check('8. the party step asks for a name and a short name, and nothing more',
+  qq(dom, '.screen-setup .field-input').length === 2,
+  qq(dom, '.screen-setup .field-input').length + ' fields');
+check('9. and offers every symbol the game has',
+  qq(dom, '.sym-option').length === dom.window.CMP.PARTY_SYMBOLS.length,
+  qq(dom, '.sym-option').length + ' of ' + dom.window.CMP.PARTY_SYMBOLS.length);
+check('10. and colours', qq(dom, '.col-option').length >= 8,
+  qq(dom, '.col-option').length + ' colours');
+
+// 9. There is no slogan field anywhere in setup any more.
+check('setup: no slogan is asked for',
+  !/slogan/i.test(q(dom, '.screen-setup').textContent),
+  q(dom, '.screen-setup').textContent.replace(/\s+/g, ' ').slice(0, 90));
+
+// A colour is optional, and one is shown as assigned until somebody picks.
+check('setup: a colour is assigned before anybody chooses one',
+  !!q(dom, '.col-option.is-assigned') || !!q(dom, '.col-option.is-on'));
+
+const partyInputs = qq(dom, '.screen-setup .field-input');
+typeInto(dom, partyInputs[0], 'Punjab Development Party');
 await settle();
 
 // 29. The abbreviation writes itself from the name, and stays editable.
 check('29. a short name is suggested from the party name',
   q(dom, '.js-short').value === 'PDP', q(dom, '.js-short').value);
 
+clickIt(dom, qq(dom, '.sym-option')[3]);
+clickIt(dom, qq(dom, '.col-option')[5]);
+await settle();
+
+await nextStep();
+check('16. step three is the round length',
+  qq(dom, '.screen-setup .clock-option').length === 3,
+  qq(dom, '.screen-setup .clock-option').length + ' options');
+check('16. two minutes by default',
+  /2 min/.test(q(dom, '.screen-setup .clock-option.is-active').textContent),
+  q(dom, '.screen-setup .clock-option.is-active').textContent.replace(/\s+/g, ' '));
+check('16. and each says what it is for',
+  qq(dom, '.clock-option-note').every((n) => n.textContent.length > 4),
+  qq(dom, '.clock-option-note').map((n) => n.textContent).join(' | '));
+// 7. What a round pays is stated where the round length is chosen, which is
+// the one place the two facts are about the same thing.
+check('7. the round allowance is stated beside the clock',
+  /5 crore/i.test(q(dom, '.screen-setup').textContent),
+  q(dom, '.screen-setup').textContent.replace(/\s+/g, ' ').slice(-110));
+
+await nextStep();
+
 // 11. And the card shows what all of it adds up to before anybody starts.
 check('11. the preview names the player and the party',
-  /SIMRAN KAUR GILL/.test(q(dom, '.pv-name').textContent) &&
+  /SIMRAN KAUR GILL/i.test(q(dom, '.pv-name').textContent) &&
   /PUNJAB DEVELOPMENT PARTY/.test(q(dom, '.pv-party').textContent),
   q(dom, '.pv-name').textContent + ' / ' + q(dom, '.pv-party').textContent);
 check('11. with the symbol and the badge on it',
   !!q(dom, '.pv-badge .sym') && q(dom, '.pv-short').textContent === 'PDP',
   q(dom, '.pv-badge') ? q(dom, '.pv-badge').innerHTML.slice(0, 80) : 'no badge');
+check('11. and recaps the candidate and the clock',
+  qq(dom, '.setup-recap-line').length === 3,
+  qq(dom, '.setup-recap-label').map((n) => n.textContent).join(' / '));
 
-clickIt(dom, qq(dom, '.sym-option')[3]);
-clickIt(dom, qq(dom, '.col-option')[5]);
-clickIt(dom, q(dom, '.btn-start'));
+await nextStep();
 
 /* ---------------------------------------------------------------- panel */
 
@@ -1213,6 +1380,39 @@ await settle();
   await settle();
 }
 
+/*
+ * Grant, on the panel, and never mistakable for cash.
+ *
+ * Potential is a judgement about opportunity; grant in hand is money that can
+ * only be spent in one region. A player who read the first as the second
+ * would be spending against a number that was never there, so the panel keeps
+ * them apart and says which is which.
+ */
+{
+  clickIt(dom, seatCell(17));
+  await settle();
+  check('panel: grant has a section of its own',
+    /Potential here/.test(q(dom, '.dp').textContent),
+    q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(0, 90));
+  check('panel: with a band and a reading',
+    !!q(dom, '.dp-grant-value.is-high, .dp-grant-value.is-medium, .dp-grant-value.is-low'),
+    q(dom, '.dp-grant') ? q(dom, '.dp-grant').textContent.replace(/\s+/g, ' ') : 'none');
+  check('panel: and it says potential is not money',
+    /not money/i.test(q(dom, '.dp').textContent));
+  /*
+   * It reads the replaceable config rather than the engine's grant rules,
+   * which is the whole point of keeping that file separate.
+   */
+  const region = dom.window.CMP.regionOfSeat(17);
+  const fromConfig = dom.window.CMP.grantPotential(
+    dom.window.CMP.grantContextFor(dom.window.CMP.app.getGame(), region, null));
+  check('panel: the reading comes from the grant configuration',
+    q(dom, '.dp-grant').textContent.indexOf(String(fromConfig) + '%') !== -1,
+    q(dom, '.dp-grant').textContent.replace(/\s+/g, ' ') + ' vs config ' + fromConfig);
+  clickIt(dom, q(dom, '.dp-close'));
+  await settle();
+}
+
 /* 9. Closing it leaves the board exactly where it was. */
 clickIt(dom, seatCell(17));
 await settle();
@@ -1577,10 +1777,7 @@ dom = await openPage();
 clickIt(dom, playButton(dom));
 await dom.window.CMP.data.ensure();
 await settle();
-typeInto(dom, qq(dom, '.field-input')[0], 'Round Runner');
-typeInto(dom, qq(dom, '.field-input')[1], 'Round Runner Party');
-clickIt(dom, dom.window.document.querySelector('.btn-xl'));
-await settle();
+await startSolo(dom, 'Round Runner', 'Round Runner Party');
 
 check('the round bar is shown', !!q(dom, '.round-bar'));
 check('it opens on round 1', q(dom, '.round-clock').textContent === 'R1',

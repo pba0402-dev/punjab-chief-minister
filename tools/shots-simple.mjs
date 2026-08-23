@@ -297,6 +297,34 @@ const SCENES = {
     "CMP.app.goTo('setup');" +
     "setTimeout(function(){window.scrollTo(0,400);},400);",
 
+  /* Step one: the candidate, which is the only choice here that changes the
+     game rather than describing it. */
+  'setup-candidate':
+    "CMP.app.goTo('setup');",
+
+  /* The lower half of step one: where the candidate is strong, and where the
+     grants look promising. */
+  'setup-regions':
+    "CMP.app.goTo('setup');" +
+    "setTimeout(function(){window.scrollTo(0,760);},500);",
+
+  /* Step two: the party. Symbol, colour, name — and no slogan. */
+  'setup-party':
+    "CMP.app.goTo('setup');" +
+    "setTimeout(function(){" +
+    "  var b=document.querySelector('.screen-setup .btn-start'); if(b)b.click();" +
+    "},420);",
+
+  /* Step four: the preview and the one button. */
+  'setup-start':
+    "CMP.app.goTo('setup');" +
+    "setTimeout(function(){" +
+    "  var i=0;(function go(){" +
+    "    var b=document.querySelector('.screen-setup .btn-start');" +
+    "    if(b&&i<3){b.click();i++;setTimeout(go,220);}" +
+    "  })();" +
+    "},420);",
+
   /*
    * Election night: a region, and then who is leading.
    *
