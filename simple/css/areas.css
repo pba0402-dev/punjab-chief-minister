@@ -47,9 +47,9 @@
 .ma-target {
   appearance: none;
   width: 100%;
-  border: 1px solid rgba(216, 169, 74, 0.4);
+  border: 1px solid var(--wash-gold-2);
   border-radius: var(--radius-sm);
-  background: rgba(216, 169, 74, 0.08);
+  background: var(--wash-gold);
   padding: 10px 13px;
   display: flex;
   flex-direction: column;
@@ -94,7 +94,7 @@
 }
 .ma-region.is-open {
   border-color: var(--wheat);
-  background: rgba(216, 169, 74, 0.1);
+  background: var(--wash-gold);
 }
 .ma-region-name {
   font-size: 0.8rem;
@@ -185,7 +185,7 @@
 .ma-d-select.is-on {
   border-color: var(--wheat);
   background: var(--wheat);
-  color: #17130a;
+  color: #1a1305;
 }
 
 /* Who holds what, as one bar. */

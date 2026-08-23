@@ -154,6 +154,16 @@ CMP.ui.profile = (function () {
                 el('div', { class: 'pf-who' }, [
                   el('strong', { class: 'pf-name', text: me.name }),
                 ]),
+                // Your name and your face are held in this browser, so they
+                // can still be changed with the record out of reach.
+                el('button', {
+                  class: 'pf-edit',
+                  type: 'button',
+                  text: 'Edit',
+                  onclick: function () {
+                    openEditor({ name: me.name, avatar: me.avatar });
+                  },
+                }),
               ]),
               el('p', {
                 class: 'pf-note',
@@ -195,6 +205,19 @@ CMP.ui.profile = (function () {
                 (profile.levelNeed - profile.levelInto).toLocaleString('en-IN') + ' to the next level',
             }),
           ]),
+          /*
+           * The only two things about a profile the player chose, so the only
+           * two that can be changed. Everything else on this screen was
+           * earned by playing and is not editable by anyone, including them.
+           */
+          el('button', {
+            class: 'pf-edit',
+            type: 'button',
+            text: 'Edit',
+            onclick: function () {
+              openEditor(profile);
+            },
+          }),
         ]),
 
         /* ---- the record ---- */
@@ -328,6 +351,87 @@ CMP.ui.profile = (function () {
             });
           });
         });
+    }
+
+    /**
+     * Changing your name and your face.
+     *
+     * A sheet rather than a screen, because it is two fields and there is
+     * nothing to read. Both are written through CMP.profile, which already
+     * knows how to keep the browser and the server in step; this only
+     * collects the answer.
+     *
+     * There is no photo upload here, on purpose. The face is chosen from the
+     * game's own cast, so a profile carries nothing the player did not pick
+     * from a list: no image to store, nothing to moderate, and the privacy
+     * map in APP-PRIVACY-DATA-MAP.md stays true exactly as written.
+     */
+    function openEditor(profile) {
+      var me = CMP.profile.get();
+      var name = (me && me.name) || profile.name || '';
+      var face = (me && me.avatar) || profile.avatar || CMP.ui.avatars.list()[0];
+
+      var input = el('input', {
+        class: 'field',
+        type: 'text',
+        value: name,
+        maxlength: '24',
+        'aria-label': 'Your name',
+        oninput: function (e) {
+          name = e.target.value;
+        },
+      });
+
+      function close() {
+        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+      }
+
+      var sheet = el('div', { class: 'sheet' }, [
+        el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('h2', { class: 'sheet-title', text: 'Edit profile' }),
+
+          el('label', { class: 'field-label', text: 'Your name' }),
+          input,
+
+          el('p', { class: 'field-label', text: 'Your face' }),
+          CMP.ui.avatars.picker({
+            selected: face,
+            size: 66,
+            onPick: function (id) {
+              face = id;
+            },
+          }),
+
+          el('button', {
+            class: 'btn btn-primary btn-wide',
+            type: 'button',
+            text: 'Save',
+            onclick: function () {
+              var clean = String(name || '').trim().slice(0, 24);
+              if (clean) CMP.profile.rename(clean);
+              CMP.profile.setAvatar(face);
+              close();
+              // Re-read rather than patch what is on screen: the server holds
+              // the record and this screen is a view of it.
+              paint(CMP.profile.stats());
+              CMP.profile.refresh().then(paint);
+            },
+          }),
+          el('button', {
+            class: 'btn btn-quiet btn-wide',
+            type: 'button',
+            text: 'Cancel',
+            onclick: function () {
+              close();
+            },
+          }),
+        ]),
+      ]);
+
+      sheet.addEventListener('click', function (e) {
+        if (e.target === sheet) close();
+      });
+      document.body.appendChild(sheet);
     }
 
     paint(CMP.profile.stats());

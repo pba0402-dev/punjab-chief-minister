@@ -95,9 +95,9 @@
  * touching the arc.
  */
 .round-clock {
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
@@ -386,14 +386,42 @@
  * A row of tabs rather than four cards: cards would cost forty pixels of a
  * phone screen to say what a rule and a label say.
  */
+/*
+ * Navy, so the navigation is not the game.
+ *
+ * It sat on the same charcoal as everything under it, which made a bar of
+ * four tabs read as another card in the stack. Its own colour separates the
+ * chrome from the board without a rule or a shadow doing the work — and navy
+ * rather than more gold, because gold is the game's accent and a bar of it
+ * would compete with every selected thing on screen.
+ */
+/*
+ * It stays on screen.
+ *
+ * Four tabs that scroll away are four tabs you have to scroll back up to
+ * reach, which on the map — a screen taller than any phone — means the way
+ * out of where you are is off screen most of the time. Sticky at the top, and
+ * above the round strip in the stack so the two never overlap: the strip is
+ * told where the bar ends through --nav-h, which the shell measures.
+ */
 .g-nav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 8;
+
+  --nav-ground: #131a2b;
+  --nav-raised: #1b2540;
+  --nav-ink: #eceaf2;
+  --nav-quiet: #7f8aa6;
+  --nav-edge: #232f4d;
+
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--ink-2);
+  border: 1px solid var(--nav-edge);
+  border-radius: 8px;
+  background: var(--nav-ground);
 }
 
 .g-nav-item {
@@ -402,32 +430,42 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: 46px;
-  padding: 6px 4px;
+  gap: 3px;
+  min-height: 48px;
+  padding: 7px 4px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: none;
   font-family: var(--font);
-  color: var(--muted-2);
+  color: var(--nav-quiet);
   cursor: pointer;
-  transition: color 0.12s ease, background 0.12s ease;
+  transition: color 0.14s ease, background 0.14s ease;
 }
-.g-nav-item:hover { color: var(--muted); }
+.g-nav-item:hover { color: var(--nav-ink); }
 .g-nav-item:focus-visible { outline: 2px solid var(--river); outline-offset: -2px; }
 
-/* The one you are on, in the gold the rest of the game uses for "chosen". */
+/*
+ * The one you are on: a lighter navy, ivory text, and a thin gold line under
+ * it. The gold is two pixels of accent rather than a gold tab — enough to
+ * find at a glance, not enough to argue with the board.
+ */
 .g-nav-item.is-on {
-  background: var(--ink-3, rgba(255, 255, 255, 0.05));
-  color: var(--wheat);
-  box-shadow: inset 0 -2px 0 var(--wheat);
+  background: var(--nav-raised);
+  color: var(--nav-ink);
+  box-shadow: inset 0 -2px 0 #b98f3d;
 }
+.g-nav-item.is-on .g-nav-glyph { color: #d8b979; }
 
-.g-nav-glyph { font-size: 0.92rem; line-height: 1; }
+.g-nav-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: inherit;
+  transition: color 0.14s ease;
+}
 .g-nav-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 

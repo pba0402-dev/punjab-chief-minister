@@ -227,16 +227,42 @@ across every round played, plus the same figures as a table — deliberately not
 on the game screen, because it is the shape of a whole campaign and a
 distraction during one.
 
-## The look, and why it is quiet
+## The look, and why it is paper
 
-The ground is a near-black charcoal with a trace of blue. Text is off-white,
-never pure white, on soft rather than hard contrast — the difference is
-invisible in a screenshot and considerable at midnight.
+The ground is warm ivory, and the ink on it is midnight navy. That is the
+palette of a ballot paper, a nomination form and a results sheet — which is
+what the game is about — and it is also what stays legible on a phone held
+outdoors, where the game is actually played.
 
-Gold is an accent and nothing else: the action worth taking, the thing you
-have selected, the majority line. It is not a card colour. Party colours
-appear on borders, badges, bars and indicators, so the interface stays neutral
-and the parties stay legible.
+It was near-black until August 2026. Near-black reads as a piece of software
+rather than as an election, and an hour of it at full brightness is tiring in
+a way a printed page is not.
+
+Three rules hold the whole thing together:
+
+- **Navy is text and chrome, never a card fill** — with one exception, the
+  navigation bar, which is navy so that the chrome reads as chrome and not as
+  another card in the stack.
+- **Gold means "this is the action" or "this is the one you chose."** It is
+  never decoration and never a ground to read on. There is one gold surface on
+  the opening screen and it is the button you came for.
+- **Party colours appear on badges, bars, borders and the map, and nowhere
+  else**, so the interface stays neutral and the parties stay legible.
+
+Type carries the rest: Fraunces names things — the game, a screen, a district,
+a party — and Karla runs everything read as data. If it is set in the serif it
+is a name; if it is not, it is a number or a label.
+
+Every colour is defined once, in `css/tokens.css`. The sixteen other sheets
+are written against `--ink` and `--cream`, which are now roles rather than
+descriptions and point at the paper and the navy; that indirection is what let
+the whole game turn over at once instead of most of it turning over and a few
+screens staying behind on the old palette.
+
+Contrast is checked rather than assumed. Every text colour clears WCAG AA
+against the ground it sits on — the gold and the caption grey were both
+adjusted for it, because "premium" that cannot be read at arm's length is not
+premium.
 
 Hierarchy is carried by weight and colour rather than size, which is why the
 title is 32-36px rather than 70 and a seat count reads as a number rather than
@@ -1217,7 +1243,14 @@ in `index.php` that constructs the store.
   hands, and who leads now
 - **Profile** — portrait, name, level, the record, the party record, every
   achievement earned or not, and the full election history
-- **Leaderboard** — ranked on the configured score, verified games only
+- **Leaderboard** — ranked on the configured score, verified games only.
+  Reached from Game Statistics rather than from the opening screen: it is a
+  table of other people's results, and the way into a game should not be
+  competing with one
+- **The Election Briefing** — ten chapters on how the game works and a handful
+  of tips, under More → Help / Tutorial. Every figure in it is read out of
+  `CMP.CAMPAIGN` at render time rather than typed into the prose, so a rule
+  change carries the tutorial with it
 - **Autosave** — solo progress writes to `localStorage` after every round and
   every move, and needs no server; multiplayer state lives on the server, saved
   under lock on every change
@@ -1251,8 +1284,8 @@ simple/
     ui/dom.js                element helper + Indian currency formatting
     net.js                   multiplayer API client + polling
     profile.js               who the player is between games
-    ui/home.js               the opening screen and the live figures
-    ui/profile.js            the profile and leaderboard screens
+    ui/home.js               the opening screen: title, facts, two ways in
+    ui/profile.js            the profile, its editor, and the leaderboard
     ui/setup.js              solo party + candidate form
     ui/multiplayer.js        create game / join game
     ui/lobby.js              the four-player lobby
@@ -1266,6 +1299,7 @@ simple/
     ui/territory.js          priority districts, and alliances
     ui/map.js                the 117-seat map and tile view
     ui/constituency.js       one seat: the race, or who won it and when
+    ui/briefing.js           the Election Briefing: ten chapters and the tips
     ui/oversight.js          rivals, reporting and your own record
     ui/result.js             result, hung assembly and coalition talks
     ui/election.js           the game screen — round strip, map, leaderboard

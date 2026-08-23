@@ -13,12 +13,12 @@
 
 .granted-note {
   margin: 0;
-  padding: 13px 15px;
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--wheat-deep);
-  background: rgba(232, 185, 60, 0.06);
-  font-size: 0.92rem;
-  color: var(--muted);
+  padding: 9px 0 9px 13px;
+  border-left: 2px solid var(--gold);
+  background: none;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--navy-2);
 }
 .granted-note strong {
   color: var(--wheat);
@@ -81,7 +81,7 @@
 .heat-track {
   height: 10px;
   border-radius: 999px;
-  background: #241f19;
+  background: var(--paper-3);
   overflow: hidden;
 }
 .heat-fill {
@@ -135,10 +135,10 @@
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-.rating-safe { color: #7fd6a0; }
-.rating-likely { color: #9fd4e8; }
+.rating-safe { color: var(--warn-good); }
+.rating-likely { color: var(--blue); }
 .rating-lean { color: var(--wheat); }
-.rating-tossup { color: #ff9d8a; }
+.rating-tossup { color: var(--warn-bad); }
 
 /* ---------------------------------------------------------- actions */
 
@@ -150,7 +150,7 @@
   flex-wrap: wrap;
 }
 .group-note { font-size: 0.83rem; color: var(--muted-2); }
-.risky-title { color: #ffb5a6; }
+.risky-title { color: var(--warn-bad); }
 
 .action-grid {
   display: grid;
@@ -181,7 +181,7 @@
 .action-card:active:not(.is-disabled) { transform: translateY(0); }
 .action-card:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
 .action-card.is-disabled { opacity: 0.42; cursor: not-allowed; }
-.action-risky { border-left: 3px solid rgba(226, 99, 79, 0.55); }
+.action-risky { border-left: 3px solid var(--warn-bad); }
 .action-risky:hover:not(.is-disabled) { border-color: var(--danger); }
 
 .action-icon { grid-area: icon; font-size: 1.25rem; line-height: 1.2; }
@@ -204,9 +204,9 @@
   padding: 2px 7px;
   border-radius: 4px;
 }
-.action-risk { background: rgba(127, 214, 160, 0.16); color: #8fdcae; }
-.action-risk.risk-risky { background: rgba(226, 99, 79, 0.16); color: #f19281; }
-.action-impact { background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+.action-risk { background: var(--wash-good); color: var(--warn-good); }
+.action-risk.risk-risky { background: var(--wash-bad); color: var(--warn-bad); }
+.action-impact { background: var(--wash-ink); color: var(--muted); }
 
 .action-cost {
   grid-area: cost;
@@ -241,7 +241,7 @@
   flex-direction: column;
   gap: 7px;
 }
-.report.is-good { border-left-color: #7fd6a0; }
+.report.is-good { border-left-color: var(--warn-good); }
 .report.is-bad { border-left-color: var(--danger); }
 .report-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .report-head strong {
@@ -258,24 +258,24 @@
   padding: 3px 9px;
   border-radius: 5px;
   font-variant-numeric: tabular-nums;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--wash-ink);
   color: var(--muted);
 }
-.delta.up { background: rgba(127, 214, 160, 0.16); color: #8fdcae; }
-.delta.down { background: rgba(226, 99, 79, 0.16); color: #f19281; }
-.delta.heat { background: rgba(232, 134, 60, 0.16); color: #f0a765; }
+.delta.up { background: var(--wash-good); color: var(--warn-good); }
+.delta.down { background: var(--wash-bad); color: var(--warn-bad); }
+.delta.heat { background: var(--wash-gold-2); color: var(--gold); }
 
 .consequence {
   margin-top: 4px;
   padding: 11px 13px;
   border-radius: var(--radius-sm);
-  background: rgba(226, 99, 79, 0.1);
-  border: 1px solid rgba(226, 99, 79, 0.35);
+  background: var(--wash-bad);
+  border: 1px solid var(--wash-bad);
   font-size: 0.88rem;
   line-height: 1.5;
-  color: #f4bdb2;
+  color: var(--warn-bad);
 }
-.consequence strong { color: #ff9d8a; }
+.consequence strong { color: var(--warn-bad); }
 .consequence-seats { color: var(--muted); }
 
 /* ---------------------------------------------------------- log */
@@ -292,7 +292,7 @@
   border: 1px solid var(--line-soft);
   font-size: 0.85rem;
 }
-.log-risky { border-left: 3px solid rgba(226, 99, 79, 0.5); }
+.log-risky { border-left: 3px solid var(--warn-bad); }
 .log-action { font-weight: 600; }
 .log-where {
   color: var(--muted);
@@ -302,8 +302,8 @@
 }
 .log-cost { color: var(--wheat); font-variant-numeric: tabular-nums; }
 .log-result { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted-2); }
-.log-result.up { color: #8fdcae; }
-.log-result.down { color: #f19281; }
+.log-result.up { color: var(--warn-good); }
+.log-result.down { color: var(--warn-bad); }
 
 /* ---------------------------------------------------------- seat picker */
 
@@ -333,11 +333,11 @@
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--wash-ink);
   color: var(--cream);
 }
-.picker-row:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--line); }
-.picker-row.is-selected { border-color: var(--wheat); background: rgba(232, 185, 60, 0.08); }
+.picker-row:hover { background: var(--wash-ink-2); border-color: var(--line); }
+.picker-row.is-selected { border-color: var(--wheat); background: var(--wash-gold); }
 .picker-number { font-size: 0.75rem; color: var(--muted-2); font-variant-numeric: tabular-nums; }
 .picker-name { display: flex; flex-direction: column; min-width: 0; }
 .picker-name strong { font-size: 0.92rem; }

@@ -28,10 +28,14 @@
   width: 100%;
   height: 100%;
 }
-.sym-option.is-on {
-  border-color: currentColor;
-  background: color-mix(in srgb, currentColor 12%, var(--ink-2));
-}
+/*
+ * Nothing here.
+ *
+ * A symbol is picked as a .pick-card now, and that carries the selected
+ * state — a gold edge and a tick. This rule tinted the card with the party
+ * colour on top of it, which put two different answers to "is this the one"
+ * on the same button.
+ */
 .sym-option:focus-visible {
   outline: 2px solid var(--river);
   outline-offset: 2px;
@@ -55,7 +59,7 @@
   border-radius: 50%;
   background: var(--swatch);
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(18, 32, 54, 0.14);
   transition: transform 0.12s ease, border-color 0.12s ease;
 }
 .col-option.is-on {
@@ -650,7 +654,7 @@
   border-radius: 50%;
   border: 2px solid var(--ink);
   background: var(--wheat);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 4px rgba(18, 32, 54, 0.1);
 }
 .cs-range::-moz-range-thumb {
   width: 26px;

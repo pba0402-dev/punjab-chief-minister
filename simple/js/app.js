@@ -419,6 +419,18 @@ CMP.app = (function () {
             goTo('home');
           },
 
+          /*
+           * Help, from inside a running election.
+           *
+           * It is a screen rather than a sheet because ten chapters do not
+           * fit in one, and the election is not disturbed by looking at it:
+           * the game keeps running and the board is exactly where it was
+           * when you come back.
+           */
+          onBriefing: function () {
+            goTo('briefing');
+          },
+
           // The confirmed decision. Out for good, no way back in.
           onEndGame: function () {
             CMP.net.leave(true).then(function () {
@@ -462,6 +474,14 @@ CMP.app = (function () {
           setGame(started);
         },
       });
+    } else if (screen === 'briefing') {
+      view = CMP.ui.briefing.render({
+        onBack: function () {
+          // Back to wherever it was opened from: the board while a game is
+          // running, and the opening screen otherwise.
+          goTo(game ? 'election' : 'home');
+        },
+      });
     } else if (screen === 'profile') {
       view = CMP.ui.profile.render({
         // A player who has just deleted themselves has no profile to go back
@@ -479,11 +499,17 @@ CMP.app = (function () {
         onBack: function () {
           goTo('home');
         },
+        onLeaderboard: function () {
+          goTo('leaderboard');
+        },
       });
     } else if (screen === 'leaderboard') {
+      // Back to statistics rather than to home: that is where it is reached
+      // from now, and a back control that does not undo the step you took is
+      // worse than none.
       view = CMP.ui.profile.leaderboard({
         onBack: function () {
-          goTo('home');
+          goTo('stats');
         },
       });
     } else if (screen === 'multiplayer') {

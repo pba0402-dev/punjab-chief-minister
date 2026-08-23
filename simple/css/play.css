@@ -131,9 +131,9 @@
 
 .g-money-grants {
   appearance: none;
-  border: 1px solid rgba(88, 168, 184, 0.35);
+  border: 1px solid var(--wash-blue-2);
   border-radius: var(--radius-sm);
-  background: rgba(88, 168, 184, 0.09);
+  background: var(--wash-blue);
   padding: 9px 11px;
   display: flex;
   flex-direction: column;
@@ -284,9 +284,9 @@
   align-items: center;
   gap: 11px;
   padding: 13px 16px;
-  border: 1px solid rgba(88, 168, 184, 0.4);
+  border: 1px solid var(--wash-blue-2);
   border-radius: var(--radius);
-  background: rgba(88, 168, 184, 0.1);
+  background: var(--wash-blue);
 }
 .g-ready-tick {
   font-size: 1.1rem;
@@ -333,7 +333,7 @@
 }
 .clock-option.is-active {
   border-color: var(--wheat);
-  background: rgba(232, 185, 60, 0.12);
+  background: var(--wash-gold-2);
 }
 .clock-option-value {
   font-size: 0.95rem;
@@ -370,8 +370,8 @@
   text-align: left;
 }
 .resume-link.is-rejoin {
-  border-color: rgba(88, 168, 184, 0.45);
-  background: rgba(88, 168, 184, 0.1);
+  border-color: var(--wash-blue-2);
+  background: var(--wash-blue);
 }
 .resume-title {
   font-size: 0.86rem;

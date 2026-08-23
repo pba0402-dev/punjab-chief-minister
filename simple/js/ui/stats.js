@@ -98,6 +98,32 @@ CMP.ui.stats = (function () {
 
         partyBlock(s.byParty || []),
 
+        /*
+         * The leaderboard, one tap on.
+         *
+         * It used to be a card on the opening screen, competing with the
+         * button somebody came to press. It belongs here instead: it is
+         * another public figure counted from finished games, and this is the
+         * screen those live on. Offered rather than inlined, because it is a
+         * long table and this screen is a summary.
+         */
+        opts.onLeaderboard
+          ? el('button', {
+              class: 'st-jump',
+              type: 'button',
+              onclick: opts.onLeaderboard,
+            }, [
+              el('span', { class: 'st-jump-body' }, [
+                el('strong', { class: 'st-jump-label', text: 'Leaderboard' }),
+                el('span', {
+                  class: 'st-jump-note',
+                  text: 'Who is winning, across every election',
+                }),
+              ]),
+              el('span', { class: 'st-jump-chev', 'aria-hidden': 'true', text: '›' }),
+            ])
+          : null,
+
         el('p', {
           class: 'st-foot',
           text: 'Every figure here is counted by the server from something ' +

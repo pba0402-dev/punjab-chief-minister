@@ -5,15 +5,43 @@
    and then the numbers — in that order, at sizes a phone can hold.
    ------------------------------------------------------------------ */
 
+/*
+ * The masthead.
+ *
+ * A rule, a mark, a rule; then the name in the serif; then what it is, in
+ * spaced capitals. That order is how a nomination form, a notice of poll and
+ * a results declaration all open, and the game is about all three.
+ */
 .h-hero {
   gap: 8px;
-  padding: 0;
+  padding: 4px 0 2px;
+}
+
+.h-crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  max-width: 190px;
+  margin: 0 auto 4px;
+}
+.h-crest-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-deep), transparent);
+  opacity: 0.55;
+}
+.h-crest-mark {
+  font-size: 0.92rem;
+  line-height: 1;
+  color: var(--gold);
 }
 
 .h-title {
   font-family: var(--font-display);
-  font-size: clamp(1.9rem, 8.5vw, 2.25rem);
-  font-weight: 700;
+  font-size: clamp(2rem, 9vw, 2.5rem);
+  font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.02em;
   color: var(--cream);
@@ -33,15 +61,22 @@
 }
 
 /* The three facts that define the game. */
+/*
+ * The three facts, ruled off above and below.
+ *
+ * Two hairlines rather than a card: the numbers are a caption to the title,
+ * not a panel of their own, and a box round them would make them compete with
+ * the button underneath.
+ */
 .h-facts {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   width: 100%;
-  margin-top: 4px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
+  margin-top: 6px;
+  padding: 11px 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
 .h-fact {
   display: flex;
@@ -50,9 +85,10 @@
   gap: 1px;
 }
 .h-fact-value {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--cream);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--navy);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
@@ -75,35 +111,12 @@
 
 .h-play { gap: 8px; }
 
-.h-play-btn {
-  min-height: 56px;
-  padding: 11px 16px;
-  gap: 1px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--ink-2);
-  box-shadow: none;
-}
-.h-play-label {
-  font-family: var(--font);
-  font-size: 0.98rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-.h-play-sub {
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--muted-2);
-}
-
 /* One gold button on the screen: the thing to do. */
 .h-play-btn.is-primary {
   background: linear-gradient(168deg, var(--wheat) 0%, var(--wheat-deep) 100%);
   border-color: var(--wheat-deep);
-  color: #17130a;
-  box-shadow: 0 10px 26px rgba(216, 169, 74, 0.14);
+  color: #1a1305;
+  box-shadow: 0 10px 26px var(--wash-gold-2);
 }
 .h-play-btn.is-primary .h-play-label { font-size: 1.08rem; }
 .h-play-btn.is-primary .h-play-sub { color: rgba(23, 19, 10, 0.66); }
@@ -118,43 +131,16 @@
   letter-spacing: 0.18em;
   color: var(--muted);
 }
-.h-figure-value { font-size: 1.25rem; }
-.h-figure-label { font-size: 0.53rem; }
-.h-board-score { color: var(--wheat); font-size: 0.78rem; }
 .h-note { font-size: 0.76rem; }
 
 /* ----------------------------------------------------- choosing a face */
 
-.av-picker {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-}
+/*
+ * The faces used to be an eight-column grid of 46px circles. They are a rail
+ * of cards now — see .pick-rail — so this only carries what is still true of
+ * them either way.
+ */
 
-.av-option {
-  appearance: none;
-  min-height: 0;
-  aspect-ratio: 1;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--ink-2);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 0.12s ease, transform 0.12s ease;
-}
-.av-option .portrait {
-  width: 100%;
-  height: auto;
-  border-radius: 50%;
-  display: block;
-}
-.av-option.is-on {
-  border-color: var(--wheat);
-  transform: scale(1.06);
-}
 .av-option:focus-visible {
   outline: 2px solid var(--river);
   outline-offset: 2px;
@@ -186,16 +172,113 @@
   .h-sub { font-size: 0.62rem; letter-spacing: 0.2em; }
   .h-facts { padding: 8px 0; }
   .h-fact-value { font-size: 1.05rem; }
-  .h-play-btn { min-height: 52px; padding: 10px 14px; }
-  .h-play-label { font-size: 0.92rem; }
   .h-play-btn.is-primary .h-play-label { font-size: 1rem; }
-  .av-picker { grid-template-columns: repeat(6, 1fr); gap: 5px; }
-}
-
-@media (max-width: 349px) {
-  .av-picker { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* The faces are drawn on a dark ground of their own, so the ring around
    them is the selection and not the edge of the picture. */
 .av-option .portrait { --portrait-bg: transparent; }
+
+/* ------------------------------------------- choosing a symbol, or a face */
+
+/*
+ * A rail of cards rather than a grid of swatches.
+ *
+ * Both of these are choices about identity — the symbol goes on every badge in
+ * the game, and the face is the person the whole campaign is fought as — and
+ * picking either out of a grid of small squares made it feel like choosing a
+ * bullet point. One row, larger cards, and it snaps so a card never sits half
+ * off the edge.
+ */
+.pick-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.pick-rail::-webkit-scrollbar { display: none; }
+
+.pick-card {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 104px;
+  padding: 14px 10px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.pick-card:hover { border-color: var(--gold); }
+.pick-card:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+
+/*
+ * The chosen one.
+ *
+ * A gold edge and a tick in the corner rather than a colour wash: on paper a
+ * tinted card is hard to tell from an untinted one at a glance, and the tick
+ * is the same mark the map uses for a seat that is settled. Two rings of
+ * shadow do the lifting the old translate did, so a rail of cards does not
+ * jump about as you scroll it.
+ */
+.pick-card.is-on {
+  border-color: var(--gold);
+  background: var(--paper-2);
+  box-shadow: 0 0 0 1px var(--gold), var(--shadow-card);
+}
+.pick-card.is-on::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #fffdf6;
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.pick-card-art {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+}
+.pick-card-art .portrait { border: 2px solid var(--line); }
+.pick-card.is-on .pick-card-art .portrait { border-color: var(--wheat); }
+
+.pick-card-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  text-align: center;
+  line-height: 1.25;
+}
+.pick-card.is-on .pick-card-name { color: var(--cream); }
+
+/* The face cards carry a bigger portrait, so they are a little wider. */
+.av-picker .pick-card { width: 112px; }
+.av-picker .pick-card-art { min-height: 80px; }
+
+@media (max-width: 379px) {
+  .pick-card { width: 94px; }
+  .av-picker .pick-card { width: 100px; }
+}

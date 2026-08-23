@@ -40,30 +40,6 @@
   flex-direction: column;
   align-items: center;
 }
-.h-title-top { font-size: clamp(2.1rem, 10.5vw, 3.1rem); }
-.h-title-of {
-  font-family: var(--font);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--wheat);
-  margin: 7px 0 5px;
-  padding-left: 0.4em;
-}
-.h-title-bottom {
-  font-size: clamp(2.9rem, 15vw, 4.4rem);
-  color: var(--wheat);
-}
-
-.h-tagline {
-  margin: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 
 .h-welcome {
   margin: 2px 0 0;
@@ -81,57 +57,19 @@
   gap: 12px;
 }
 
-.h-play-btn {
-  appearance: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  font-family: var(--font);
-  text-align: left;
-  cursor: pointer;
-  color: var(--cream);
-  background: var(--ink-2);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-}
-.h-play-label {
-  font-family: var(--font-display);
-  font-size: 1.42rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.1;
-}
-.h-play-sub {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .h-play-btn.is-solo {
   background: linear-gradient(168deg, var(--wheat) 0%, var(--wheat-deep) 100%);
   border-color: var(--wheat);
-  color: #1a1408;
-  box-shadow: 0 16px 34px rgba(232, 185, 60, 0.16);
+  color: #1a1305;
+  box-shadow: 0 16px 34px var(--wash-gold-2);
 }
-.h-play-btn.is-solo .h-play-sub { color: rgba(26, 20, 8, 0.68); }
+.h-play-btn.is-solo .h-play-sub { color: rgba(18, 32, 54, 0.42); }
 
 .h-play-btn.is-friends {
-  border-color: rgba(88, 168, 184, 0.42);
-  background: linear-gradient(168deg, rgba(88, 168, 184, 0.16) 0%, var(--ink-2) 100%);
+  border-color: var(--wash-blue-2);
+  background: linear-gradient(168deg, var(--wash-blue-2) 0%, var(--ink-2) 100%);
 }
 .h-play-btn.is-friends .h-play-sub { color: var(--river); }
-
-.h-play-btn:hover { transform: translateY(-1px); }
-.h-play-btn:focus-visible {
-  outline: 2px solid var(--river);
-  outline-offset: 3px;
-}
-.h-play-btn:active { transform: translateY(0); }
 
 /* ---------------------------------------------------- pick it up again */
 
@@ -147,13 +85,6 @@
 
 .h-block:empty { display: none; }
 
-.h-block-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .h-block-title {
   margin: 0 0 10px;
   font-size: 0.68rem;
@@ -163,20 +94,6 @@
   color: var(--wheat);
 }
 .h-block-head .h-block-title { margin-bottom: 0; }
-
-.h-more {
-  appearance: none;
-  border: 0;
-  background: none;
-  padding: 0;
-  font-family: var(--font);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--river);
-  cursor: pointer;
-}
-.h-more:hover { text-decoration: underline; }
 
 .h-kicker {
   margin: -4px 0 10px;
@@ -188,26 +105,13 @@
   margin: 0;
   font-size: 0.82rem;
   color: var(--muted);
-}
-
-/* -------------------------------------------------------- live figures */
-
-.h-figures {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.h-figure,
-.pf-figure {
+}.pf-figure {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding: 12px 4px;
   border-top: 1px solid var(--line-soft);
-}
-.h-figure-value,
-.pf-figure-value {
+}.pf-figure-value {
   font-family: var(--font-display);
   font-size: 1.7rem;
   font-weight: 700;
@@ -215,9 +119,7 @@
   letter-spacing: -0.02em;
   color: var(--cream);
   font-variant-numeric: tabular-nums;
-}
-.h-figure-label,
-.pf-figure-label {
+}.pf-figure-label {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -237,21 +139,6 @@
   flex-direction: column;
   gap: 1px;
 }
-.h-board-row {
-  display: grid;
-  grid-template-columns: 20px 28px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-top: 1px solid var(--line-soft);
-}
-.h-board-row:first-child { border-top: 0; }
-.h-board-rank {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--muted-2);
-  font-variant-numeric: tabular-nums;
-}
 .h-board-row .portrait { border-radius: 50%; }
 .h-board-blank {
   width: 28px;
@@ -259,104 +146,7 @@
   border-radius: 50%;
   background: var(--ink-3);
 }
-.h-board-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.h-board-score {
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--wheat);
-  font-variant-numeric: tabular-nums;
-}
-
-/* --------------------------------------------------------- your profile */
-
-.h-profile {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  align-items: center;
-  gap: 12px;
-  padding-top: 10px;
-}
-.h-profile .portrait { border-radius: 50%; }
-.h-profile-who {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.h-profile-name {
-  font-size: 1rem;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.h-profile-level {
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--wheat);
-}
-.h-profile-figures {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-/* ---------------------------------------------------- party performance */
-
-.h-parties {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.h-party {
-  display: grid;
-  grid-template-columns: 52px 1fr 40px;
-  align-items: center;
-  gap: 10px;
-}
-.h-party-name {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--party, var(--cream));
-}
-.h-party-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--ink-3);
-  overflow: hidden;
-}
-.h-party-fill {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--party, var(--wheat));
-}
-.h-party-share {
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-align: right;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------------------------------------------------- recent elections */
-
-.h-recent {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.h-recent-row,
-.pf-history-row {
+.h-profile .portrait { border-radius: 50%; }.pf-history-row {
   display: grid;
   grid-template-columns: 54px 1fr auto auto;
   align-items: center;
@@ -364,22 +154,15 @@
   padding: 9px 0 9px 10px;
   border-top: 1px solid var(--line-soft);
   border-left: 2px solid var(--party, var(--line));
-}
-.h-recent-row:first-child { border-top: 0; }
-.h-recent-party,
-.pf-history-party {
+}.pf-history-party {
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--party, var(--cream));
-}
-.h-recent-seats,
-.pf-history-seats {
+}.pf-history-seats {
   font-size: 0.86rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-.h-recent-result,
-.pf-history-result {
+}.pf-history-result {
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -426,10 +209,30 @@
 
 .pf-card {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
 }
+
+/* Quiet, because the record beside it is what the screen is for. */
+.pf-edit {
+  appearance: none;
+  align-self: start;
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-family: var(--font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy-2);
+  cursor: pointer;
+}
+.pf-edit:hover { border-color: var(--gold); color: var(--navy); }
+.pf-edit:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .pf-card .portrait { border-radius: 50%; }
 .pf-who {
   display: flex;
@@ -642,12 +445,33 @@
   .h-play-btn { padding: 16px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .h-play-btn { transition: none; }
-  .h-play-btn:hover { transform: none; }
+/* ================================================== the opening screen */
+
+/*
+ * The page itself.
+ *
+ * A very faint engraved wash, the way security paper is printed: hairlines at
+ * an angle, far enough apart and light enough that you read it as texture
+ * rather than as a pattern. It is the difference between a screen and a sheet,
+ * and it costs one gradient.
+ */
+.screen-home {
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(18, 32, 54, 0.014) 0 1px,
+      transparent 1px 9px
+    );
 }
 
-/* ================================================== the opening screen */
+.h-inner {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 30px 18px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
 
 /*
  * One card shape for everything you can press.
@@ -655,99 +479,207 @@
  * The page used to be five differently-sized boxes and four blocks of
  * statistics; it is a short list of choices now, and a list reads as a list
  * only if the items look like each other. What varies between them is weight,
- * not shape.
+ * not shape: an icon, a name, a line of explanation, a chevron.
  */
 .h-card {
   appearance: none;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
   min-height: 62px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
+  padding: 15px 16px;
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-  background: var(--ink-2);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-card);
   font-family: var(--font);
   text-align: left;
-  color: var(--cream);
+  color: var(--navy);
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
-.h-card:hover { transform: translateY(-1px); border-color: var(--line-2, var(--muted-2)); }
+.h-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold);
+  box-shadow: var(--shadow);
+}
 .h-card:active { transform: translateY(0); }
-.h-card:focus-visible { outline: 2px solid var(--river); outline-offset: 3px; }
+.h-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+.h-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.h-card-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--blue);
+  flex: none;
+}
+.h-icon { width: 20px; height: 20px; display: block; }
+
+/* The chevron says "this goes somewhere" without a word doing it. */
+.h-card-chev {
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--navy-3);
+}
 
 .h-card-label {
   font-family: var(--font-display);
-  font-size: 1.28rem;
-  font-weight: 700;
-  line-height: 1.12;
+  font-size: 1.16rem;
+  font-weight: 600;
+  line-height: 1.15;
   letter-spacing: -0.01em;
 }
 .h-card-sub {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--navy-2);
   line-height: 1.35;
 }
 
-/* The way in: the one thing on the page that is meant to be pressed. */
+/*
+ * The way in: the one thing on the page that is meant to be pressed.
+ *
+ * It is the only gold surface on the screen and the only one with a shadow
+ * that reads at arm's length. Nothing else is allowed to come near it —
+ * that is the whole hierarchy, and it is why the leaderboard had to go.
+ */
 .h-card.is-primary {
-  background: linear-gradient(168deg, var(--wheat) 0%, var(--wheat-deep) 100%);
-  border-color: var(--wheat);
-  color: #1a1408;
-  min-height: 84px;
-  box-shadow: 0 16px 34px rgba(232, 185, 60, 0.16);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 88px;
+  padding: 18px 18px;
+  background: linear-gradient(168deg, #d3ac3c 0%, #a8811f 100%);
+  border-color: var(--gold-deep);
+  color: #1a1305;
+  box-shadow: 0 8px 22px -6px rgba(154, 116, 32, 0.45);
 }
-.h-card.is-primary .h-card-label { font-size: 1.5rem; }
-.h-card.is-primary .h-card-sub { color: rgba(26, 20, 8, 0.7); }
+.h-card.is-primary:hover {
+  border-color: var(--gold-deep);
+  box-shadow: 0 12px 28px -6px rgba(154, 116, 32, 0.5);
+}
+.h-card.is-primary .h-card-label { font-size: 1.42rem; }
+.h-card.is-primary .h-card-sub { color: rgba(26, 19, 5, 0.72); }
+.h-card.is-primary .h-card-icon {
+  width: 46px;
+  height: 46px;
+  border-color: rgba(26, 19, 5, 0.24);
+  background: rgba(255, 253, 246, 0.28);
+  color: #1a1305;
+}
+.h-card.is-primary .h-icon { width: 24px; height: 24px; }
+.h-card.is-primary .h-card-chev { color: rgba(26, 19, 5, 0.5); }
 
-.h-card.is-solo {
-  border-color: rgba(88, 168, 184, 0.4);
-  background: linear-gradient(168deg, rgba(88, 168, 184, 0.14) 0%, var(--ink-2) 100%);
+/* Playing alone: the same shape, in the second voice rather than the first. */
+.h-card.is-solo .h-card-icon {
+  border-color: var(--wash-blue-2);
+  background: var(--wash-blue);
 }
-.h-card.is-solo .h-card-sub { color: var(--river); }
 
 /*
  * Something left unfinished, which is the only card that is not always there.
- * It leads with the river accent because picking a game back up is a
- * different kind of act from starting one.
+ * It leads with the blue accent because picking a game back up is a different
+ * kind of act from starting one.
  */
 .h-card.is-continue {
-  border-left: 3px solid var(--river);
+  border-left: 3px solid var(--blue);
 }
-.h-card.is-continue .h-card-sub { color: var(--river); }
+.h-card.is-continue .h-card-sub { color: var(--blue); font-weight: 500; }
 
-/* The three places to go: present, quiet, and never competing with Play. */
+/*
+ * The two places to go.
+ *
+ * Flat, ruled, and never competing with Play: no card fill, no shadow, one
+ * hairline between them. They are a contents list, not two more offers.
+ */
 .h-nav {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.h-nav-title {
+  margin: 0;
+  padding: 11px 16px 8px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+  border-bottom: 1px solid var(--rule-soft);
 }
 .h-card.is-quiet {
   min-height: 0;
-  padding: 13px 16px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 0;
   background: none;
+  box-shadow: none;
 }
-.h-card.is-quiet .h-card-label { font-size: 1rem; }
+.h-card.is-quiet + .h-card.is-quiet { border-top: 1px solid var(--rule-soft); }
+.h-card.is-quiet:hover {
+  transform: none;
+  background: var(--wash-ink);
+  box-shadow: none;
+}
+.h-card.is-quiet .h-card-label {
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
 .h-card.is-quiet .h-card-sub {
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: none;
-  color: var(--muted-2);
+  font-size: 0.72rem;
+  color: var(--navy-3);
 }
+.h-card.is-quiet .h-card-icon {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: none;
+  color: var(--navy-3);
+}
+.h-card.is-quiet .h-icon { width: 18px; height: 18px; }
 
 .h-resume:empty { display: none; }
 
 @media (max-width: 430px) {
-  .h-card { padding: 15px 16px; }
-  .h-card.is-primary { min-height: 78px; }
-  .h-card.is-primary .h-card-label { font-size: 1.34rem; }
-  .h-card-label { font-size: 1.18rem; }
+  .h-inner { padding: 24px 14px 40px; gap: 18px; }
+  .h-card { padding: 14px; gap: 12px; }
+  .h-card.is-primary { min-height: 82px; padding: 16px 14px; }
+  .h-card.is-primary .h-card-label { font-size: 1.28rem; }
+  .h-card-label { font-size: 1.08rem; }
+  .h-card-sub { font-size: 0.72rem; }
+  .h-card-icon { width: 34px; height: 34px; }
+}
+
+/* Under about 340px the icon is the first thing worth its space. */
+@media (max-width: 339px) {
+  .h-card:not(.is-primary) .h-card-icon { display: none; }
+  .h-card { grid-template-columns: minmax(0, 1fr) auto; }
+  .h-card.is-primary { grid-template-columns: auto minmax(0, 1fr) auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .h-card { transition: none; }
+  .h-card:hover { transform: none; }
 }
 
 /* The three pages a store review and a privacy request both need to find. */

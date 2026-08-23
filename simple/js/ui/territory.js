@@ -126,11 +126,44 @@ CMP.ui.territory = (function () {
 
     function paint() {
       if (!view || game.mode !== 'multiplayer') {
+        /*
+         * Solo, where there is nobody to agree with.
+         *
+         * This was one grey sentence on an otherwise empty screen, which
+         * reads as a section that failed to load rather than as one that has
+         * nothing to say. It is a tab on the bar now, so it is reached by
+         * accident often enough to be worth explaining properly: what an
+         * alliance is, when it can be made, and where to find one.
+         */
+        var deadline = ((CMP.CAMPAIGN || {}).rounds || {}).allianceDeadline || 10;
         mount(root, [
-          el('p', {
-            class: 'g-block-note',
-            text: 'Alliances are for games with other people in them.',
-          }),
+          el('div', { class: 'tr-empty' }, [
+            el('span', { class: 'tr-empty-mark', 'aria-hidden': 'true', text: '\u26ad' }),
+            el('h3', { class: 'tr-empty-title', text: 'Nobody to agree with' }),
+            el('p', {
+              class: 'tr-empty-note',
+              text: 'You are playing on your own, and the three opponents ' +
+                'are run by the game. An alliance is an agreement between ' +
+                'two people, so there is none to make here.',
+            }),
+          ]),
+          el('div', { class: 'tr-empty-rules' }, [
+            el('h4', { class: 'tr-empty-rules-title', text: 'In a game with friends' }),
+            el('ul', { class: 'tr-empty-list' }, [
+              el('li', {
+                text: 'An alliance is offered, and has to be accepted. ' +
+                  'Nobody is allied without agreeing to it.',
+              }),
+              el('li', {
+                text: 'Allied seats count together for forming a government, ' +
+                  'and only for that. The seats stay whoever won them.',
+              }),
+              el('li', {
+                text: 'Offers close after round ' + deadline + '. A ' +
+                  'partnership struck on election night is not a partnership.',
+              }),
+            ]),
+          ]),
         ]);
         return;
       }

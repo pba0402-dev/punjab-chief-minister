@@ -83,7 +83,7 @@
 
 .g-round .round-bar {
   position: sticky;
-  top: 0;
+  top: calc(var(--nav-h, 54px) + env(safe-area-inset-top, 0px));
   z-index: 6;
   padding: 8px 12px 9px;
   gap: 6px;
@@ -152,7 +152,7 @@
   flex: none;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(226, 99, 79, 0.16);
+  background: var(--wash-bad);
   color: var(--warm-bad);
   font-size: 0.64rem;
   font-weight: 700;
@@ -160,56 +160,15 @@
 
 /* ----------------------------------------------------------------- nav */
 
-.g-nav {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
-  margin: 0 -14px;
-  padding-left: 14px;
-  padding-right: 14px;
-}
-.g-nav::-webkit-scrollbar { display: none; }
-
-/* A soft edge, so a row that runs off the side reads as scrollable rather
-   than as something that got cut off. */
-.g-nav-wrap { position: relative; }
-.g-nav-wrap::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 26px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--ink));
-}
-
-.g-nav-item {
-  flex: none;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--ink-2);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-  min-height: 36px;
-}
-.g-nav-item:hover { color: var(--cream); border-color: var(--wheat-deep); }
-.g-nav-item:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
-.g-nav-item.is-active {
-  background: var(--wheat);
-  border-color: var(--wheat);
-  color: #241c08;
-}
+/*
+ * The bar is defined once, in hud.css.
+ *
+ * What used to be here was the previous design — a scrolling row of pills
+ * with a fade at its edge and an .is-active class nothing sets any more. It
+ * was inert only because hud.css loads after it, which is not a thing to rely
+ * on: the same arrangement across three files is what once hid the party
+ * abbreviations behind the portraits on the scoreboard.
+ */
 
 .g-notice:empty { display: none; }
 
@@ -329,7 +288,7 @@
 .g-majority-track {
   height: 4px;
   border-radius: 999px;
-  background: rgba(246, 241, 231, 0.08);
+  background: var(--wash-ink);
   overflow: hidden;
 }
 .g-majority-fill {
@@ -474,7 +433,7 @@
   border-radius: 999px;
   border: 1px solid var(--wheat-deep);
   background: var(--wheat);
-  color: #241c08;
+  color: #1a1305;
   font: inherit;
   font-size: 0.7rem;
   font-weight: 700;
@@ -557,7 +516,7 @@
 .g-heat-track {
   height: 4px;
   border-radius: 999px;
-  background: rgba(246, 241, 231, 0.08);
+  background: var(--wash-ink);
   overflow: hidden;
 }
 .g-heat-fill { display: block; height: 100%; border-radius: 999px; }
@@ -569,8 +528,8 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: 11px;
-  border: 1px solid rgba(226, 99, 79, 0.4);
-  background: rgba(226, 99, 79, 0.09);
+  border: 1px solid var(--warn-bad);
+  background: var(--wash-bad);
   color: var(--warm-bad);
   font-size: 0.82rem;
 }
@@ -579,25 +538,51 @@
 
 .loan-offers { display: flex; flex-direction: column; gap: 5px; }
 .loan-offer {
-  display: flex;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 12px;
   border-radius: 11px;
-  border: 1px solid var(--line);
-  background: var(--ink-2);
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  min-height: 44px;
+  min-height: 48px;
 }
-.loan-offer:hover { border-color: var(--wheat-deep); }
+.loan-offer:hover { border-color: var(--gold); }
 .loan-offer:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
 .loan-offer.is-blocked { opacity: 0.5; cursor: not-allowed; }
-.loan-amount { font-family: var(--font-display); font-size: 1.05rem; }
-.loan-terms { font-size: 0.72rem; color: var(--muted-2); text-align: right; }
+.loan-amount {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+/*
+ * What the loan actually costs, on three lines.
+ *
+ * The three spans had no rule of their own, so they ran together as one
+ * string - "Receive ₹52 lakhRepay ₹78 lakhDue round 5" - and the amount
+ * beside them wrapped to make room for it. They are what the player is
+ * deciding on, so each gets its own line and the amount is never broken.
+ */
+.loan-terms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--navy-2);
+  text-align: right;
+}
+.loan-line { display: block; font-variant-numeric: tabular-nums; }
+.loan-line.is-quiet { color: var(--navy-3); }
+.loan-terms.is-blocked { color: var(--warn-bad); max-width: 22em; }
 .loan-open { display: flex; flex-direction: column; gap: 6px; }
 
 /* ------------------------------------------------------------- the log */
@@ -615,7 +600,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 0;
-  background: rgba(8, 6, 4, 0.72);
+  background: rgba(18, 32, 54, 0.42);
   backdrop-filter: blur(2px);
 }
 .sheet-panel {
@@ -630,7 +615,7 @@
   border: 1px solid var(--line);
   border-bottom: 0;
   background: var(--ink-2);
-  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 -18px 50px rgba(18, 32, 54, 0.1);
   animation: sheet-up 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes sheet-up {
@@ -644,20 +629,57 @@
 }
 .sheet-item {
   width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line-soft);
-  background: var(--ink-3);
-  color: var(--cream);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--navy);
   font: inherit;
   font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
   min-height: 46px;
 }
-.sheet-item:hover { border-color: var(--wheat-deep); }
+.sheet-item:hover { border-color: var(--gold); }
 .sheet-item:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
-.sheet-item.is-danger { color: var(--warm-bad); }
+.sheet-item.is-danger { color: var(--warn-bad); border-color: var(--wash-bad); }
+
+/*
+ * A row in the menu that goes somewhere.
+ *
+ * Glyph, name, note, chevron — the same shape as the cards on the opening
+ * screen, so a list of choices looks like a list of choices wherever it is.
+ * The chevron is the whole distinction between this and a switch.
+ */
+.sheet-item.is-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.sheet-item.is-row .sheet-item-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--blue);
+  font-size: 0.86rem;
+  line-height: 1;
+}
+.sheet-item.is-row.is-danger .sheet-item-glyph,
+.sheet-item.is-row.is-exit .sheet-item-glyph {
+  color: var(--warn-bad);
+}
+.sheet-item-chev { font-size: 1.2rem; line-height: 1; color: var(--navy-3); }
+
+/* Leaving is set apart from the four, with a rule above it. */
+.sheet-item.is-exit {
+  margin-top: 2px;
+  border-color: var(--wash-bad);
+}
 
 .report-sheet { border-top: 3px solid var(--line); }
 .report-sheet.is-good { border-top-color: var(--warm-good); }
@@ -775,7 +797,7 @@
 .sd-bar-track {
   height: 10px;
   border-radius: 3px;
-  background: rgba(246, 241, 231, 0.07);
+  background: var(--wash-ink);
   overflow: hidden;
 }
 .sd-bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--party); }
@@ -863,15 +885,6 @@
   .g-inner { padding-top: 16px; gap: 14px; }
   .g-title { font-size: 1.2rem; }
   .g-round .round-steps { display: flex; }
-  /* With room to spare there is no reason to hide anything behind a scroll. */
-  .g-nav {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    margin: 0;
-    padding-left: 0;
-    padding-right: 0;
-  }
-  .g-nav-wrap::after { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1019,12 +1032,12 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  background: rgba(246, 241, 231, 0.08);
+  background: var(--wash-ink);
   color: var(--muted-2);
 }
 .area-status.is-safe,
 .area-status.is-leading { background: rgba(143, 220, 174, 0.16); color: var(--warm-good); }
-.area-status.is-close { background: rgba(232, 185, 60, 0.18); color: var(--wheat); }
+.area-status.is-close { background: var(--wash-gold-2); color: var(--wheat); }
 .area-status.is-losing { background: rgba(241, 146, 129, 0.16); color: var(--warm-bad); }
 .area-chev { color: var(--muted-2); font-size: 0.95rem; line-height: 1; }
 
@@ -1060,7 +1073,7 @@
   align-self: flex-start;
   padding: 8px 14px;
   border-radius: 999px;
-  border: 1px dashed rgba(226, 99, 79, 0.5);
+  border: 1px dashed var(--warn-bad);
   background: transparent;
   color: var(--warm-bad);
   font: inherit;
@@ -1120,7 +1133,7 @@
 .cs-amount:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
 .cs-amount.is-active {
   border-color: var(--wheat);
-  background: rgba(232, 184, 74, 0.16);
+  background: var(--wash-gold-2);
   color: var(--cream);
 }
 

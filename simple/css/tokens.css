@@ -1,82 +1,149 @@
 /* ------------------------------------------------------------------
-   The visual system, restated.
+   The visual system.
 
-   The game had grown a warm brown ground with gold on almost everything,
-   which reads as a financial dashboard rather than a strategy game and is
-   tiring over a long session on a phone.
+   The game was played on near-black. It read as a piece of software rather
+   than as an election, and an hour of it on a phone at full brightness is
+   tiring in a way a printed page is not.
 
-   This is the same identity, disciplined:
+   So the ground is paper. Warm ivory, deep navy set on it, a restrained
+   blue for the second voice and gold kept for the thing worth pressing.
+   That is the language of a ballot paper, a nomination form and a results
+   sheet — which is what the game is about — and it is also the palette that
+   stays legible outdoors, where a phone is actually used.
 
-     - the ground is a near-black charcoal with a faint blue cast, not brown
-     - text is off-white, never pure white, on soft rather than hard contrast
-     - gold is an accent and nothing else: the action you should take, the
-       thing you have selected, the majority line. It is not a card colour
-     - party colours appear on borders, badges, bars and indicators only
+   Three rules hold the whole thing together:
 
-   Loaded straight after styles.css, so it redefines those tokens for every
-   sheet that follows without any of them needing to know.
+     - navy is text and chrome, never a card fill, with one exception: the
+       navigation bar, which is navy so the chrome reads as chrome
+     - gold means "this is the action" or "this is the one you chose". It is
+       never decoration and never a background for reading on
+     - party colours appear on badges, bars, borders and the map, and
+       nowhere else
+
+   This sheet loads straight after styles.css and redefines its tokens, so
+   every sheet after it follows without knowing anything changed.
    ------------------------------------------------------------------ */
 
 :root {
-  /* Grounds. Charcoal with a trace of blue, which reads as neutral beside
-     warm text and stops the whole screen looking like old paper. */
-  --ink: #0e0f12;
-  --ink-2: #16181d;
-  --ink-3: #1d2026;
+  /* ---- the palette, named for what it is ---- */
 
-  --line: #2a2e36;
-  --line-soft: #1e2128;
+  /* Paper. Warm rather than white — a flat #fff under a serif reads as a
+     word processor, and the warmth is what makes it read as stock. */
+  --paper: #f6f2e9;
+  --paper-2: #fdfbf6;   /* a card lifted off the page */
+  --paper-3: #ece5d7;   /* a field or a well, pressed into it */
 
-  /* Text. Off-white rather than white: the difference is invisible in a
-     screenshot and considerable at midnight. */
-  --cream: #ecebe8;
-  --muted: #9ba1ab;
-  --muted-2: #6b7280;
+  /* Ink. Midnight navy, not black: it holds the serif without the
+     hard edge pure black gives on a bright screen. */
+  --navy: #122036;
+  --navy-2: #43556f;    /* supporting text */
+  --navy-3: #5f6a78;    /* labels and captions: 4.9:1 on the paper */
 
-  /* The one accent. Softer and less saturated than the old gold, because it
-     now appears only where it means something. */
-  --wheat: #d8a94a;
-  --wheat-deep: #b0842c;
+  /* Rules are thin and warm, so a card edge is felt rather than drawn. */
+  --rule: #ded5c4;
+  --rule-soft: #ebe4d6;
 
-  /* A cool second voice for information rather than action. */
-  --river: #6aa9c4;
-  --danger: #d9614f;
-  --good: #6fbf8e;
+  /* Gold, dark enough to be read as text on paper. */
+  --gold: #856216;
+  --gold-deep: #6b4d11;
+  --gold-bright: #c9a227;   /* for fills, with navy set on them */
+
+  /* The second voice: information rather than action. */
+  --blue: #2c5d8f;
+  --blue-deep: #1d4269;
+
+  --warn-bad: #a63a2c;
+  --warn-good: #2c6b4c;
+
+  /* ---- tints, so a wash is never a magic rgba() in some other file ---- */
+  --wash-ink: rgba(18, 32, 54, 0.05);
+  --wash-ink-2: rgba(18, 32, 54, 0.08);
+  --wash-gold: rgba(133, 98, 22, 0.11);
+  --wash-gold-2: rgba(133, 98, 22, 0.18);
+  --wash-blue: rgba(44, 93, 143, 0.09);
+  --wash-blue-2: rgba(44, 93, 143, 0.15);
+  --wash-bad: rgba(166, 58, 44, 0.1);
+  --wash-good: rgba(44, 107, 76, 0.1);
+
+  /* ------------------------------------------------------------------
+     The names the rest of the game is written against.
+
+     Sixteen stylesheets say --ink for "the ground" and --cream for "the
+     text". Those names were literal when the ground was ink-black; they are
+     now roles rather than descriptions, and they are kept because pointing
+     them at the new palette turns the whole game over at once — where
+     renaming them across sixteen files would turn most of it over and leave
+     a handful of screens behind on the old one.
+     ------------------------------------------------------------------ */
+  --ink: var(--paper);
+  --ink-2: var(--paper-2);
+  --ink-3: var(--paper-3);
+
+  --line: var(--rule);
+  --line-soft: var(--rule-soft);
+
+  --cream: var(--navy);
+  --muted: var(--navy-2);
+  --muted-2: var(--navy-3);
+
+  --wheat: var(--gold);
+  --wheat-deep: var(--gold-deep);
+
+  --river: var(--blue);
+  --danger: var(--warn-bad);
+  --good: var(--warn-good);
+  --warm-bad: var(--warn-bad);
+  --warm-good: var(--warn-good);
 
   --radius: 12px;
   --radius-sm: 8px;
 
-  /* Shadows do the work borders used to. */
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* A quieter ground: one soft pool of light, not two competing washes. */
-body {
-  background:
-    radial-gradient(1100px 620px at 50% -10%, #1a1d24 0%, transparent 62%),
-    var(--ink);
-  color: var(--cream);
+  /*
+   * Shadows on paper are short and soft.
+   *
+   * The dark design used a 40px drop at half opacity, which is how you lift
+   * a panel off black. The same shadow on ivory looks like a smudge — on
+   * paper the depth cue is a tight, low-opacity shadow plus the rule.
+   */
+  --shadow: 0 10px 30px rgba(18, 32, 54, 0.1);
+  --shadow-sm: 0 1px 3px rgba(18, 32, 54, 0.07);
+  --shadow-card: 0 1px 2px rgba(18, 32, 54, 0.05), 0 6px 18px rgba(18, 32, 54, 0.05);
 }
 
 /*
- * Typography, brought down a step.
+ * The ground.
  *
- * The old scale shouted: 4.4rem titles and 1.9rem figures on a phone. Weight
- * and colour carry the hierarchy now, so the sizes can be the ones the brief
- * asks for — a 32-36px title at the very top, and numbers that read as
- * numbers rather than headlines.
+ * Two very faint washes rather than one flat fill: warm at the top where the
+ * title sits, cool at the bottom. Neither is nameable as a colour at a
+ * glance — they are there so a long screen does not read as a single slab.
+ */
+body {
+  background:
+    radial-gradient(1200px 680px at 50% -12%, #fffdf7 0%, transparent 62%),
+    radial-gradient(900px 560px at 88% 104%, #eef1ee 0%, transparent 60%),
+    var(--paper);
+  color: var(--navy);
+}
+
+/*
+ * Typography.
+ *
+ * Fraunces for anything that names something — the game, a screen, a
+ * district, a party. Karla for everything read as data. The split is the
+ * whole hierarchy: if it is set in the serif it is a name, and if it is not
+ * it is a number or a label.
  */
 .title {
   font-size: clamp(1.75rem, 6vw, 2.25rem);
   letter-spacing: -0.02em;
+  color: var(--navy);
 }
 .title-sm { font-size: clamp(1.15rem, 4vw, 1.4rem); }
 
 .eyebrow {
   font-size: 0.66rem;
   letter-spacing: 0.2em;
-  color: var(--muted);
+  color: var(--navy-3);
 }
 
 /* Touch targets. Anything a finger is meant to find is at least 44px. */
@@ -84,27 +151,32 @@ button,
 .btn,
 [role='button'] {
   min-height: 44px;
-}
-
-/* Small controls opt out deliberately, and stay comfortable by padding. */
+}/* Small controls opt out deliberately,
+and stay comfortable by padding. */
 .btn-small,
 .seat-filter,
-.al-quick-btn,
-.h-more {
+.al-quick-btn {
   min-height: 36px;
 }
 
-/* Gold is for the action worth taking. Everything else is a quiet surface. */
+/*
+ * Gold is for the action worth taking.
+ *
+ * Navy on gold rather than the other way round: gold text on a gold-tinted
+ * ground was legible on black and is not on paper, and a filled button is
+ * the one place the accent can carry a whole surface without shouting.
+ */
 .btn-primary {
-  background: linear-gradient(170deg, var(--wheat) 0%, var(--wheat-deep) 100%);
-  border-color: var(--wheat-deep);
-  color: #17130a;
+  background: linear-gradient(170deg, var(--gold-bright) 0%, var(--gold) 100%);
+  border-color: var(--gold-deep);
+  color: #1a1305;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-quiet {
-  background: var(--ink-2);
-  border-color: var(--line);
-  color: var(--cream);
+  background: var(--paper-2);
+  border-color: var(--rule);
+  color: var(--navy);
 }
 
 @media (prefers-reduced-motion: reduce) {

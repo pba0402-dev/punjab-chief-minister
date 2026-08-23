@@ -37,7 +37,7 @@
   gap: 7px;
   padding: 5px 11px;
   border-radius: 999px;
-  background: var(--party, var(--ink-3));
+  background: var(--party, var(--navy));
   color: var(--party-ink, #fff);
   font-size: 0.72rem;
   font-weight: 700;
@@ -83,7 +83,7 @@
   border-radius: var(--radius);
   border: 1px solid var(--line);
   border-left: 4px solid var(--river);
-  background: rgba(88, 168, 184, 0.06);
+  background: var(--wash-blue);
 }
 .incumbent-row {
   display: grid;
@@ -127,7 +127,7 @@
   letter-spacing: 0.08em;
   color: var(--river);
 }
-.race-track { height: 10px; border-radius: 5px; background: #241f19; overflow: hidden; }
+.race-track { height: 10px; border-radius: 5px; background: var(--paper-3); overflow: hidden; }
 .race-fill { display: block; height: 100%; border-radius: 5px; transition: width 0.4s ease; }
 .race-value { text-align: right; font-variant-numeric: tabular-nums; }
 .race-lead {
@@ -175,9 +175,9 @@
   text-align: center;
   align-items: center;
 }
-.verdict-win { border-color: #7fd6a0; background: rgba(127, 214, 160, 0.07); }
+.verdict-win { border-color: var(--warn-good); background: rgba(127, 214, 160, 0.07); }
 .verdict-lose { border-color: var(--danger); background: rgba(226, 99, 79, 0.06); }
-.verdict-hung { border-color: var(--wheat-deep); background: rgba(232, 185, 60, 0.07); }
+.verdict-hung { border-color: var(--wheat-deep); background: var(--wash-gold); }
 .verdict-kicker {
   font-size: 0.72rem;
   font-weight: 700;
@@ -220,7 +220,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.result-track { height: 12px; border-radius: 6px; background: #241f19; overflow: hidden; }
+.result-track { height: 12px; border-radius: 6px; background: var(--paper-3); overflow: hidden; }
 .result-fill { display: block; height: 100%; border-radius: 6px; }
 .result-seats {
   text-align: right;
@@ -282,7 +282,7 @@
   color: var(--cream);
 }
 .pair-row:hover { border-color: var(--wheat-deep); }
-.pair-row.is-selected { border-color: var(--wheat); background: rgba(232, 185, 60, 0.08); }
+.pair-row.is-selected { border-color: var(--wheat); background: var(--wash-gold); }
 .pair-seats {
   font-family: var(--font-display);
   font-weight: 700;
@@ -306,7 +306,7 @@
 .term-option:hover { color: var(--cream); border-color: var(--wheat-deep); }
 .term-option.is-selected {
   border-color: var(--wheat);
-  background: rgba(232, 185, 60, 0.12);
+  background: var(--wash-gold-2);
   color: var(--cream);
   font-weight: 700;
 }
@@ -337,7 +337,7 @@
   height: 24px;
   padding: 0 7px;
   border-radius: 6px;
-  background: var(--party, var(--ink-3));
+  background: var(--party, var(--navy));
   color: #fff;
   font-size: 0.68rem;
   font-weight: 700;
@@ -354,8 +354,8 @@
   letter-spacing: 0.08em;
   padding: 2px 7px;
   border-radius: 4px;
-  background: rgba(226, 99, 79, 0.16);
-  color: #f19281;
+  background: var(--wash-bad);
+  color: var(--warn-bad);
 }
 .rival-finding {
   font-size: 0.7rem;
@@ -363,19 +363,19 @@
   letter-spacing: 0.04em;
   color: var(--muted);
 }
-.finding-cleared { color: #8fdcae; }
+.finding-cleared { color: var(--warn-good); }
 .finding-warning { color: var(--wheat); }
 .finding-fine,
 .finding-majorFine,
 .finding-restriction,
-.finding-disqualification { color: #f19281; }
+.finding-disqualification { color: var(--warn-bad); }
 .rival-done { font-size: 0.76rem; color: var(--muted-2); text-align: right; max-width: 130px; }
 .btn-report {
-  border-color: rgba(226, 99, 79, 0.5);
-  color: #f19281;
+  border-color: var(--warn-bad);
+  color: var(--warn-bad);
   letter-spacing: 0.06em;
 }
-.btn-report:hover { background: rgba(226, 99, 79, 0.12); border-color: var(--danger); }
+.btn-report:hover { background: var(--wash-bad); border-color: var(--danger); }
 
 .reason-picker { display: flex; flex-direction: column; gap: 14px; }
 .reason-list { display: flex; flex-direction: column; gap: 7px; }
@@ -404,7 +404,7 @@
   background: var(--ink-2);
   font-size: 0.88rem;
 }
-.finding-row.finding-cleared { border-left-color: #7fd6a0; }
+.finding-row.finding-cleared { border-left-color: var(--warn-good); }
 .finding-row.finding-warning { border-left-color: var(--wheat); }
 .finding-row.finding-fine,
 .finding-row.finding-majorFine,

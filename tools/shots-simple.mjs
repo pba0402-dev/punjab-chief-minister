@@ -221,6 +221,48 @@ const SCENES = {
     "CMP.app.setGame(g);CMP.app.goTo('election');",
 
   /*
+   * The More menu: four rows, and the way out set apart from them.
+   */
+  'more-menu':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var b=document.querySelector('.g-more'); if(b)b.click();" +
+    "},240);",
+
+  /*
+   * The Election Briefing, which is where the rules are written down.
+   */
+  'briefing':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){CMP.app.goTo('briefing');},240);",
+
+  /*
+   * A tab on the bar: its name in the serif, and no back arrow.
+   *
+   * The three tabs beside Home used to carry an arrow that went Home, which
+   * the bar underneath already does. This is the screen that shows they no
+   * longer do.
+   */
+  'nav-tab':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){" +
+    "  var t=[].slice.call(document.querySelectorAll('.g-nav-item'))" +
+    "    .filter(function(b){return /Grant/.test(b.textContent);})[0];" +
+    "  if(t)t.click();" +
+    "},220);",
+
+  /*
+   * The bar after a scroll.
+   *
+   * The map is taller than any phone, so if the bar scrolled away with it the
+   * way out of the board would be off screen most of the time. This scrolls
+   * past the board to show it did not.
+   */
+  'nav-stuck':
+    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:'Naya Punjab'});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
+    "setTimeout(function(){window.scrollTo(0,520);},420);",
+
+  /*
    * The face and symbol pickers, so the audit sees the actual images.
    *
    * Everything else shows a portrait at 28-46px in a corner; this is the one

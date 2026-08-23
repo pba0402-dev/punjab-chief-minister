@@ -849,45 +849,50 @@ check('the evidence score is never sent to the browser',
 
 section('Closing the polls');
 // Closing the polls is not part of a round, so it lives in the menu rather
-// than on the campaign screen.
+// than on the campaign screen — one step in, under Game Settings, because it
+// changes how the election runs rather than what happens on the board.
 goHome(host);
 host.click(host.q('.g-more'));
 await sleep(60);
 const hostSheet = host.q('.sheet-panel');
 check('the menu opens', !!hostSheet);
-check('only the host is offered the declare control',
-  !!host.qq('.sheet-item').find((b) => /Close the polls now/.test(b.textContent)),
-  host.qq('.sheet-item').map((b) => b.textContent).join(' | '));
-/*
- * The election history is not in the menu any more — it is on the money
- * screen, which is already the record of the campaign. Four settings is what
- * the menu is for now.
- */
+
 /*
  * Scoped to the sheet that is actually open: the suite opens this menu
  * several times and the earlier ones are still in the document, so counting
  * every `.sheet-item` on the page counts four menus at once.
  */
-const openSheet = host.qq('.sheet').slice(-1)[0];
-const sheetItems = [...openSheet.querySelectorAll('.sheet-item')];
-// Volumes are controls on the switches above them, not extra destinations.
-const sheetActions = sheetItems.filter((b) => !/volume/i.test(b.textContent));
+const latestSheet = () => {
+  const open = host.qq('.sheet').slice(-1)[0];
+  return open ? [...open.querySelectorAll('.sheet-item')] : [];
+};
+
+const menuRows = latestSheet();
 check('the menu is settings and leaving, not a list of screens',
-  sheetActions.length <= 6,
-  sheetActions.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+  menuRows.length === 4,
+  menuRows.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
 check('and none of the game screens are in it',
-  !sheetActions.some((b) => /^(Money|Grants|Loan|Corruption|Bribe|All 117|Election history)/
+  !menuRows.some((b) => /^(Money|Grants|Loan|Corruption|Bribe|All 117|Election history)/
     .test(b.textContent.trim())),
-  sheetActions.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+  menuRows.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+
+host.click(menuRows.find((b) => /Game Settings/.test(b.textContent)));
+await sleep(60);
+check('only the host is offered the declare control',
+  !!latestSheet().find((b) => /Close the polls now/.test(b.textContent)),
+  latestSheet().map((b) => b.textContent.trim().slice(0, 20)).join(' | '));
 
 players[1].click(players[1].q('.g-more'));
 await sleep(60);
+players[1].click(players[1].qq('.sheet-item')
+  .filter((b) => /Game Settings/.test(b.textContent)).slice(-1)[0]);
+await sleep(60);
 check('a guest is not offered it',
   !players[1].qq('.sheet-item').find((b) => /Close the polls/.test(b.textContent)),
-  players[1].qq('.sheet-item').map((b) => b.textContent).join(' | '));
+  players[1].qq('.sheet-item').map((b) => b.textContent.trim().slice(0, 20)).join(' | '));
 players[1].click(players[1].qq('.sheet-panel button').find((b) => b.textContent === 'Close'));
 
-host.click(host.qq('.sheet-item').find((b) => /Close the polls now/.test(b.textContent)));
+host.click(latestSheet().find((b) => /Close the polls now/.test(b.textContent)));
 await sleep(80);
 // Ending a campaign early for four people is worth a confirmation.
 check('closing early asks first', !!host.q('.dialog'));
@@ -1168,7 +1173,7 @@ check('4. home carries no statistics of its own',
   host.text().slice(0, 160));
 check('4. and offers the statistics screen instead',
   host.qq('.h-nav .h-card-label').map((n) => n.textContent).join('/') ===
-    'Game Statistics/Leaderboard/My Profile',
+    'Game Statistics/My Profile',
   host.qq('.h-nav .h-card-label').map((n) => n.textContent).join('/'));
 
 host.click(host.qq('.h-nav .h-card')[0]);

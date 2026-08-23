@@ -54,10 +54,16 @@ CMP.ui.constituency = (function () {
     ]);
   }
 
-  /** Real party codes may be outside the four; colour them sensibly anyway. */
+  /**
+   * Real party codes may be outside the four; colour them sensibly anyway.
+   *
+   * The stand-in is a blue-grey rather than the warm grey it was: on paper a
+   * warm grey sits close enough to the ground to read as another party with a
+   * pale colour, which is exactly what it is not.
+   */
   function partyColourFor(code) {
     var party = CMP.getParty(String(code || '').toLowerCase());
-    return party ? party.colour : '#a89b89';
+    return party ? party.colour : '#8b93a7';
   }
 
   function candidateFor(partyId, roster) {

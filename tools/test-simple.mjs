@@ -289,12 +289,20 @@ check('2. solo is still offered', !!playButton(dom),
   qq(dom, '.h-card').map((c) => c.querySelector('.h-card-label').textContent).join(' / '));
 
 /*
- * 4 + 8 + 9 + 10. Three places to go, and the statistics are not on this page.
+ * 4 + 8 + 9 + 10. Two places to go, and the statistics are not on this page.
+ *
+ * The leaderboard was a third card here. It is a table of other people's
+ * results, which is the last thing the way into a game should compete with,
+ * so it moved to the statistics screen — where the rest of the public figures
+ * already are. This asserts both halves: that it is gone from here, and that
+ * what is left is exactly the two.
  */
 const navLabels = qq(dom, '.h-nav .h-card-label').map((n) => n.textContent);
-check('10. the three navigation cards are there',
-  navLabels.join('/') === 'Game Statistics/Leaderboard/My Profile',
+check('10. the two navigation cards are there',
+  navLabels.join('/') === 'Game Statistics/My Profile',
   navLabels.join('/'));
+check('10. and the leaderboard is not one of them',
+  !/leaderboard/i.test(text(dom)));
 check('4. no statistics block is on the home screen',
   !q(dom, '.h-figures') && !q(dom, '.st-figs'));
 check('8. and no leaderboard rows either',
@@ -2317,19 +2325,36 @@ const moreLabels = qq(dom, '.sheet-panel .sheet-item').map((n) =>
   (n.querySelector('.sheet-item-title') || n).textContent.replace(/^\W+\s*/, '').trim());
 
 /*
- * Four things you can do, and the volumes that belong to two of them.
+ * Four rows, and none of them is a move.
  *
- * A volume is not a fifth destination — it is a control on the switch above
- * it — so the count is of what the menu offers rather than of every row in
- * it.
+ * The audio controls used to be inline here, which meant the menu opened on
+ * four sliders and the four things you can actually do were below them. They
+ * are one row now - Sound & Music - and the menu is a list of four choices.
  */
-const moreActions = moreLabels.filter((l) => !/volume/i.test(l));
-check('3. the menu offers four things', moreActions.length === 4,
-  moreActions.join(' | '));
-check('3. and they are music, sound, about the map and exit',
-  ['Music', 'Sound', 'About the map', 'Exit game']
-    .every((want, i) => moreActions[i] === want),
-  moreActions.join(' | '));
+check('3. the menu offers four things', moreLabels.length === 4,
+  moreLabels.join(' | '));
+check('3. and they are sound, settings, help and exit',
+  ['Sound & Music', 'Game Settings', 'Help / Tutorial', 'Exit game']
+    .every((want, i) => moreLabels[i] === want),
+  moreLabels.join(' | '));
+check('3. no volume slider is on the menu itself',
+  qq(dom, '.sheet-range').length === 0,
+  qq(dom, '.sheet-range').length + ' sliders');
+check('3. nothing that came off it is still listed',
+  ['Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'All 117', 'Election history']
+    .every((gone) => !moreLabels.some((l) => l.indexOf(gone) === 0)),
+  moreLabels.join(' | '));
+check('3. and no empty rows are left behind',
+  qq(dom, '.sheet-panel .sheet-item').every((n) => n.textContent.trim().length > 0));
+
+/* ---- Sound & Music, one row in ---- */
+
+clickIt(dom, qq(dom, '.sheet-item').find(
+  (n) => /Sound & Music/.test(n.textContent)));
+await settle();
+check('4. sound and music open on their own sheet',
+  /Sound & Music/.test(q(dom, '.sheet-title').textContent),
+  q(dom, '.sheet-title') ? q(dom, '.sheet-title').textContent : 'no sheet');
 check('4. music and sound each have their own volume',
   qq(dom, '.sheet-item.is-volume').length === 2 &&
   qq(dom, '.sheet-range').length === 2,
@@ -2343,12 +2368,6 @@ await settle();
 check('4. moving it stores a level, not an on/off',
   dom.window.CMP.settings.get('musicVolume') === 0.15,
   String(dom.window.CMP.settings.get('musicVolume')));
-check('3. nothing that came off it is still listed',
-  ['Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'All 117', 'Election history']
-    .every((gone) => !moreLabels.some((l) => l.indexOf(gone) === 0)),
-  moreLabels.join(' | '));
-check('3. and no empty rows are left behind',
-  qq(dom, '.sheet-panel .sheet-item').every((n) => n.textContent.trim().length > 0));
 
 // Music and sound still work, and remember.
 const musicRow = qq(dom, '.sheet-item.is-toggle')[0];
@@ -2380,6 +2399,206 @@ check('3. loan and grant are one tap from anywhere',
   qq(dom, '.g-nav-label').map((n) => n.textContent).join('/') ===
     'Home/Grant/Alliances/Loan',
   qq(dom, '.g-nav-label').map((n) => n.textContent).join('/'));
+
+/* ---------------------------------------------------- the navigation bar */
+
+/* ------------------------------------------------------ help and settings */
+
+/* ------------------------------------------------------------- the profile */
+
+section('My Profile');
+
+{
+  const pf = await openPage([
+    { key: 'cmp.punjab.profile.v1', value: JSON.stringify({
+      id: 'abc123', name: 'Simran Kaur Gill', avatar: 'a3' }) },
+  ]);
+  await settle();
+
+  clickIt(pf, qq(pf, '.h-card').find((c) => /My Profile/.test(c.textContent)));
+  await settle();
+  check('profile: it opens from the home screen', !!q(pf, '.screen-profile'),
+    q(pf, '.screen') ? q(pf, '.screen').className : 'no screen');
+
+  /*
+   * The brief is explicit that the leaderboard does not belong in here. The
+   * one sentence that mentions it explains why solo games do not count, which
+   * is about this player's own record rather than about anybody else's.
+   */
+  check('profile: no leaderboard table inside it',
+    !q(pf, '.pf-board') && !q(pf, '.lb-board') &&
+      qq(pf, '.pf-section').every((n) => !/rank/i.test(n.textContent)),
+    'sections: ' + qq(pf, '.pf-section').length);
+
+  // Name and face can be changed; nothing else on the screen can.
+  check('profile: there is an edit control', !!q(pf, '.pf-edit'));
+  clickIt(pf, q(pf, '.pf-edit'));
+  await settle();
+  check('profile: the editor offers a name and a face',
+    !!q(pf, '.sheet-panel .field') && !!q(pf, '.sheet-panel .av-picker'),
+    q(pf, '.sheet-title') ? q(pf, '.sheet-title').textContent : 'no sheet');
+  check('profile: and no photo upload',
+    !q(pf, '.sheet-panel input[type=file]'));
+
+  typeInto(pf, q(pf, '.sheet-panel .field'), 'Harpreet Kaur');
+  clickIt(pf, qq(pf, '.sheet-panel button').find((b) => b.textContent === 'Save'));
+  await settle();
+  check('profile: saving a new name keeps it',
+    pf.window.CMP.profile.get().name === 'Harpreet Kaur',
+    pf.window.CMP.profile.get().name);
+  check('profile: and the sheet closes', !q(pf, '.sheet'));
+}
+
+section('The Election Briefing');
+
+clickIt(dom, q(dom, '.g-more'));
+await settle();
+clickIt(dom, qq(dom, '.sheet-item').find((n) => /Help \/ Tutorial/.test(n.textContent)));
+await settle();
+
+check('help: the briefing opens from the menu',
+  !!q(dom, '.screen-briefing'),
+  q(dom, '.screen') ? q(dom, '.screen').className : 'no screen');
+check('help: ten chapters', qq(dom, '.br-chapter').length === 10,
+  qq(dom, '.br-chapter').length + ' chapters');
+check('help: one is open to start with',
+  qq(dom, '.br-chapter.is-open').length === 1);
+check('help: and there are quick tips', qq(dom, '.br-tip').length >= 4,
+  qq(dom, '.br-tip').length + ' tips');
+
+/*
+ * The figures in the briefing are read out of the rules, not typed into the
+ * prose. A tutorial that quotes numbers it does not read goes quietly wrong
+ * the first time somebody tunes the game, so this asserts the link rather
+ * than the number: change the entry cap and the sentence changes with it.
+ */
+const capChapter = dom.window.CMP.ui.briefing.chapters()[2];
+const realCap = dom.window.CMP.CAMPAIGN.spending.entryMaximum / 10000000;
+check('help: the entry cap is quoted from the rules',
+  capChapter.points.some((t) => t.indexOf('₹' + realCap + ' crore') !== -1),
+  capChapter.points.join(' | ').slice(0, 110));
+
+const loanChapter = dom.window.CMP.ui.briefing.chapters()[6];
+const realRate = Math.round(dom.window.CMP.CAMPAIGN.finance.loan.interestRate * 100);
+check('help: so is the interest rate',
+  loanChapter.points.some((t) => t.indexOf(realRate + '%') !== -1),
+  loanChapter.points[0].slice(0, 90));
+
+// Opening a chapter closes the one that was open.
+clickIt(dom, qq(dom, '.br-chapter-head')[4]);
+await settle();
+check('help: opening one chapter closes the other',
+  qq(dom, '.br-chapter.is-open').length === 1 &&
+  qq(dom, '.br-chapter')[4].classList.contains('is-open'));
+
+// And it goes back to the board rather than to the home screen.
+clickIt(dom, q(dom, '.br-back'));
+await settle();
+check('help: back returns to the election, not to home',
+  !!q(dom, '.screen-election'),
+  q(dom, '.screen') ? q(dom, '.screen').className : 'no screen');
+
+/*
+ * Game Settings holds what is a setting. About the map was a row on the menu
+ * itself, which put a paragraph about cell shapes next to the way out of the
+ * game.
+ */
+clickIt(dom, q(dom, '.g-more'));
+await settle();
+clickIt(dom, qq(dom, '.sheet-item').find((n) => /Game Settings/.test(n.textContent)));
+await settle();
+check('settings: about the map moved here',
+  qq(dom, '.sheet-item').some((n) => /About the map/.test(n.textContent)),
+  qq(dom, '.sheet-item').map((n) => n.textContent.slice(0, 18)).join(' | '));
+clickIt(dom, qq(dom, '.sheet-panel button').find((b) => b.textContent === 'Close'));
+await settle();
+
+section('The navigation bar');
+
+/*
+ * A tab on the bar is not a screen you descended into.
+ *
+ * Grant, Alliances and Loan are one tap away from everywhere, so a back arrow
+ * on them is a second control doing the bar's job. The screens reached from
+ * More have no other way out and keep theirs.
+ */
+openSection(dom, 'Grant');
+await settle();
+check('nav: a tab on the bar carries no back arrow',
+  !!q(dom, '.g-section-head') && !q(dom, '.g-section-head .sd-back'),
+  q(dom, '.g-section-head') ? q(dom, '.g-section-head').innerHTML.slice(0, 60) : 'no head');
+check('nav: and its name is set in the serif',
+  !!q(dom, '.g-section-head.is-flush .g-section-title'));
+
+openSection(dom, 'Loan');
+await settle();
+check('nav: the same on Loan', !q(dom, '.g-section-head .sd-back'));
+
+openSection(dom, 'Alliances');
+await settle();
+check('nav: and on Alliances', !q(dom, '.g-section-head .sd-back'));
+
+// A screen below the bar still has one, because it is the only way back.
+goHome(dom);
+clickIt(dom, q(dom, '.round-aside .g-fig.is-lead'));
+await settle();
+check('nav: a screen below the bar keeps its back arrow',
+  !!q(dom, '.g-section-head .sd-back'));
+clickIt(dom, q(dom, '.g-section-head .sd-back'));
+await settle();
+
+/*
+ * A reload is not a decision to go somewhere else.
+ *
+ * Reopening the page used to land on Home whatever you had been doing. The
+ * tab is written to its own storage key, so this reads it back the way the
+ * next page load would.
+ */
+openSection(dom, 'Loan');
+await settle();
+check('nav: the open tab is written down',
+  JSON.parse(dom.window.localStorage.getItem(dom.window.CMP.storage.UI_KEY)).section === 'loan',
+  dom.window.localStorage.getItem(dom.window.CMP.storage.UI_KEY));
+
+const reopened = await openPage([
+  { key: dom.window.CMP.storage.KEY, value: dom.window.localStorage.getItem(dom.window.CMP.storage.KEY) },
+  { key: dom.window.CMP.storage.UI_KEY, value: dom.window.localStorage.getItem(dom.window.CMP.storage.UI_KEY) },
+]);
+await settle();
+clickIt(reopened, q(reopened, '.h-card.is-continue'));
+// Resuming loads the constituencies before it can draw a board, so the
+// screen does not change on the same tick the card is pressed.
+await reopened.window.CMP.data.ensure();
+await settle();
+check('nav: and a reload comes back to it',
+  !!q(reopened, '.g-nav-item.is-on') &&
+    q(reopened, '.g-nav-item.is-on .g-nav-label').textContent === 'Loan',
+  q(reopened, '.g-nav-item.is-on')
+    ? q(reopened, '.g-nav-item.is-on .g-nav-label').textContent
+    : 'nothing lit');
+
+// Exactly one tab is ever lit, wherever you are.
+check('nav: exactly one tab is lit',
+  qq(reopened, '.g-nav-item.is-on').length === 1,
+  String(qq(reopened, '.g-nav-item.is-on').length));
+
+/*
+ * A screen below the bar leaves Home lit rather than nothing.
+ *
+ * The bar answers "which of the four am I in"; a rival's areas is not one of
+ * the four, and an unlit bar reads as broken rather than as informative.
+ */
+goHome(dom);
+clickIt(dom, q(dom, '.round-aside .g-fig.is-lead'));
+await settle();
+check('nav: and a screen below it leaves Home lit',
+  qq(dom, '.g-nav-item.is-on').length === 1 &&
+    q(dom, '.g-nav-item.is-on .g-nav-label').textContent === 'Home',
+  q(dom, '.g-nav-item.is-on')
+    ? q(dom, '.g-nav-item.is-on .g-nav-label').textContent
+    : 'nothing lit');
+goHome(dom);
+await settle();
 
 section('12. Console');
 const realErrors = consoleErrors.filter((e) => !/Could not parse CSS|Not implemented/.test(e));

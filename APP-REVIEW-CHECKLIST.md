@@ -19,12 +19,14 @@ is Apple's call, and two items below make it genuinely uncertain.
 | Audio licensing register | `AUDIO-LICENSES.md` — no files installed |
 | Content rights review | `CONTENT-RIGHTS-REVIEW.md` |
 | Age-rating evidence | `APP-STORE-CONTENT-REVIEW.md` |
+| Text contrast | Every text colour clears WCAG AA against its ground |
+| In-app help | More → Help / Tutorial: the Election Briefing, ten chapters |
 | Metadata drafts | `APP-STORE-METADATA.md` |
 | iOS packaging plan | `IOS-APP-PLAN.md` |
 | No login required to play | Solo play starts from the opening screen |
 | No permissions requested | Camera, location, contacts, photos, notifications: none |
-| Works in mobile portrait | 294 screenshots, 320–1400px, no horizontal overflow |
-| No crashes in the suites | 1,246 checks across nine suites |
+| Works in mobile portrait | 287 screenshots, 320–1400px, no horizontal overflow |
+| No crashes in the suites | 1,274 checks across nine suites |
 
 ---
 

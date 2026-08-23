@@ -92,22 +92,39 @@ CMP.ui.setup = (function () {
 
     /* ---------------------------------------------------------- pickers */
 
+    /**
+     * The symbols, as cards you scroll through rather than a grid you scan.
+     *
+     * A symbol is the face of a party — it goes on the scoreboard, the map and
+     * every badge in the game — and picking one out of sixteen small squares
+     * made it feel like choosing a bullet point. Larger cards, one row, and
+     * the chosen one carrying the party's own colour.
+     */
     function symbolGrid() {
       var party = partySoFar();
-      return el('div', { class: 'sym-grid' }, CMP.PARTY_SYMBOLS.map(function (sym) {
+      return el('div', {
+        class: 'pick-rail',
+        role: 'radiogroup',
+        'aria-label': 'Party symbol',
+      }, CMP.PARTY_SYMBOLS.map(function (sym) {
         var on = draft.partySymbol === sym.id;
         return el('button', {
-          class: 'sym-option' + (on ? ' is-on' : ''),
+          class: 'pick-card sym-option' + (on ? ' is-on' : ''),
           type: 'button',
+          role: 'radio',
           title: sym.name,
           'aria-label': sym.name,
-          'aria-pressed': on ? 'true' : 'false',
-          style: { color: on ? party.colour : 'var(--muted)' },
+          'aria-checked': on ? 'true' : 'false',
+          style: { '--party': party.colour, color: on ? party.colour : 'var(--muted)' },
           onclick: function () {
             draft.partySymbol = sym.id;
+            if (CMP.audio) CMP.audio.play('select');
             paint();
           },
-        }, [CMP.ui.symbol.render(sym.id, 28)]);
+        }, [
+          el('span', { class: 'pick-card-art' }, [CMP.ui.symbol.render(sym.id, 52)]),
+          el('span', { class: 'pick-card-name', text: sym.name }),
+        ]);
       }));
     }
 

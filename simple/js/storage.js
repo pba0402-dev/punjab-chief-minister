@@ -80,12 +80,60 @@ CMP.storage = (function () {
     backend.remove(KEY);
   }
 
+  /* ------------------------------------------------------------------
+     Where you were, as opposed to what you were playing.
+
+     Which tab is open is not part of the game — reloading the page must not
+     be able to change the state of an election — so it lives in a key of its
+     own. It is also why a failure here is silent: losing the fact that you
+     were on the Grant tab is not worth an error, and the game reads it back
+     defensively anyway.
+     ------------------------------------------------------------------ */
+
+  var UI_KEY = 'cmp.punjab.ui.v1';
+
+  function readUi() {
+    try {
+      var raw = backend.get(UI_KEY);
+      var got = raw ? JSON.parse(raw) : null;
+      return got && typeof got === 'object' ? got : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /** Remember one piece of interface state across a reload. */
+  function remember(key, value) {
+    try {
+      var ui = readUi();
+      ui[key] = value;
+      backend.set(UI_KEY, JSON.stringify(ui));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** Read it back, or null if it was never written or cannot be read. */
+  function recall(key) {
+    var ui = readUi();
+    return Object.prototype.hasOwnProperty.call(ui, key) ? ui[key] : null;
+  }
+
+  function forgetUi() {
+    backend.remove(UI_KEY);
+  }
+
   return {
     KEY: KEY,
+    UI_KEY: UI_KEY,
     save: save,
     load: load,
     hasSave: hasSave,
     clear: clear,
+    remember: remember,
+    recall: recall,
+    forgetUi: forgetUi,
     backendName: function () {
       return backend.name;
     },

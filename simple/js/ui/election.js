@@ -90,12 +90,75 @@ CMP.ui.election = (function () {
     return null;
   }
 
+/*
+ * The four systems a campaign is run from, always in reach.
+ *
+ * Home, Grant, Alliances and Loan were three buttons above the board that
+ * scrolled away with it, and everything else was behind More. They are a bar
+ * under the title now: wherever you are, the other three are one tap, and the
+ * one you are on says so.
+ *
+ * The list lives out here rather than inside create() because three things
+ * ask what the four tabs are: which one to open on, which one to write down,
+ * and which one is lit.
+ */
+  var NAV = [
+    { id: 'home', label: 'Home', glyph: '◈' },
+    { id: 'priorities', label: 'Grant', glyph: '₹' },
+    { id: 'allies', label: 'Alliances', glyph: '⚭' },
+    { id: 'loan', label: 'Loan', glyph: '◑' },
+  ];
+
+  /** True when this section is one of the four, rather than a screen below them. */
+  function onTheBar(id) {
+    for (var i = 0; i < NAV.length; i++) {
+      if (NAV[i].id === id) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Which tab the current view belongs to.
+   *
+   * The four are destinations; everything else - a candidate, their seats,
+   * the money ledger, all 117 - is somewhere you got to from the board, so
+   * Home stays lit while you are down there. Exactly one is always on.
+   */
+  function navFor(current) {
+    return onTheBar(current) ? current : 'home';
+  }
+
+/*
+ * Which tab a reload comes back to.
+ *
+ * A refresh used to land on Home wherever you were, which reads as the game
+ * having lost your place — worst on a phone, where a reload is often not
+ * something you chose. So the tab is written down when you move and read back
+ * when the screen is built.
+ *
+ * Only the four tabs on the bar are restored. The rest — the risky screens,
+ * a rival's areas, a seat panel — are places you go for one thing and leave,
+ * and a reload that reopened somebody's bribe screen would be answering a
+ * question nobody asked. Anything else, or anything unrecognised, is Home.
+ */
+  function openingSection() {
+    var saved = CMP.storage && CMP.storage.recall
+      ? CMP.storage.recall('section')
+      : null;
+    return onTheBar(saved) ? saved : 'home';
+  }
+
+  function rememberSection(next) {
+    if (!CMP.storage || !CMP.storage.remember) return;
+    CMP.storage.remember('section', onTheBar(next) ? next : 'home');
+  }
+
   function create(opts) {
     var game = null;
     var selected = null;      // the seat a campaign action would target
     var openSeat = null;      // the seat whose detail panel is open
     var openParty = null;     // the candidate whose areas are open
-    var section = 'home';
+    var section = openingSection();
     var lastReport = null;
     var notice = null;
     var busy = false;
@@ -339,6 +402,7 @@ CMP.ui.election = (function () {
       if (CMP.audio) CMP.audio.play('tap');
       section = next;
       openSeat = null;
+      rememberSection(next);
       if (next === 'areas' && !openParty) openParty = game.partyId;
       if (next !== 'areas') openParty = null;
       // The bar has to follow the view. Every route into a section comes
@@ -449,32 +513,16 @@ CMP.ui.election = (function () {
     }
 
     /*
-     * The four systems a campaign is run from, always in reach.
+     * Tell the round strip how tall the bar is.
      *
-     * Home, Grant, Alliances and Loan were three buttons above the board that
-     * scrolled away with it, and everything else was behind More. They are a
-     * bar under the title now: wherever you are, the other three are one tap,
-     * and the one you are on says so.
+     * Both are sticky and both want the top of the screen, so the strip is
+     * offset by whatever the bar actually measures rather than by a number
+     * written down here — the labels wrap at narrow widths and a guess would
+     * be wrong on exactly the phones that can least afford the overlap.
      */
-    var NAV = [
-      { id: 'home', label: 'Home', glyph: '\u25c8' },
-      { id: 'priorities', label: 'Grant', glyph: '\u20b9' },
-      { id: 'allies', label: 'Alliances', glyph: '\u26ad' },
-      { id: 'loan', label: 'Loan', glyph: '\u25d1' },
-    ];
-
-    /**
-     * Which tab the current view belongs to.
-     *
-     * The four are destinations; everything else — a candidate, their seats,
-     * the money ledger, all 117 — is somewhere you got to from the board, so
-     * Home stays lit while you are down there. Exactly one is always on.
-     */
-    function navFor(current) {
-      for (var i = 0; i < NAV.length; i++) {
-        if (NAV[i].id === current) return current;
-      }
-      return 'home';
+    function measureNav() {
+      if (!navNode || !navNode.offsetHeight || !root.style) return;
+      root.style.setProperty('--nav-h', navNode.offsetHeight + 'px');
     }
 
     function paintNav() {
@@ -493,6 +541,7 @@ CMP.ui.election = (function () {
           el('span', { class: 'g-nav-label', text: item.label }),
         ]);
       }));
+      measureNav();
     }
 
     /**
@@ -622,130 +671,201 @@ CMP.ui.election = (function () {
       document.body.appendChild(sheet);
     }
 
-    /** Everything that is not part of a round: history, sound, leaving. */
-    function openMenu() {
+    /**
+     * A row in the menu that goes somewhere.
+     *
+     * One shape for all of them, so the menu reads as four choices rather
+     * than as a pile of controls. The chevron is what distinguishes a row
+     * that opens something from a switch that changes something.
+     */
+    function menuRow(glyph, title, note, onclick, cls) {
+      return el('button', {
+        class: 'sheet-item is-row' + (cls ? ' ' + cls : ''),
+        type: 'button',
+        onclick: onclick,
+      }, [
+        el('span', { class: 'sheet-item-glyph', 'aria-hidden': 'true', text: glyph }),
+        el('span', { class: 'sheet-item-body' }, [
+          el('strong', { class: 'sheet-item-title', text: title }),
+          el('span', { class: 'sheet-item-note', text: note }),
+        ]),
+        el('span', { class: 'sheet-item-chev', 'aria-hidden': 'true', text: '›' }),
+      ]);
+    }
+
+    /*
+     * Sub-sheets open on top of the menu, so leaving one for a dialog has to
+     * take both down. Anything appended to the body with class .sheet is one
+     * of ours, and none of them survives a decision.
+     */
+    function shutMenuChain() {
+      var open = document.querySelectorAll('body > .sheet');
+      for (var i = 0; i < open.length; i++) {
+        if (open[i].parentNode) open[i].parentNode.removeChild(open[i]);
+      }
+    }
+
+    /** A sheet with a title, a body and a Close. The shape all of these share. */
+    function subSheet(title, rows) {
+      var sheet = el('div', { class: 'sheet' }, [
+        el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
+          el('h2', { class: 'sheet-title', text: title }),
+        ].concat(rows).concat([
+          el('button', {
+            class: 'btn btn-quiet btn-wide',
+            type: 'button',
+            text: 'Close',
+            onclick: function () { shut(); },
+          }),
+        ])),
+      ]);
+      function shut() {
+        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
+      }
+      sheet.addEventListener('click', function (e) {
+        if (e.target === sheet) shut();
+      });
+      document.body.appendChild(sheet);
+      return shut;
+    }
+
+    /**
+     * Sound and music.
+     *
+     * The switches remember what the player asked for whether or not anything
+     * is playing yet - see js/settings.js, which says so rather than offering
+     * a switch that quietly does nothing.
+     */
+    function openSoundSheet() {
+      subSheet('Sound & Music', [
+        el('div', { class: 'sheet-group' }, [
+          settingRow('music', '♪', 'Music', 'Background music'),
+          volumeRow('musicVolume', 'Music volume'),
+          settingRow('sound', '▶', 'Sound effects', 'Taps, results and alerts'),
+          volumeRow('soundVolume', 'Sound volume'),
+          CMP.audio && !CMP.audio.ready()
+            ? el('p', {
+                class: 'sheet-note',
+                text: 'No audio files are installed yet, so these remember ' +
+                  'what you asked for and nothing plays.',
+              })
+            : null,
+        ]),
+      ]);
+    }
+
+    /**
+     * Game settings.
+     *
+     * What is genuinely a setting, and nothing that is a move. The host's
+     * control over when the count begins lives here too: it changes how the
+     * game runs rather than what happens on the board.
+     */
+    function openSettingsSheet() {
       var view = opts.getServerView && opts.getServerView();
       var isHost = !!(view && view.youAreHost);
       var left = (game.roundsTotal || CMP.ROUNDS.total) - (game.round || 1);
 
+      subSheet('Game Settings', [
+        el('div', { class: 'sheet-group' }, [
+          menuRow('◱', 'About the map',
+            'What the shapes do and do not claim',
+            function () {
+              shutMenuChain();
+              showAboutSheet();
+            }),
+          isHost
+            ? menuRow('▣',
+                left > 0 ? 'Close the polls now' : 'Begin the count',
+                left > 0
+                  ? 'End the campaign early and count the votes'
+                  : 'Every round is done; read the result',
+                function () {
+                  shutMenuChain();
+                  confirmDeclare(left);
+                },
+                'is-danger')
+            : null,
+          game.mode === 'multiplayer'
+            ? menuRow('✕', 'End this game',
+                'Finish here for good. Nobody will be able to rejoin.',
+                function () {
+                  shutMenuChain();
+                  confirmEndGame();
+                },
+                'is-danger')
+            : null,
+        ]),
+      ]);
+    }
+
+    /** Everything that is not part of a round: sound, settings, help, leaving. */
+    function openMenu() {
       var sheet = el('div', { class: 'sheet' }, [
         el('div', { class: 'sheet-panel', role: 'dialog', 'aria-modal': 'true' }, [
           el('h2', { class: 'sheet-title', text: 'Menu' }),
 
           /*
-           * Four things, and none of them is a move.
+           * Four rows, and none of them is a move.
            *
            * Money, Grants, Corruption, Bribe, all 117 constituencies and the
-           * election history were here. They are gone from this menu on
+           * election history were in this menu once. They are gone from it on
            * purpose: it is the place you go while a round is running, and a
-           * list of eleven destinations is not that.
+           * list of eleven destinations is not that. What is left is the four
+           * things that are about the sitting rather than about the game -
+           * how it sounds, how it runs, how it works, and how to leave.
            *
-           * What that leaves reachable elsewhere: Loan and Grant are buttons
-           * above the board, the grant ledger opens from the grant figure in
-           * the round strip, and a corruption or negative campaign is a mode
-           * on the campaign panel where every other kind of spending lives.
-           */
-
-          /*
-           * Sound, and what the map is not claiming.
-           *
-           * The audio switches remember what the player asked for whether or
-           * not anything is playing yet — see js/settings.js, which says so
-           * rather than offering a switch that quietly does nothing.
+           * The audio controls used to be inline here, which meant the menu
+           * opened on four sliders. They are one row now, like the rest.
            */
           el('div', { class: 'sheet-group' }, [
-            settingRow('music', '\u266a', 'Music', 'Background music'),
-            volumeRow('musicVolume', 'Music volume'),
-            settingRow('sound', '\u25b6', 'Sound', 'Game sound effects'),
-            volumeRow('soundVolume', 'Sound volume'),
-            CMP.audio && !CMP.audio.ready()
-              ? el('p', {
-                  class: 'sheet-note',
-                  text: 'No audio files are installed yet, so these remember ' +
-                    'what you asked for and nothing plays.',
-                })
-              : null,
+            menuRow('♪', 'Sound & Music',
+              'Music, effects and their volumes', function () {
+                shutMenuChain();
+                openSoundSheet();
+              }),
+            menuRow('⚙', 'Game Settings',
+              'How this election runs', function () {
+                shutMenuChain();
+                openSettingsSheet();
+              }),
+            menuRow('ℹ', 'Help / Tutorial',
+              'The Election Briefing, in ten short chapters', function () {
+                shutMenuChain();
+                if (opts.onBriefing) opts.onBriefing();
+              }),
           ]),
 
-          el('button', {
-            class: 'sheet-item',
-            type: 'button',
-            onclick: function () {
-              close();
-              showAboutSheet();
-            },
-          }, [
-            el('strong', { class: 'sheet-item-title', text: 'About the map' }),
-            el('span', {
-              class: 'sheet-item-note',
-              text: 'What the shapes do and do not claim',
-            }),
-          ]),
-
-          isHost
-            ? el('button', {
-                class: 'sheet-item is-danger',
-                type: 'button',
-                text: left > 0 ? 'Close the polls now' : 'Begin the count',
-                onclick: function () {
-                  close();
-                  confirmDeclare(left);
-                },
-              })
-            : null,
-
-          // Stepping away and finishing for good are different things and
-          // are worded so nobody has to guess which is which.
-          el('button', {
-            class: 'sheet-item is-exit',
-            type: 'button',
-            onclick: function () {
-              close();
+          /*
+           * Leaving, kept apart from the four and worded so nobody has to
+           * guess what it does. Stepping away and finishing for good are
+           * different acts, and they are not next to each other.
+           */
+          menuRow('⏻', 'Exit game',
+            game.mode === 'multiplayer'
+              ? 'The election carries on. You can rejoin from the home screen.'
+              : 'Your progress is saved. Pick it up from the home screen.',
+            function () {
+              shutMenuChain();
               confirmExit();
             },
-          }, [
-            el('strong', { class: 'sheet-item-title', text: '\u23fb  Exit game' }),
-            el('span', {
-              class: 'sheet-item-note',
-              text: game.mode === 'multiplayer'
-                ? 'The election carries on. You can rejoin from the home screen.'
-                : 'Your progress is saved. Pick it up from the home screen.',
-            }),
-          ]),
-
-          game.mode === 'multiplayer'
-            ? el('button', {
-                class: 'sheet-item is-danger',
-                type: 'button',
-                onclick: function () {
-                  close();
-                  confirmEndGame();
-                },
-              }, [
-                el('strong', { class: 'sheet-item-title', text: 'End this game' }),
-                el('span', {
-                  class: 'sheet-item-note',
-                  text: 'Finish here for good. You will not be able to rejoin.',
-                }),
-              ])
-            : null,
+            'is-exit'),
 
           el('button', {
             class: 'btn btn-quiet btn-wide',
             type: 'button',
             text: 'Close',
             onclick: function () {
-              close();
+              if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
             },
           }),
         ]),
       ]);
 
-      function close() {
-        if (sheet.parentNode) sheet.parentNode.removeChild(sheet);
-      }
       sheet.addEventListener('click', function (e) {
-        if (e.target === sheet) close();
+        if (e.target === sheet && sheet.parentNode) {
+          sheet.parentNode.removeChild(sheet);
+        }
       });
       document.body.appendChild(sheet);
     }
@@ -1088,9 +1208,21 @@ CMP.ui.election = (function () {
     }
 
     /** Every screen but home opens with a way back to it. */
+    /*
+     * A back arrow is only worth its space where it is the way out.
+     *
+     * Grant, Alliances and Loan are on the bar at the bottom of every screen,
+     * so a second control that also goes Home is a duplicate — and worse, it
+     * suggests those screens are somewhere you descended into rather than one
+     * of four places you switch between. The screens reached from More or
+     * from the map keep theirs, because for those it is the only way back.
+     */
     function sectionHead(title, note) {
-      return el('header', { class: 'g-section-head' }, [
-        el('button', {
+      var onBar = onTheBar(section);
+      return el('header', {
+        class: 'g-section-head' + (onBar ? ' is-flush' : ''),
+      }, [
+        onBar ? null : el('button', {
           class: 'sd-back',
           type: 'button',
           'aria-label': 'Back to the election',

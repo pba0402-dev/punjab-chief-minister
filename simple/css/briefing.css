@@ -1,0 +1,209 @@
+/* ------------------------------------------------------------------
+   The Election Briefing.
+
+   Ten chapters, one open at a time. An accordion rather than ten screens or
+   one long scroll: a player who wants the loan rules should be able to see
+   that there are loan rules, and reach them, without reading the other nine.
+   ------------------------------------------------------------------ */
+
+.br-inner {
+  width: min(600px, 100%);
+  margin: 0 auto;
+  padding: 22px 16px calc(40px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.br-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.br-back {
+  appearance: none;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--navy);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.br-back:hover { border-color: var(--gold); }
+.br-back:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.br-titles { min-width: 0; }
+.br-eyebrow {
+  margin: 0 0 1px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.br-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 6.5vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------ chapters */
+
+.br-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.br-chapter + .br-chapter { border-top: 1px solid var(--rule-soft); }
+
+.br-chapter-head {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 0;
+  background: none;
+  font-family: var(--font);
+  text-align: left;
+  color: var(--navy);
+  cursor: pointer;
+}
+.br-chapter-head:hover { background: var(--wash-ink); }
+.br-chapter-head:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+/*
+ * The chapter number is real information here, not decoration: these are
+ * meant to be read in order the first time, and the order is the order you
+ * meet the rules in a game.
+ */
+.br-chapter-no {
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy-3);
+}
+.is-open .br-chapter-no {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #fffdf6;
+}
+
+.br-chapter-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.br-chapter-title {
+  font-family: var(--font-display);
+  font-size: 1.06rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.br-chapter-lede {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--navy-2);
+}
+
+.br-chapter-chev {
+  width: 22px;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  color: var(--navy-3);
+}
+
+.br-points {
+  margin: 0;
+  padding: 0 15px 15px 51px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.br-point {
+  position: relative;
+  padding-left: 14px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--navy-2);
+}
+.br-point::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+/* ---------------------------------------------------------------- tips */
+
+.br-tips {
+  padding: 15px 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.br-tips-title {
+  margin: 0 0 9px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.br-tip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.br-tip {
+  padding-left: 15px;
+  border-left: 2px solid var(--wash-blue-2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--navy-2);
+}
+
+@media (max-width: 379px) {
+  .br-inner { padding-left: 12px; padding-right: 12px; }
+  .br-chapter-head { gap: 10px; padding: 12px; }
+  .br-points { padding-left: 46px; }
+}

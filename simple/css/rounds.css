@@ -6,8 +6,8 @@
 /* The good/bad pair the campaign log and rating chips already use, named
    here so the round screens do not each pick their own green and red. */
 :root {
-  --warm-good: #8fdcae;
-  --warm-bad: #f19281;
+  --warm-good: var(--warn-good);
+  --warm-bad: var(--warn-bad);
 }
 
 /* ------------------------------------------------------------- the clock */
@@ -20,7 +20,7 @@
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background:
-    linear-gradient(180deg, rgba(232, 184, 74, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--wash-gold), transparent 60%),
     var(--ink-2);
 }
 
@@ -47,7 +47,7 @@
   margin-left: 10px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(214, 92, 63, 0.16);
+  background: var(--wash-bad);
   color: var(--warm-bad);
   font-size: 0.62rem;
   letter-spacing: 0.08em;
@@ -68,7 +68,7 @@
 .round-track {
   height: 5px;
   border-radius: 999px;
-  background: rgba(246, 241, 231, 0.09);
+  background: var(--wash-ink-2);
   overflow: hidden;
 }
 .round-fill {
@@ -90,9 +90,9 @@
   min-width: 6px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(246, 241, 231, 0.12);
+  background: var(--wash-ink-2);
 }
-.round-pip.is-done { background: rgba(232, 184, 74, 0.5); }
+.round-pip.is-done { background: var(--gold); }
 .round-pip.is-now { background: var(--cream); }
 
 /* -------------------------------------------------------- the projection */
@@ -143,7 +143,7 @@
 .projection-track {
   height: 12px;
   border-radius: 4px;
-  background: rgba(246, 241, 231, 0.07);
+  background: var(--wash-ink);
   overflow: hidden;
 }
 .projection-fill {
@@ -244,7 +244,7 @@
   background: var(--ink-3);
   font-size: 0.84rem;
 }
-.loan-item.is-due { border-color: rgba(214, 92, 63, 0.5); }
+.loan-item.is-due { border-color: var(--warn-bad); }
 .loan-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
 .loan-due { color: var(--muted-2); }
 .loan-item.is-due .loan-due { color: var(--warm-bad); }
@@ -265,7 +265,7 @@
 .bank-chip:hover { border-color: var(--wheat-deep); color: var(--cream); }
 .bank-chip.is-active {
   border-color: var(--wheat);
-  background: rgba(232, 184, 74, 0.14);
+  background: var(--wash-gold-2);
   color: var(--cream);
 }
 .bank-chip:focus-visible { outline: 3px solid var(--river); outline-offset: 2px; }
@@ -276,8 +276,8 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(214, 92, 63, 0.4);
-  background: rgba(214, 92, 63, 0.09);
+  border: 1px solid var(--warn-bad);
+  background: var(--wash-bad);
   color: var(--warm-bad);
   font-size: 0.86rem;
 }
@@ -291,7 +291,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 6, 4, 0.72);
+  background: rgba(18, 32, 54, 0.42);
   backdrop-filter: blur(2px);
 }
 
@@ -306,9 +306,9 @@
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--ink-2);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 24px 60px rgba(18, 32, 54, 0.14);
 }
-.dialog-danger { border-color: rgba(214, 92, 63, 0.45); }
+.dialog-danger { border-color: var(--warn-bad); }
 
 .dialog-eyebrow {
   font-size: 0.7rem;
@@ -368,7 +368,7 @@
   border-radius: var(--radius);
   border: 1px solid var(--wheat-deep);
   background:
-    linear-gradient(180deg, rgba(232, 184, 74, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--wash-gold), transparent 55%),
     var(--ink-2);
 }
 .summary-head {
@@ -539,7 +539,7 @@
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background:
-    radial-gradient(600px 300px at 50% 0%, rgba(232, 184, 74, 0.07), transparent 70%),
+    radial-gradient(600px 300px at 50% 0%, var(--wash-gold), transparent 70%),
     var(--ink-2);
 }
 
@@ -559,7 +559,7 @@
 .count-track {
   height: 4px;
   border-radius: 999px;
-  background: rgba(246, 241, 231, 0.09);
+  background: var(--wash-ink-2);
   overflow: hidden;
 }
 .count-fill {
@@ -580,7 +580,7 @@
 .count-bar {
   height: 14px;
   border-radius: 4px;
-  background: rgba(246, 241, 231, 0.07);
+  background: var(--wash-ink);
   overflow: hidden;
 }
 .count-bar-fill {
