@@ -2406,6 +2406,73 @@ check('3. loan and grant are one tap from anywhere',
 
 /* ------------------------------------------------------------- the profile */
 
+/* ------------------------------------------------- the home background */
+
+section('The home background');
+
+/*
+ * A CSS background that 404s is invisible, and invisible is exactly what a
+ * missing decorative image looks like when it is working properly. Nothing in
+ * the browser will tell you. So this reads the rule, pulls the path out of it,
+ * and resolves that path the way the browser would - relative to the
+ * stylesheet, not to the page.
+ */
+{
+  const homeCss = fs.readFileSync(path.join(ROOT, 'css/home.css'), 'utf8');
+
+  const band = homeCss.match(/\.screen-home::before\s*\{[\s\S]*?\n\}/);
+  check('bg: the home screen has a background band', !!band);
+
+  const url = band && band[0].match(/url\(['"]?([^'")]+)['"]?\)/);
+  check('bg: it names an image', !!url, url ? url[1] : 'no url()');
+
+  if (url) {
+    const onDisk = path.resolve(path.join(ROOT, 'css'), url[1]);
+    check('bg: and the file is actually there',
+      fs.existsSync(onDisk), url[1] + ' -> ' + onDisk);
+    check('bg: reached by a relative path, so it works wherever it is served',
+      url[1].startsWith('../') || url[1].startsWith('assets/'),
+      url[1]);
+  }
+
+  /*
+   * The three properties the brief pins down. They are what stop a photograph
+   * from tiling, stretching, or being cropped from the wrong edge.
+   */
+  check('bg: cover, centred on its top edge, and never repeated',
+    band && /background-size:\s*cover/.test(band[0]) &&
+      /background-position:\s*center top/.test(band[0]) &&
+      /background-repeat:\s*no-repeat/.test(band[0]),
+    band ? band[0].slice(-140).replace(/\s+/g, ' ') : '');
+
+  /*
+   * A band pinned to both edges of a full-width block cannot widen the page.
+   * A width, or a horizontal transform, could - and a background that puts a
+   * scrollbar across every screen is the one failure mode worth a test of its
+   * own, because it is invisible until somebody tries it on a phone.
+   */
+  check('bg: pinned to both edges rather than given a width',
+    band && /left:\s*0/.test(band[0]) && /right:\s*0/.test(band[0]) &&
+      !/\n\s*width:/.test(band[0]),
+    band ? 'width found in the rule' : '');
+
+  // It is decoration. It must never sit over anything, or take a tap.
+  check('bg: behind the content, and not clickable',
+    band && /z-index:\s*-1/.test(band[0]) &&
+      /pointer-events:\s*none/.test(band[0]));
+
+  /*
+   * And only on the home screen. The band is an establishing shot; a game in
+   * progress has a map to look at.
+   */
+  check('bg: the game screen does not carry it',
+    !/\.screen-(game|election)[^{]*\{[^}]*punjab-assembly-bg/.test(homeCss) &&
+      !fs.readdirSync(path.join(ROOT, 'css'))
+        .filter((f) => f !== 'home.css' && f.endsWith('.css'))
+        .some((f) => fs.readFileSync(path.join(ROOT, 'css', f), 'utf8')
+          .includes('punjab-assembly-bg')));
+}
+
 section('My Profile');
 
 {

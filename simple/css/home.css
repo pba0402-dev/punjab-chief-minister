@@ -456,12 +456,106 @@
  * and it costs one gradient.
  */
 .screen-home {
+  position: relative;
+  isolation: isolate;
   background-image:
     repeating-linear-gradient(
       -45deg,
       rgba(18, 32, 54, 0.014) 0 1px,
       transparent 1px 9px
     );
+}
+
+/*
+ * The assembly, behind the masthead.
+ *
+ * A band across the top rather than a full-page background: the photograph is
+ * an establishing shot, and an establishing shot that carries on behind a list
+ * of buttons stops establishing anything. It fades to nothing well before the
+ * cards, so what a player reads is always ink on paper.
+ *
+ * It is a ::before layer, not a background on the element itself, for three
+ * reasons. The element already carries the engraved wash and would have to
+ * stack them. A separate layer can be sized in viewport units without the
+ * content having to match. And most of all it cannot widen the page: pinned to
+ * both edges of a block that is already the width of the screen, there is
+ * nothing for it to overflow.
+ */
+.screen-home::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  height: clamp(280px, 42vh, 420px);
+  pointer-events: none;
+
+  background-image:
+    /*
+     * The veil, over the photograph.
+     *
+     * Warm ivory at four stops rather than one flat wash: the title sits in
+     * the sky, which is already pale, so it needs little; the middle carries
+     * the building and can be left alone; and the foot has trees and beds
+     * dark enough that navy on them would be unreadable, so that is where the
+     * veil closes to solid paper. The photograph does not end - the page
+     * simply arrives.
+     */
+    linear-gradient(
+      to bottom,
+      rgba(252, 249, 243, 0.5) 0%,
+      rgba(251, 247, 240, 0.48) 18%,
+      rgba(249, 245, 237, 0.72) 42%,
+      rgba(247, 243, 234, 0.92) 66%,
+      var(--paper) 88%
+    ),
+    url('../assets/backgrounds/punjab-assembly-bg.png');
+
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+/*
+ * The content sits above its own establishing shot.
+ *
+ * z-index rather than order alone, because the band is pulled to -1 to keep it
+ * out of the way of anything that opens over the page.
+ */
+.h-inner { position: relative; z-index: 0; }
+
+/*
+ * Wide screens see more sky than building.
+ *
+ * At `cover` a 3:2 photograph in a short, very wide band is cropped to a
+ * letterbox of its middle, which on a desktop is mostly cloud. Giving the band
+ * more height puts the dome back in it.
+ */
+@media (min-width: 900px) {
+  .screen-home::before { height: clamp(360px, 46vh, 520px); }
+}
+
+/*
+ * Short screens in landscape get less of it.
+ *
+ * 42vh of a 380px-tall window is a band with nothing under it, so the whole
+ * screen becomes photograph and the button somebody came for is below the
+ * fold.
+ */
+@media (max-height: 520px) {
+  .screen-home::before { height: 180px; }
+}
+
+/*
+ * A large image behind text is a bet on the image loading.
+ *
+ * Where somebody has asked for less data, the band is the gradient alone -
+ * which is the same colours, so the page looks intentional rather than
+ * broken.
+ */
+@media (prefers-reduced-data: reduce) {
+  .screen-home::before { background-image: none; background: var(--paper); }
 }
 
 .h-inner {

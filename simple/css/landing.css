@@ -74,9 +74,25 @@
   gap: 8px;
   width: 100%;
   margin-top: 6px;
-  padding: 11px 0;
+  padding: 11px 10px;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
+
+  /*
+   * A whisper of paper behind the figures.
+   *
+   * They are the one row on this screen that sits directly on the photograph
+   * rather than on a card, and the third of them lands on the dome, where the
+   * stonework is busy enough to take the edge off a small capital. This is
+   * barely visible on a plain ground and is what makes the row hold wherever
+   * the crop happens to put it.
+   */
+  background: linear-gradient(
+    to bottom,
+    rgba(252, 250, 245, 0.72),
+    rgba(250, 247, 240, 0.6)
+  );
+  border-radius: 3px;
 }
 .h-fact {
   display: flex;

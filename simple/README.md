@@ -249,6 +249,18 @@ Three rules hold the whole thing together:
 - **Party colours appear on badges, bars, borders and the map, and nowhere
   else**, so the interface stays neutral and the parties stay legible.
 
+The opening screen carries one photograph — the assembly at first light — as a
+band across the top, in `assets/backgrounds/`. A band rather than a page
+background, because an establishing shot that carries on behind a list of
+buttons stops establishing anything: it fades to solid paper well above the
+cards, so what a player reads is always ink on paper. It is a `::before` layer
+pinned to both edges of a block that is already the width of the screen, which
+is what makes it impossible for it to widen the page.
+
+It is decorative and it is not a photograph of a real building. Nothing in the
+game claims otherwise, and nothing about the game is affiliated with any
+government, election commission, party or candidate.
+
 Type carries the rest: Fraunces names things — the game, a screen, a district,
 a party — and Karla runs everything read as data. If it is set in the serif it
 is a name; if it is not, it is a number or a label.
