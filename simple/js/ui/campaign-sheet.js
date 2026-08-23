@@ -538,6 +538,7 @@ CMP.ui.campaignSheet = (function () {
       /* ---------------------------------------------------------- play */
 
       function run() {
+        if (CMP.audio) CMP.audio.play('invest');
         if (busy) return;
         busy = true;
         paint();

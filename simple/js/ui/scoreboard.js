@@ -494,6 +494,7 @@ CMP.ui.scoreboard = (function () {
     }
 
     function go(next) {
+      if (CMP.audio) CMP.audio.play(next === 'overall' ? 'victory' : 'results');
       stopAdvance();
       stopReveal();
       stage = next;

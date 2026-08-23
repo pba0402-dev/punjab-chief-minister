@@ -870,13 +870,15 @@ check('only the host is offered the declare control',
  */
 const openSheet = host.qq('.sheet').slice(-1)[0];
 const sheetItems = [...openSheet.querySelectorAll('.sheet-item')];
+// Volumes are controls on the switches above them, not extra destinations.
+const sheetActions = sheetItems.filter((b) => !/volume/i.test(b.textContent));
 check('the menu is settings and leaving, not a list of screens',
-  sheetItems.length <= 6,
-  sheetItems.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+  sheetActions.length <= 6,
+  sheetActions.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
 check('and none of the game screens are in it',
-  !sheetItems.some((b) => /^(Money|Grants|Loan|Corruption|Bribe|All 117|Election history)/
+  !sheetActions.some((b) => /^(Money|Grants|Loan|Corruption|Bribe|All 117|Election history)/
     .test(b.textContent.trim())),
-  sheetItems.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
+  sheetActions.map((b) => b.textContent.trim().slice(0, 16)).join(' | '));
 
 players[1].click(players[1].q('.g-more'));
 await sleep(60);

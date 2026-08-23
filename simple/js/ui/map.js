@@ -621,6 +621,7 @@ CMP.ui.map = (function () {
     /* ------------------------------------------------------ interaction */
 
     function select(num, notify) {
+      if (CMP.audio) CMP.audio.play('select');
       selected = Number(num);
       // The district comes with the seat: the campaign panel can target
       // either, so the map highlights both and lets the panel say which.

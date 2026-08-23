@@ -2316,12 +2316,33 @@ await settle();
 const moreLabels = qq(dom, '.sheet-panel .sheet-item').map((n) =>
   (n.querySelector('.sheet-item-title') || n).textContent.replace(/^\W+\s*/, '').trim());
 
-check('3. the menu offers four things', moreLabels.length === 4,
-  moreLabels.join(' | '));
+/*
+ * Four things you can do, and the volumes that belong to two of them.
+ *
+ * A volume is not a fifth destination — it is a control on the switch above
+ * it — so the count is of what the menu offers rather than of every row in
+ * it.
+ */
+const moreActions = moreLabels.filter((l) => !/volume/i.test(l));
+check('3. the menu offers four things', moreActions.length === 4,
+  moreActions.join(' | '));
 check('3. and they are music, sound, about the map and exit',
   ['Music', 'Sound', 'About the map', 'Exit game']
-    .every((want, i) => moreLabels[i] === want),
-  moreLabels.join(' | '));
+    .every((want, i) => moreActions[i] === want),
+  moreActions.join(' | '));
+check('4. music and sound each have their own volume',
+  qq(dom, '.sheet-item.is-volume').length === 2 &&
+  qq(dom, '.sheet-range').length === 2,
+  qq(dom, '.sheet-item.is-volume').length + ' volumes');
+
+// 4. And a volume is remembered as a number rather than coerced to a switch.
+const musicSlider = qq(dom, '.sheet-range')[0];
+musicSlider.value = '15';
+musicSlider.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+await settle();
+check('4. moving it stores a level, not an on/off',
+  dom.window.CMP.settings.get('musicVolume') === 0.15,
+  String(dom.window.CMP.settings.get('musicVolume')));
 check('3. nothing that came off it is still listed',
   ['Money', 'Grants', 'Loan', 'Corruption', 'Bribe', 'All 117', 'Election history']
     .every((gone) => !moreLabels.some((l) => l.indexOf(gone) === 0)),

@@ -336,6 +336,7 @@ CMP.ui.election = (function () {
     }
 
     function setSection(next) {
+      if (CMP.audio) CMP.audio.play('tap');
       section = next;
       openSeat = null;
       if (next === 'areas' && !openParty) openParty = game.partyId;
@@ -527,6 +528,44 @@ CMP.ui.election = (function () {
     }
 
     /**
+     * A volume, as a slider that writes straight through.
+     *
+     * Its own control rather than a step on the switch: turning music down is
+     * a different thing from turning it off, and a game that only offers the
+     * second forces the choice.
+     */
+    function volumeRow(key, label) {
+      var value = CMP.settings.get(key);
+      var out = el('span', {
+        class: 'sheet-item-state',
+        text: Math.round(value * 100) + '%',
+      });
+
+      var slider = el('input', {
+        class: 'sheet-range',
+        type: 'range',
+        min: '0',
+        max: '100',
+        step: '5',
+        value: String(Math.round(value * 100)),
+        'aria-label': label,
+        oninput: function (e) {
+          var next = Number(e.target.value) / 100;
+          CMP.settings.set(key, next);
+          out.textContent = Math.round(next * 100) + '%';
+        },
+      });
+
+      return el('div', { class: 'sheet-item is-volume' }, [
+        el('span', { class: 'sheet-item-body' }, [
+          el('span', { class: 'sheet-item-note', text: label }),
+          slider,
+        ]),
+        out,
+      ]);
+    }
+
+    /**
      * Leaving, with a question first.
      *
      * Exit is one tap from the map, so it asks — and it says which kind of
@@ -616,7 +655,16 @@ CMP.ui.election = (function () {
            */
           el('div', { class: 'sheet-group' }, [
             settingRow('music', '\u266a', 'Music', 'Background music'),
+            volumeRow('musicVolume', 'Music volume'),
             settingRow('sound', '\u25b6', 'Sound', 'Game sound effects'),
+            volumeRow('soundVolume', 'Sound volume'),
+            CMP.audio && !CMP.audio.ready()
+              ? el('p', {
+                  class: 'sheet-note',
+                  text: 'No audio files are installed yet, so these remember ' +
+                    'what you asked for and nothing plays.',
+                })
+              : null,
           ]),
 
           el('button', {

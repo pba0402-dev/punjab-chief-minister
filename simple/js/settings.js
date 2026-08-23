@@ -26,7 +26,14 @@ CMP.settings = (function () {
    * On by default, because a game with music should play it the first time
    * and a player who does not want it says so once.
    */
-  var DEFAULTS = { music: true, sound: true };
+  var DEFAULTS = {
+    music: true,
+    sound: true,
+    // Music sits under the game rather than on top of it, so it starts
+    // quieter than the effects it has to make room for.
+    musicVolume: 0.35,
+    soundVolume: 0.7,
+  };
 
   var cache = null;
   var listeners = [];
@@ -55,7 +62,8 @@ CMP.settings = (function () {
         var saved = raw ? JSON.parse(raw) : null;
         if (saved && typeof saved === 'object') {
           Object.keys(DEFAULTS).forEach(function (k) {
-            if (typeof saved[k] === 'boolean') cache[k] = saved[k];
+            var want = typeof DEFAULTS[k];
+            if (typeof saved[k] === want) cache[k] = saved[k];
           });
         }
       } catch (e) {
@@ -72,7 +80,12 @@ CMP.settings = (function () {
 
   function set(key, value) {
     if (!(key in DEFAULTS)) return get(key);
-    var next = !!value;
+
+    // A switch stays a switch and a volume stays a number: coercing a volume
+    // to a boolean would turn 0.35 into "on" and lose it.
+    var next = typeof DEFAULTS[key] === 'number'
+      ? Math.max(0, Math.min(1, Number(value) || 0))
+      : !!value;
     if (all()[key] === next) return next;
 
     cache[key] = next;
