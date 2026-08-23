@@ -486,25 +486,30 @@ check(
 
 const cashBeforeLoan = borrower.cash;
 const taken = CMP.campaign.takeLoan(borrower, cfgLoan.minAmount);
-check('taking a loan adds cash', borrower.cash === cashBeforeLoan + taken.amount);
+check('taking a loan adds the loan less its interest',
+  borrower.cash === cashBeforeLoan + taken.received,
+  borrower.cash + ' vs ' + (cashBeforeLoan + taken.received));
 check('and records the debt separately', CMP.campaign.debtOf(borrower) === taken.repay);
 check('cash and debt are different numbers', borrower.cash !== CMP.campaign.debtOf(borrower));
 
-// The debt limit holds, however many loans are taken.
+/*
+ * One loan at a time.
+ *
+ * They used to stack up to a debt limit, which let a campaign take three in a
+ * round and treat the ceiling as a target. A bank lends once and waits to be
+ * repaid.
+ */
 const stacker = freshGame();
 let loops = 0;
 while (CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).ok && loops++ < 30) {
   CMP.campaign.takeLoan(stacker, cfgLoan.minAmount);
 }
-check('several loans can be held at once', stacker.loans.length > 1, String(stacker.loans.length));
+check('only one loan can be held at a time', stacker.loans.length === 1,
+  String(stacker.loans.length));
 check(
-  'the debt limit is never passed',
-  CMP.campaign.debtOf(stacker) <= cfgLoan.debtLimit,
-  CMP.campaign.debtOf(stacker) + ' of ' + cfgLoan.debtLimit
-);
-check(
-  'and borrowing past it is refused with a reason',
-  /debt limit/i.test(CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).error || '')
+  'and a second is refused with a reason',
+  /existing loan/i.test(CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).error || ''),
+  CMP.campaign.loanOffer(stacker, cfgLoan.minAmount).error
 );
 check(
   'one maximum loan also fits inside the limit',
@@ -550,39 +555,42 @@ short_.round = short_.loans[0].dueRound;
 
 const missSummary = { repayments: [] };
 CMP.campaign.settleLoans(short_, missSummary);
-
 const missed = missSummary.repayments[0];
-check('21. a payment that cannot be met is recorded as missed', missed.missed === true);
-check('21. what the campaign had went toward it', missed.paid === partPaid, String(missed.paid));
-check('21. cash never goes negative', short_.cash === 0, String(short_.cash));
-check('21. and the loan does not disappear',
-  short_.loans[0].settled === false && CMP.campaign.debtOf(short_) > 0,
+
+/*
+ * 21-23. A bill that empties the purse is still paid.
+ *
+ * It used to take what the campaign had, carry the rest and add thirty per
+ * cent — a debt that grew and kept coming back round after round. The whole
+ * repayment comes out at once now and the balance goes under if it has to.
+ * The loan is finished either way; what is left is a campaign in the red,
+ * which is a plainer thing to understand and a harder one to ignore.
+ */
+check('21. the whole repayment comes out, not just what was there',
+  missed.paid === owedTotal, missed.paid + ' of ' + owedTotal);
+check('21. the balance goes below zero by the shortfall',
+  short_.cash === partPaid - owedTotal, String(short_.cash));
+check('21. and the shortfall is reported',
+  missed.shortfall === owedTotal - partPaid,
+  missed.shortfall + ' vs ' + (owedTotal - partPaid));
+check('22. the loan is finished rather than carried',
+  short_.loans[0].settled === true && CMP.campaign.debtOf(short_) === 0,
   String(CMP.campaign.debtOf(short_)));
+check('22. nothing is due again next round',
+  !(short_.loans || []).some((l) => !l.settled));
+check('22. and the campaign is told what happened',
+  /short/i.test(missed.text || ''), missed.text);
 
-const rate = CMP.FINANCE.loan.missedPenaltyRate;
-const leftAfterPart = owedTotal - partPaid;
-check('22. a penalty is added to what is outstanding',
-  missed.penalty === Math.round(leftAfterPart * rate),
-  missed.penalty + ' on ' + leftAfterPart);
-check('22. the penalty is 30%', rate === 0.3, String(rate));
-check('22. and the balance is due again next round',
-  short_.loans[0].dueRound === short_.round + 1,
-  String(short_.loans[0].dueRound));
-
-check('18. no further borrowing while behind',
-  /missed payment/i.test(CMP.campaign.loanOffer(short_, CMP.FINANCE.loan.minAmount).error || ''),
+check('8. no borrowing while the balance is under',
+  /outstanding debt/i.test(CMP.campaign.loanOffer(short_, CMP.FINANCE.loan.minAmount).error || ''),
   CMP.campaign.loanOffer(short_, CMP.FINANCE.loan.minAmount).error);
 
-// Next round: enough to clear it, and it clears.
-const nowOwed = CMP.campaign.debtOf(short_);
-short_.round = short_.loans[0].dueRound;
-short_.cash = nowOwed;
-const clearSummary = { repayments: [] };
-CMP.campaign.settleLoans(short_, clearSummary);
-check('23. the carried balance is collected automatically',
-  short_.loans[0].settled === true && CMP.campaign.debtOf(short_) === 0);
-check('23. and the campaign is told it cleared',
-  !clearSummary.repayments[0].missed, JSON.stringify(clearSummary.repayments[0]));
+// And income pays it down before it becomes money to spend.
+const owedNow = CMP.campaign.balanceOf(short_);
+const paid = CMP.campaign.creditRoundIncome(short_, short_.round + 1);
+check('7. income lands on the balance, debt and all',
+  CMP.campaign.balanceOf(short_) === owedNow + paid,
+  CMP.campaign.balanceOf(short_) + ' = ' + owedNow + ' + ' + paid);
 
 /*
  * Affordability: nobody is lent what they cannot service.
@@ -611,7 +619,7 @@ stacked.loans = [{
 const tooBig = CMP.campaign.loanOffer(stacked, CMP.FINANCE.loan.maxAmount);
 check('17. a loan beyond capacity is refused', tooBig.ok === false, tooBig.error);
 check('17. and the refusal explains why',
-  /repayment capacity|debt limit/i.test(tooBig.error || ''), tooBig.error);
+  /repayment capacity|debt limit|existing loan/i.test(tooBig.error || ''), tooBig.error);
 check('15. existing debt is subtracted from capacity',
   CMP.campaign.repaymentCapacity(stacked).owed === 240000000,
   String(CMP.campaign.repaymentCapacity(stacked).owed));
@@ -648,14 +656,23 @@ const phpMissed = php(
     round: 3,
   })
 );
-check('21. PHP records a missed payment the same way',
-  phpMissed.repayments[0].missed === true, JSON.stringify(phpMissed.repayments[0]));
-check('21. PHP never lets cash go negative', phpMissed.cash === 0, String(phpMissed.cash));
-check('22. PHP adds the same 30% penalty',
-  phpMissed.repayments[0].penalty === Math.round((1200000 - 400000) * 0.3),
-  String(phpMissed.repayments[0].penalty));
-check('21. PHP keeps the loan alive',
-  phpMissed.loans[0].settled === false, JSON.stringify(phpMissed.loans[0]));
+/*
+ * 21. And the server settles it the same way the browser does.
+ *
+ * The whole bill comes out, the balance goes under, and the loan is finished.
+ * Two implementations of one rule, so this checks the one that actually
+ * decides a multiplayer game.
+ */
+check('21. PHP takes the whole repayment',
+  phpMissed.repayments[0].paid === 1200000,
+  String(phpMissed.repayments[0].paid));
+check('21. PHP lets the balance go below zero',
+  phpMissed.cash === 400000 - 1200000, String(phpMissed.cash));
+check('21. PHP reports the shortfall',
+  phpMissed.repayments[0].shortfall === 800000,
+  String(phpMissed.repayments[0].shortfall));
+check('22. PHP finishes the loan rather than carrying it',
+  phpMissed.loans[0].settled === true, JSON.stringify(phpMissed.loans[0]));
 
 /* ------------------------------------------------------------- funding */
 

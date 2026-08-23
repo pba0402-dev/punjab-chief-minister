@@ -1871,6 +1871,44 @@ CMP.ui.election = (function () {
 
     /* --------------------------------------------------------------- loan */
 
+    /**
+     * The loan that is running, in place of the ones that are not on offer.
+     *
+     * Everything the bargain was: what was borrowed, what was taken as
+     * interest, what actually arrived, what falls due and when.
+     */
+    function activeLoanPanel(loan) {
+      var due = loan.dueRound - (game.round || 1);
+      var received = loan.amount - loan.interest;
+
+      return el('div', { class: 'loan-active' }, [
+        el('span', { class: 'loan-active-tag', text: 'Active loan' }),
+        el('strong', { class: 'loan-active-amount', text: money.words(loan.amount) }),
+
+        el('div', { class: 'sum-lines' }, [
+          line2('Received', money.words(received)),
+          line2('Interest', money.words(loan.interest)),
+          line2('Total repayment', money.words(loan.repay), true),
+          line2('Due', 'Round ' + loan.dueRound +
+            (due > 0 ? ' · in ' + due + (due === 1 ? ' round' : ' rounds') : ' · now')),
+        ]),
+
+        el('p', {
+          class: 'g-block-note',
+          text: 'It is repaid automatically when the round arrives. If the ' +
+            'campaign is short, the balance goes below zero and later income ' +
+            'pays it down.',
+        }),
+      ]);
+    }
+
+    function line2(label, value, strong) {
+      return el('div', { class: 'sum-line' + (strong ? ' is-strong' : '') }, [
+        el('span', { class: 'sum-line-label', text: label }),
+        el('strong', { class: 'sum-line-value', text: value }),
+      ]);
+    }
+
     function loanSection() {
       var cfg = CMP.FINANCE.loan;
       var debt = CMP.campaign.debtOf(game);
@@ -1940,7 +1978,10 @@ CMP.ui.election = (function () {
 
           el('div', { class: 'sum-lines' }, [
             el('div', { class: 'sum-line' }, [
-              el('span', { class: 'sum-line-label', text: 'Interest' }),
+              el('span', {
+                class: 'sum-line-label',
+                text: 'Interest, taken when the loan is made',
+              }),
               el('strong', { class: 'sum-line-value', text: Math.round(cfg.interestRate * 100) + '%' }),
             ]),
             el('div', { class: 'sum-line' }, [
@@ -1956,9 +1997,28 @@ CMP.ui.election = (function () {
             ]),
           ]),
 
+          /*
+           * One loan at a time.
+           *
+           * While one is running there is nothing to choose, so the offers
+           * come off and the active loan takes their place. Showing four
+           * amounts that would all be refused is a worse screen than showing
+           * none.
+           */
           game.borrowingBlocked
             ? el('p', { class: 'g-blocked', text: 'No bank will lend to you after your default.' })
-            : el('div', { class: 'loan-offers' }, amounts.map(function (amount) {
+            : outstanding.length
+              ? activeLoanPanel(outstanding[0])
+              : CMP.campaign.balanceOf(game) < 0
+                ? el('p', { class: 'g-blocked' }, [
+                    el('strong', { class: 'loan-locked-title', text: 'Loan locked' }),
+                    el('span', {
+                      class: 'loan-locked-note',
+                      text: 'Clear your outstanding debt before borrowing again. ' +
+                        'Your balance is ' + money.words(CMP.campaign.balanceOf(game)) + '.',
+                    }),
+                  ])
+                : el('div', { class: 'loan-offers' }, amounts.map(function (amount) {
                 var offer = CMP.campaign.loanOffer(game, amount);
                 return el('button', {
                   class: 'loan-offer' + (offer.ok ? '' : ' is-blocked'),
@@ -1972,12 +2032,22 @@ CMP.ui.election = (function () {
                   },
                 }, [
                   el('strong', { class: 'loan-amount', text: money.words(amount) }),
-                  el('span', {
-                    class: 'loan-terms',
-                    text: offer.ok
-                      ? 'repay ' + money.words(offer.repay) + ' · round ' + offer.dueRound
-                      : offer.error,
-                  }),
+                  offer.ok
+                    ? el('span', { class: 'loan-terms' }, [
+                        el('span', {
+                          class: 'loan-line',
+                          text: 'Receive ' + money.words(offer.received),
+                        }),
+                        el('span', {
+                          class: 'loan-line',
+                          text: 'Repay ' + money.words(offer.repay),
+                        }),
+                        el('span', {
+                          class: 'loan-line is-quiet',
+                          text: 'Due round ' + offer.dueRound,
+                        }),
+                      ])
+                    : el('span', { class: 'loan-terms is-blocked', text: offer.error }),
                 ]);
               })),
 

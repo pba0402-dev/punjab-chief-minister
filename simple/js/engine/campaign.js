@@ -195,8 +195,21 @@ CMP.campaign = (function () {
    * deducted until it falls due, which is exactly what makes borrowing
    * tempting. Grant money is deliberately not included — see spendableOn.
    */
+  /**
+   * What there is to spend, which is never less than nothing.
+   *
+   * A campaign in the red has a negative balance and no money: `balanceOf`
+   * is the true figure and this is what a decision can draw on. Keeping them
+   * apart means income pays the debt down first without anybody having to
+   * remember to do it — it is simply added to the balance.
+   */
   function remaining(game) {
     return Math.max(0, game.cash || 0);
+  }
+
+  /** The true balance, which can be below zero after a repayment. */
+  function balanceOf(game) {
+    return game.cash || 0;
   }
 
   /** Everything the campaign holds, however restricted. For display only. */
@@ -241,7 +254,16 @@ CMP.campaign = (function () {
     if (fromGrant > 0) {
       grantsOf(game)[pot.region] = grantIn(game, pot.region) - fromGrant;
     }
-    game.cash = Math.max(0, (game.cash || 0) - fromCash);
+    /*
+     * No clamp here.
+     *
+     * `fromCash` can never exceed what there is to spend, because the amount
+     * was already bounded by the pot — so the floor was doing nothing when
+     * the balance was positive, and something disastrous when it was not:
+     * a campaign ₹58 lakh in the red that spent a rupee of grant money had
+     * its debt quietly wiped by `Math.max(0, ...)`.
+     */
+    game.cash = (game.cash || 0) - fromCash;
 
     return { total: take, grant: fromGrant, cash: fromCash, region: pot.region };
   }
@@ -915,6 +937,8 @@ CMP.campaign = (function () {
       amount: amount,
       interestRate: cfg.interestRate,
       interest: interest,
+      // What actually reaches the campaign, and what falls due.
+      received: amount - interest,
       repay: amount + interest,
       dueRound: capacity.dueRound,
       debtNow: debtOf(game),
@@ -933,13 +957,23 @@ CMP.campaign = (function () {
 
     if (game.borrowingBlocked) return refuse('No bank will lend to you after your default.');
 
-    // Nobody lends to a campaign that is already behind on one. The balance
-    // has to be cleared before there is any question of another.
-    var behind = (game.loans || []).some(function (l) {
-      return !l.settled && l.missedCount;
-    });
-    if (behind) {
-      return refuse('Clear your missed payment before borrowing again.');
+    /*
+     * One at a time.
+     *
+     * Loans used to stack up to a debt limit, which let a campaign take three
+     * in a round and treat the ceiling as a target. A bank lends once and
+     * waits to be repaid.
+     */
+    var active = (game.loans || []).filter(function (l) {
+      return !l.settled;
+    })[0];
+    if (active) {
+      return refuse('Repay your existing loan before borrowing again.');
+    }
+
+    // And nobody lends to a campaign that is already in the red.
+    if ((game.cash || 0) < 0) {
+      return refuse('Clear your outstanding debt before borrowing again.');
     }
     if (amount < cfg.minAmount) return refuse('The smallest loan is ' + money(cfg.minAmount) + '.');
     if (amount > cfg.maxAmount) return refuse('The largest single loan is ' + money(cfg.maxAmount) + '.');
@@ -967,14 +1001,26 @@ CMP.campaign = (function () {
     return offer;
   }
 
-  /** Take a loan on the quoted terms. */
+  /**
+   * Take a loan on the quoted terms.
+   *
+   * The interest is taken on the way out rather than added at the end: borrow
+   * ₹65 lakh at twenty per cent and ₹52 lakh reaches the campaign, while ₹78
+   * lakh falls due four rounds later. It is a harder bargain than it looks,
+   * which is the point — the money costs something the moment it arrives
+   * rather than only when the bill does.
+   */
   function takeLoan(game, amount) {
     var offer = loanOffer(game, amount);
     if (!offer.ok) return offer;
 
-    game.cash += offer.amount;
+    game.cash += offer.received;
     game.borrowed += offer.amount;
-    ledger(game, { kind: 'loan', label: 'Loan taken', amount: offer.amount });
+    ledger(game, {
+      kind: 'loan',
+      label: 'Loan taken, interest deducted',
+      amount: offer.received,
+    });
     game.loans.push({
       id: 'L' + (game.loans.length + 1),
       amount: offer.amount,
@@ -1019,62 +1065,43 @@ CMP.campaign = (function () {
         return;
       }
 
-      var pay = Math.min(game.cash, outstanding);
-      if (pay > 0) {
-        game.cash -= pay;
-        game.repaid += pay;
-        loan.paid = (loan.paid || 0) + pay;
-        ledger(game, { kind: 'repayment', label: 'Loan repayment', amount: -pay });
-      }
-
-      var left = outstanding - pay;
-
-      if (left <= 0) {
-        loan.settled = true;
-        game.interestPaid += loan.interest;
-        summary.repayments.push({
-          id: loan.id,
-          paid: pay,
-          interest: loan.interest,
-          defaulted: false,
-          text: loan.missedCount
-            ? 'Loan cleared, with penalties.'
-            : 'Loan repaid with interest.',
-        });
-        return;
-      }
-
       /*
-       * Not cleared. The balance stands, a penalty is added to it, and it is
-       * due again next round.
+       * The bill is paid in full, whatever is in the purse.
+       *
+       * It used to take what a campaign had, carry the rest and add a penalty
+       * — a debt that grew and kept coming back. Now the whole repayment
+       * comes out at once and the balance goes below zero if it has to. The
+       * loan is finished either way; what is left is a campaign in the red,
+       * which is a plainer thing to understand and a harder one to ignore.
        */
-      var penalty = Math.round(left * penaltyRate);
-      loan.repay = (loan.paid || 0) + left + penalty;
-      loan.penalties = (loan.penalties || 0) + penalty;
-      loan.missedCount = (loan.missedCount || 0) + 1;
-      loan.dueRound = game.round + 1;
+      var before = game.cash;
+      game.cash -= outstanding;
+      game.repaid += outstanding;
+      loan.paid = (loan.paid || 0) + outstanding;
+      loan.settled = true;
+      game.interestPaid += loan.interest;
 
-      game.missedPayments = (game.missedPayments || 0) + 1;
-      game.heat = clamp(game.heat + (cfg.heat || 0) / 2, 0, config().heat.max);
+      ledger(game, { kind: 'repayment', label: 'Loan repayment', amount: -outstanding });
 
-      ledger(game, {
-        kind: 'penalty',
-        label: 'Missed payment penalty',
-        amount: -penalty,
-      });
+      var short = before < outstanding ? outstanding - Math.max(0, before) : 0;
+      if (short > 0) {
+        game.missedPayments = (game.missedPayments || 0) + 1;
+        game.heat = clamp(game.heat + (cfg.heat || 0) / 2, 0, config().heat.max);
+      }
 
       summary.repayments.push({
         id: loan.id,
-        paid: pay,
-        shortfall: left,
-        penalty: penalty,
-        outstanding: left + penalty,
-        missed: true,
-        dueRound: loan.dueRound,
-        text: 'Payment missed. ' + Math.round(penaltyRate * 100) + '% added; ' +
-          'the balance is due again next round.',
+        paid: outstanding,
+        interest: loan.interest,
+        defaulted: false,
+        shortfall: short,
+        balanceAfter: game.cash,
+        missed: short > 0,
+        text: short > 0
+          ? 'Loan repaid. You were short ' + money(short) + ', so the balance carries.'
+          : 'Loan repaid with interest.',
       });
-      summary.missedPayment = true;
+      if (short > 0) summary.missedPayment = true;
     });
 
 
@@ -2165,6 +2192,7 @@ CMP.campaign = (function () {
     districtsHeldBy: districtsHeldBy,
     districtsWonBy: districtsWonBy,
     districtsControlledBy: districtsControlledBy,
+    balanceOf: balanceOf,
     openingDistrictsFor: openingDistrictsFor,
     districtStanding: districtStanding,
     amountRange: amountRange,

@@ -1743,8 +1743,17 @@ check('18. nothing above the affordable amount is offered',
 check('17. a few amounts are offered, not every increment',
   qq(dom, '.loan-offer').length >= 3 && qq(dom, '.loan-offer').length <= 5,
   qq(dom, '.loan-offer').length + ' offers');
-check('17. each shows the repayment before it is taken',
-  qq(dom, '.loan-offer').every((n) => /repay .* · round \d+/.test(n.textContent)),
+/*
+ * 12. The whole bargain, before it is struck.
+ *
+ * Interest comes off the top now — borrow ₹65 lakh and ₹52 lakh arrives — so
+ * a card that only names the amount is naming the least useful of the three
+ * numbers.
+ */
+check('12. each offer says what arrives, what is repaid and when',
+  qq(dom, '.loan-offer').every((n) =>
+    /Receive/.test(n.textContent) && /Repay/.test(n.textContent) &&
+    /Due round \d+/.test(n.textContent)),
   q(dom, '.loan-offer').textContent);
 
 const cashBeforeBorrowing = dom.window.CMP.app.getGame().cash;
@@ -1768,10 +1777,28 @@ check('15. the money section separates where it came from',
 
 solo = dom.window.CMP.app.getGame();
 check('the loan is granted', solo.loans.length === 1);
-check('cash rose by the amount borrowed',
-  solo.cash === cashBeforeBorrowing + solo.loans[0].amount, String(solo.cash));
+/*
+ * 2. Interest is taken on the way out.
+ *
+ * The money costs something the moment it arrives rather than only when the
+ * bill does: ₹65 lakh borrowed at twenty per cent puts ₹52 lakh in the purse
+ * and leaves ₹78 lakh to find four rounds later.
+ */
+const loanTaken = solo.loans[0];
+check('2. cash rose by the loan less its interest',
+  solo.cash === cashBeforeBorrowing + (loanTaken.amount - loanTaken.interest),
+  solo.cash + ' vs ' + (cashBeforeBorrowing + loanTaken.amount - loanTaken.interest));
+check('2. the interest is a fifth of what was borrowed',
+  loanTaken.interest === Math.round(loanTaken.amount * 0.2),
+  loanTaken.interest + ' of ' + loanTaken.amount);
+check('2. and the repayment is the whole of it plus the interest',
+  loanTaken.repay === loanTaken.amount + loanTaken.interest,
+  String(loanTaken.repay));
+check('4. due four rounds after it was taken',
+  loanTaken.dueRound === loanTaken.takenRound + 4,
+  'taken ' + loanTaken.takenRound + ', due ' + loanTaken.dueRound);
 check('and the debt is tracked apart from it',
-  dom.window.CMP.campaign.debtOf(solo) === solo.loans[0].repay);
+  dom.window.CMP.campaign.debtOf(solo) === loanTaken.repay);
 check('the player strip flags the debt', !!q(dom, '.g-fig.is-debt'),
   q(dom, '.g-fig.is-debt') ? q(dom, '.g-fig.is-debt').textContent : 'no debt shown');
 

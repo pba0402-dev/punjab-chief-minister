@@ -475,6 +475,145 @@ check('14. four players would generate ₹400 crore',
 
 win.close();
 
+section('The bank: one loan, interest up front, and a balance that can go under');
+
+/*
+ * The nine scenarios, walked one at a time.
+ *
+ * The rules are easy to state and easy to get subtly wrong — interest taken
+ * on the way out rather than added at the end, one loan at a time rather than
+ * a debt ceiling, and a repayment that empties the purse and keeps going
+ * rather than carrying forward. So this walks them rather than trusting them.
+ */
+const L = 100000;   // CR is already defined above
+
+function bankGame(round, cash) {
+  const g = CMP.state.startElection({ candidateName: 'Banker' });
+  g.round = round;
+  g.cash = cash;
+  return g;
+}
+
+/* ---- 1. What the bargain actually is ---- */
+const t1 = bankGame(7, 1 * CR);
+const before1 = t1.cash;
+const offer1 = CMP.campaign.loanOffer(t1, 65 * L);
+check('1. a ₹65 lakh loan is offered', offer1.ok === true, offer1.error);
+check('1. the interest is ₹13 lakh', offer1.interest === 13 * L, String(offer1.interest));
+check('1. ₹52 lakh is what arrives', offer1.received === 52 * L, String(offer1.received));
+check('1. ₹78 lakh is what falls due', offer1.repay === 78 * L, String(offer1.repay));
+
+CMP.campaign.takeLoan(t1, 65 * L);
+check('1. and the purse rose by ₹52 lakh, not ₹65 lakh',
+  t1.cash === before1 + 52 * L, cr(t1.cash) + ' from ' + cr(before1));
+check('1. with repayment due in round 11',
+  t1.loans[0].dueRound === 11, String(t1.loans[0].dueRound));
+
+/* ---- 2 and 7. One at a time ---- */
+const secondLoan = CMP.campaign.loanOffer(t1, 2.6 * CR);
+check('2. a second loan is refused while one is running',
+  secondLoan.ok === false, secondLoan.error);
+check('7. and the reason says why',
+  /existing loan/i.test(secondLoan.error || ''), secondLoan.error);
+
+/* ---- 3. Paid in full when the round arrives ---- */
+const t3 = bankGame(7, 1 * CR);
+CMP.campaign.takeLoan(t3, 65 * L);
+t3.cash = 1.5 * CR;
+t3.round = 11;
+const sum3 = { repayments: [], events: [] };
+CMP.campaign.settleLoans(t3, sum3);
+check('3. the repayment comes out when it falls due',
+  t3.cash === 1.5 * CR - 78 * L, cr(t3.cash));
+check('3. and the loan is finished', t3.loans[0].settled === true);
+check('3. so another can be taken',
+  CMP.campaign.loanOffer(t3, 65 * L).ok === true,
+  CMP.campaign.loanOffer(t3, 65 * L).error);
+
+/* ---- 4. And in full even when the purse cannot cover it ---- */
+const t4 = bankGame(7, 1 * CR);
+CMP.campaign.takeLoan(t4, 65 * L);
+t4.cash = 20 * L;
+t4.round = 11;
+const sum4 = { repayments: [], events: [] };
+CMP.campaign.settleLoans(t4, sum4);
+check('4. a short campaign still pays the whole bill',
+  t4.cash === 20 * L - 78 * L, cr(t4.cash));
+check('4. which puts the balance below zero',
+  t4.cash === -58 * L, String(t4.cash));
+check('4. the loan is finished all the same', t4.loans[0].settled === true);
+check('4. and the round says what happened',
+  /short/i.test((sum4.repayments[0] || {}).text || ''),
+  (sum4.repayments[0] || {}).text);
+
+/* ---- 5 and 6. Income pays the debt down first ---- */
+/*
+ * Income is added to the balance, so it pays a debt down before it becomes
+ * money to spend. Checked as arithmetic rather than by sign: a round's
+ * allowance is far larger than a ₹58 lakh shortfall and clears it outright,
+ * which is the same rule doing its job.
+ */
+const owed4 = t4.cash;
+const allowance = CMP.campaign.creditRoundIncome(t4, 12);
+check('5. income lands on the balance, debt and all',
+  t4.cash === owed4 + allowance,
+  cr(t4.cash) + ' = ' + cr(owed4) + ' + ' + cr(allowance));
+
+// A debt larger than one allowance stays a debt, and stays unspendable.
+const deep = bankGame(7, 1 * CR);
+deep.cash = -(allowance + 40 * L);
+check('5. a debt bigger than an allowance survives it',
+  CMP.campaign.balanceOf(deep) < 0, cr(CMP.campaign.balanceOf(deep)));
+check('5. and there is nothing to spend while it does',
+  CMP.campaign.remaining(deep) === 0, String(CMP.campaign.remaining(deep)));
+CMP.campaign.creditRoundIncome(deep, 8);
+check('5. one allowance reduces it without clearing it',
+  CMP.campaign.balanceOf(deep) === -40 * L,
+  cr(CMP.campaign.balanceOf(deep)));
+
+// Enough income and it comes back up through zero.
+for (let r = 13; r < 20 && CMP.campaign.balanceOf(t4) < 0; r++) {
+  CMP.campaign.creditRoundIncome(t4, r);
+}
+check('6. enough income clears it and the campaign is solvent again',
+  CMP.campaign.balanceOf(t4) > 0 && CMP.campaign.remaining(t4) > 0,
+  cr(CMP.campaign.balanceOf(t4)));
+
+/* ---- 8. No borrowing while in the red ---- */
+const t8 = bankGame(7, 1 * CR);
+CMP.campaign.takeLoan(t8, 65 * L);
+t8.cash = 20 * L;
+t8.round = 11;
+CMP.campaign.settleLoans(t8, { repayments: [], events: [] });
+check('8. a campaign in the red cannot borrow',
+  CMP.campaign.loanOffer(t8, 65 * L).ok === false,
+  CMP.campaign.loanOffer(t8, 65 * L).error);
+check('8. and is told to clear the debt first',
+  /outstanding debt/i.test(CMP.campaign.loanOffer(t8, 65 * L).error || ''),
+  CMP.campaign.loanOffer(t8, 65 * L).error);
+
+/* ---- and spending never wipes a debt ---- */
+const t9 = bankGame(7, 1 * CR);
+CMP.campaign.takeLoan(t9, 65 * L);
+t9.cash = 20 * L;
+t9.round = 11;
+CMP.campaign.settleLoans(t9, { repayments: [], events: [] });
+const owedBefore = CMP.campaign.balanceOf(t9);
+CMP.campaign.play(t9, 'invest', 40,
+  { outcome: 0.2, consequence: 0.99, consequencePick: 0.5 }, 10 * L);
+check('a campaign in the red cannot spend its way out of it',
+  CMP.campaign.balanceOf(t9) === owedBefore,
+  cr(CMP.campaign.balanceOf(t9)) + ' vs ' + cr(owedBefore));
+
+/* ---- the eligibility figure is the lender's own ---- */
+const t10 = bankGame(7, 1 * CR);
+const most = CMP.campaign.maxLoan(t10);
+check('the ceiling is worked out, not a fixed number',
+  most > 0 && most <= CMP.FINANCE.loan.maxAmount, cr(most));
+check('and nothing above it is lent',
+  CMP.campaign.loanOffer(t10, most + CMP.FINANCE.loan.increments).ok === false,
+  CMP.campaign.loanOffer(t10, most + CMP.FINANCE.loan.increments).error);
+
 console.log('\n' + '-'.repeat(56));
 console.log(pass + ' passed, ' + failures.length + ' failed');
 if (failures.length) {
