@@ -140,6 +140,116 @@ CMP.ui.setup = (function () {
       });
     }
 
+    /* ------------------------------------------------------- the carousels */
+
+    /**
+     * A rail that survives the thing it is used for.
+     *
+     * The bug this exists to kill: choosing a candidate repainted the whole
+     * screen, which threw the rail away and built a new one — and a new
+     * element starts at scrollLeft 0, so picking the tenth candidate scrolled
+     * you back to the first. The selection was right and the view was wrong,
+     * which is the worst combination because it looks like the click failed.
+     *
+     * So the rail is built once and never rebuilt. Choosing something toggles
+     * a class on buttons that are already there; nothing is remounted, no
+     * scroll position is written, and the two pieces of state — what is
+     * chosen, and where the rail is scrolled — never touch each other.
+     *
+     * Cards are keyed by their own id rather than by position, so the
+     * identity of a card does not depend on where it sits in the list.
+     */
+    var rails = {};
+
+    function rail(id, spec) {
+      if (rails[id]) return rails[id].node;
+
+      var cards = {};
+      var node = el('div', {
+        class: spec.className,
+        role: 'radiogroup',
+        'aria-label': spec.label,
+      }, spec.items.map(function (item, i) {
+        var card = spec.card(item, i);
+        card.dataset.railId = String(item.id);
+        card.addEventListener('click', function () {
+          spec.onPick(item.id);
+          syncRail(id);
+        });
+        cards[item.id] = card;
+        return card;
+      }));
+
+      rails[id] = { node: node, cards: cards, chosen: spec.chosen };
+      syncRail(id);
+      return node;
+    }
+
+    /**
+     * Mark the chosen card, and bring it into view only if it is not already.
+     *
+     * "Only if" matters: scrolling on every repaint would fight a player who
+     * had scrolled somewhere to look at something, and scrolling to a card
+     * that is already on screen is a jolt with no purpose.
+     */
+    function syncRail(id) {
+      var entry = rails[id];
+      if (!entry) return;
+      var chosen = String(entry.chosen());
+
+      Object.keys(entry.cards).forEach(function (key) {
+        var card = entry.cards[key];
+        var on = key === chosen;
+        card.classList.toggle('is-on', on);
+        card.setAttribute('aria-checked', on ? 'true' : 'false');
+        var state = card.querySelector('.cd-card-state');
+        if (state) state.textContent = on ? 'Selected' : '';
+      });
+
+      bringIntoView(entry.node, entry.cards[chosen]);
+    }
+
+    function bringIntoView(node, card) {
+      if (!card || !node || typeof node.scrollLeft !== 'number') return;
+      // jsdom has no layout, so every offset is zero and there is nothing to
+      // scroll; guarding here keeps the tests honest rather than pretending.
+      if (!node.clientWidth) return;
+
+      var left = card.offsetLeft;
+      var right = left + card.offsetWidth;
+      var viewLeft = node.scrollLeft;
+      var viewRight = viewLeft + node.clientWidth;
+      if (left >= viewLeft && right <= viewRight) return;
+
+      var target = Math.max(0, left - (node.clientWidth - card.offsetWidth) / 2);
+      if (node.scrollTo) node.scrollTo({ left: target, behavior: 'smooth' });
+      else node.scrollLeft = target;
+    }
+
+    /**
+     * Put the rails back where they were, after a step change rebuilt around
+     * them.
+     *
+     * Moving a live node into a new parent is not guaranteed to preserve its
+     * scroll offset, and §13 of the brief is explicit: going to the party
+     * step and back must not lose where the candidate rail was.
+     */
+    function rememberRails() {
+      Object.keys(rails).forEach(function (id) {
+        var entry = rails[id];
+        if (entry.node.clientWidth) entry.at = entry.node.scrollLeft;
+      });
+    }
+
+    function restoreRails() {
+      Object.keys(rails).forEach(function (id) {
+        var entry = rails[id];
+        if (typeof entry.at === 'number' && entry.node.clientWidth) {
+          entry.node.scrollLeft = entry.at;
+        }
+      });
+    }
+
     /* ------------------------------------------------------ step 1: who */
 
     /**
@@ -169,36 +279,42 @@ CMP.ui.setup = (function () {
      * that a swatch could never carry.
      */
     function candidateRail() {
-      return el('div', {
-        class: 'cd-rail',
-        role: 'radiogroup',
-        'aria-label': 'Your candidate',
-      }, CMP.ui.avatars.list().map(function (id, i) {
-        var on = draft.avatar === id;
-        var stats = CMP.candidateStats(id);
-        return el('button', {
-          class: 'cd-card' + (on ? ' is-on' : ''),
-          type: 'button',
-          role: 'radio',
-          'aria-checked': on ? 'true' : 'false',
-          'aria-label': 'Candidate ' + (i + 1) + ', ' + stats.label,
-          dataset: { avatar: id },
-          onclick: function () {
-            draft.avatar = id;
-            if (CMP.profile.has()) CMP.profile.setAvatar(id);
-            if (CMP.audio) CMP.audio.play('select');
-            paint();
-          },
-        }, [
-          el('span', { class: 'cd-card-art' }, [CMP.ui.portrait.render(id, 132)]),
-          el('span', { class: 'cd-card-body' }, [
-            el('strong', { class: 'cd-card-name', text: stats.label }),
-            el('span', { class: 'cd-card-blurb', text: stats.blurb }),
-          ]),
-          on ? el('span', { class: 'cd-card-tick', 'aria-hidden': 'true', text: '✓' }) : null,
-          el('span', { class: 'cd-card-state', text: on ? 'Selected' : '' }),
-        ]);
-      }));
+      return rail('candidate', {
+        className: 'cd-rail',
+        label: 'Your candidate',
+        items: CMP.ui.avatars.list().map(function (id) {
+          return { id: id };
+        }),
+        chosen: function () {
+          return draft.avatar;
+        },
+        onPick: function (id) {
+          draft.avatar = id;
+          if (CMP.profile.has()) CMP.profile.setAvatar(id);
+          if (CMP.audio) CMP.audio.play('select');
+          // Only what depends on the choice is redrawn. The rail itself is
+          // not touched, which is the whole point.
+          paintDetail();
+        },
+        card: function (item, i) {
+          var stats = CMP.candidateStats(item.id);
+          return el('button', {
+            class: 'cd-card',
+            type: 'button',
+            role: 'radio',
+            'aria-label': 'Candidate ' + (i + 1) + ', ' + stats.label,
+            dataset: { avatar: item.id },
+          }, [
+            el('span', { class: 'cd-card-art' }, [CMP.ui.portrait.render(item.id, 132)]),
+            el('span', { class: 'cd-card-body' }, [
+              el('strong', { class: 'cd-card-name', text: stats.label }),
+              el('span', { class: 'cd-card-blurb', text: stats.blurb }),
+            ]),
+            el('span', { class: 'cd-card-tick', 'aria-hidden': 'true', text: '✓' }),
+            el('span', { class: 'cd-card-state', text: '' }),
+          ]);
+        },
+      });
     }
 
     /**
@@ -298,6 +414,29 @@ CMP.ui.setup = (function () {
       ]);
     }
 
+    /*
+     * The two nodes that follow a choice.
+     *
+     * Everything on a step that depends on what is selected lives in one of
+     * these, so a selection repaints a panel rather than the screen — and the
+     * rail above it is never touched.
+     */
+    var detailNode = el('div', { class: 'cd-detail-slot' });
+    var partySideNode = el('div', { class: 'party-side-slot' });
+
+    function paintDetail() {
+      CMP.ui.dom.mount(detailNode, [candidateDetail()]);
+    }
+
+    function paintPartySide() {
+      // The symbol carries the party colour, and the colour swatches show
+      // which one is assigned when nobody has chosen: both follow the symbol.
+      if (rails.symbol) {
+        rails.symbol.node.style.setProperty('--party', partySoFar().colour);
+      }
+      CMP.ui.dom.mount(partySideNode, partySide());
+    }
+
     function stepCandidate() {
       return [
         el('div', { class: 'block' }, [
@@ -315,7 +454,7 @@ CMP.ui.setup = (function () {
           me ? null : setError('candidateName'),
 
           candidateRail(),
-          candidateDetail(),
+          detailNode,
         ]),
       ];
     }
@@ -323,31 +462,40 @@ CMP.ui.setup = (function () {
     /* ---------------------------------------------------- step 2: party */
 
     function symbolRail() {
-      var party = partySoFar();
-      return el('div', {
-        class: 'pick-rail',
-        role: 'radiogroup',
-        'aria-label': 'Party symbol',
-      }, CMP.PARTY_SYMBOLS.map(function (sym) {
-        var on = draft.partySymbol === sym.id;
-        return el('button', {
-          class: 'pick-card sym-option' + (on ? ' is-on' : ''),
-          type: 'button',
-          role: 'radio',
-          title: sym.name,
-          'aria-label': sym.name,
-          'aria-checked': on ? 'true' : 'false',
-          style: { '--party': party.colour, color: on ? party.colour : 'var(--muted)' },
-          onclick: function () {
-            draft.partySymbol = sym.id;
-            if (CMP.audio) CMP.audio.play('select');
-            paint();
-          },
-        }, [
-          el('span', { class: 'pick-card-art' }, [CMP.ui.symbol.render(sym.id, 56)]),
-          el('span', { class: 'pick-card-name', text: sym.name }),
-        ]);
-      }));
+      var node = rail('symbol', {
+        className: 'pick-rail',
+        label: 'Party symbol',
+        items: CMP.PARTY_SYMBOLS,
+        chosen: function () {
+          return draft.partySymbol;
+        },
+        onPick: function (id) {
+          draft.partySymbol = id;
+          if (CMP.audio) CMP.audio.play('select');
+          paintPartySide();
+        },
+        card: function (sym) {
+          return el('button', {
+            class: 'pick-card sym-option',
+            type: 'button',
+            role: 'radio',
+            title: sym.name,
+            'aria-label': sym.name,
+          }, [
+            el('span', { class: 'pick-card-art' }, [CMP.ui.symbol.render(sym.id, 56)]),
+            el('span', { class: 'pick-card-name', text: sym.name }),
+          ]);
+        },
+      });
+      /*
+       * The party colour lives on the rail, not on every card.
+       *
+       * It changes when a colour is chosen, and a card that carried its own
+       * copy would have to be rebuilt to follow it — which is exactly the
+       * remount this whole arrangement exists to avoid.
+       */
+      node.style.setProperty('--party', partySoFar().colour);
+      return node;
     }
 
     function colourGrid() {
@@ -365,7 +513,7 @@ CMP.ui.setup = (function () {
           onclick: function () {
             draft.partyColour = swatch.id;
             draft.colourChosen = true;
-            paint();
+            paintPartySide();
           },
         });
       }));
@@ -378,7 +526,14 @@ CMP.ui.setup = (function () {
             el('span', { class: 'field-label', text: 'Symbol' }),
             symbolRail(),
           ]),
+          partySideNode,
+        ]),
+      ];
+    }
 
+    /** Everything on the party step that follows the symbol. */
+    function partySide() {
+      return [
           el('div', { class: 'field' }, [
             el('span', { class: 'field-label', text: 'Colour (optional)' }),
             colourGrid(),
@@ -428,7 +583,6 @@ CMP.ui.setup = (function () {
                 'scoreboard, the map and every compact card.',
             }),
           ]),
-        ]),
       ];
     }
 
@@ -570,6 +724,10 @@ CMP.ui.setup = (function () {
 
       var last = step === STEPS.length - 1;
 
+      // Where the rails are scrolled to, before the step around them is
+      // rebuilt. See restoreRails, and §13 of the brief this answers.
+      rememberRails();
+
       CMP.ui.dom.mount(root, [
         el('div', { class: 'setup-inner' }, [
           el('header', { class: 'setup-head' }, [
@@ -609,6 +767,10 @@ CMP.ui.setup = (function () {
           ]),
         ])),
       ]);
+
+      if (step === 0) paintDetail();
+      if (step === 1) paintPartySide();
+      restoreRails();
     }
 
     function toTop() {
