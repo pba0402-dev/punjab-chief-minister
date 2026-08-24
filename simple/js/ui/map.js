@@ -54,7 +54,15 @@ CMP.ui.map = (function () {
   function create(opts) {
     var geo = CMP.GEOMETRY;
     var game = null;
-    var mode = 'map'; // map | tiles
+    /*
+     * There is one representation now, so this is a constant.
+     *
+     * It survives as a value because the shell and the tests both ask the map
+     * what it is showing, and "map" is a true answer that costs nothing —
+     * where removing the question would mean touching four files to say the
+     * same thing.
+     */
+    var mode = 'map';
     var region = 'all'; // all | malwa | majha | doaba
     var selected = null;
     var selectedDistrict = null;
@@ -105,11 +113,6 @@ CMP.ui.map = (function () {
     var readout = el('div', { class: 'map-readout' });
     var summary = el('div', { class: 'map-summary' });
 
-    var modeToggle = el('div', { class: 'term-options map-modes' }, [
-      modeButton('map', 'Map'),
-      modeButton('tiles', 'Tiles'),
-    ]);
-
     var zoomControls = el('div', { class: 'map-zoom' }, [
       zoomButton('+', function () {
         zoomBy(1.4);
@@ -127,129 +130,32 @@ CMP.ui.map = (function () {
      * on a phone; a region is about forty seats, which is a thing you can
      * actually work. Choosing one frames it rather than hiding the rest.
      */
-    var regionBar = el('div', { class: 'term-options map-regions' });
-    var scopeBar = el('div', { class: 'map-scope' });
-
     /*
-     * Three levels, not four buttons.
+     * One Punjab, and nothing to choose between.
      *
-     * It used to be All Punjab, Majha, Doaba, Malwa in one row — which put
-     * the whole state and one third of it on the same footing, and left no
-     * room at all for a district. The levels are what you are looking at;
-     * the row underneath is which one.
+     * There were three geographic levels above the board and a Map/Tiles
+     * toggle beside it — four controls asking which representation of the
+     * same state the player would like, before they had done anything with
+     * any of it. The map is the game; a game that opens by asking how you
+     * would like to look at it is a dashboard.
      *
-     * `level` is what the player chose. `region` and `district` are what the
-     * map is framing, and they are the map's own business — this only tells
-     * it where to look.
+     * The districts are still there and still the playing areas. What is gone
+     * is the navigation between ways of drawing them.
      */
-    var level = 'all';
-    var district = null;
-
     function paintRegions() {
-      mount(regionBar, [
-        levelButton('all', 'All Punjab'),
-        levelButton('district', 'District'),
-        levelButton('zone', 'Zone'),
-      ]);
-      paintScope();
-    }
-
-    function levelButton(id, label) {
-      return el('button', {
-        class: 'term-option' + (level === id ? ' is-selected' : ''),
-        type: 'button',
-        text: label,
-        dataset: { level: id },
-        onclick: function () {
-          setLevel(id);
-        },
-      });
-    }
-
-    function setLevel(next) {
-      level = next;
-      if (level === 'all') {
-        district = null;
-        focusRegion('all');
-      } else if (level === 'zone') {
-        district = null;
-        // Keep whichever zone was already in view rather than snapping back
-        // to the whole state and making the player choose again.
-        focusRegion(region !== 'all' ? region : (CMP.REGIONS[0] || {}).id || 'all');
-      } else {
-        // A district level with no district chosen shows the whole state
-        // until one is picked. It is a question, not an empty screen.
-        if (district) focusDistrict(district);
-      }
-      paintRegions();
-      announceScope();
-    }
-
-    /**
-     * Which zone, or which district — the row under the levels.
-     *
-     * A scrolling row rather than a wrapped grid: twenty-three districts
-     * wrapped to four lines is most of a phone screen given over to a control.
-     */
-    function paintScope() {
-      if (level === 'all') {
-        mount(scopeBar, []);
-        scopeBar.hidden = true;
-        return;
-      }
-      scopeBar.hidden = false;
-
-      var options = level === 'zone'
-        ? (CMP.REGIONS || []).map(function (r) {
-            return { id: r.id, name: r.name, on: region === r.id };
-          })
-        : (CMP.DISTRICTS || []).map(function (d) {
-            return { id: d.id, name: d.name, on: district === d.id };
-          });
-
-      mount(scopeBar, options.map(function (o) {
-        return el('button', {
-          class: 'map-scope-chip' + (o.on ? ' is-on' : ''),
-          type: 'button',
-          text: o.name,
-          dataset: { scope: o.id },
-          onclick: function () {
-            if (level === 'zone') {
-              focusRegion(o.id);
-            } else {
-              district = o.id;
-              focusDistrict(o.id);
-              highlightDistrict(o.id);
-            }
-            paintRegions();
-            announceScope();
-          },
-        });
-      }));
-    }
-
-    /**
-     * Tell whoever is listening what the player is looking at.
-     *
-     * The board and the standing underneath it have to agree about scope, and
-     * the map is the one that knows — so it says, rather than the screen
-     * underneath guessing from a highlight.
-     */
-    function announceScope() {
-      if (!opts.onScope) return;
-      opts.onScope({
-        level: level,
-        region: level === 'zone' ? region : null,
-        district: level === 'district' ? district : null,
-      });
+      // Nothing to paint: there is one map.
     }
 
     var root = el('div', { class: 'map-block' }, [
-      regionBar,
-      scopeBar,
       summary,
-      el('div', { class: 'map-toolbar' }, [modeToggle, zoomControls]),
-      el('div', { class: 'map-frame' }, [svg]),
+      /*
+       * The zoom controls float over the board rather than above it.
+       *
+       * They had a row of their own, which on a phone is thirty-odd pixels of
+       * the one thing the screen is for. Over the map they cost nothing and
+       * are where a hand already is.
+       */
+      el('div', { class: 'map-frame' }, [svg, zoomControls]),
 
       /*
        * The readout, and nothing else.
@@ -265,18 +171,6 @@ CMP.ui.map = (function () {
        */
       readout,
     ]);
-
-    function modeButton(id, label) {
-      return el('button', {
-        class: 'term-option' + (mode === id ? ' is-selected' : ''),
-        type: 'button',
-        text: label,
-        dataset: { mode: id },
-        onclick: function () {
-          setMode(id);
-        },
-      });
-    }
 
     function zoomButton(label, fn) {
       return el('button', { class: 'map-zoom-btn', type: 'button', text: label, onclick: fn });
@@ -306,7 +200,7 @@ CMP.ui.map = (function () {
     function shapeOf(num) {
       var g = seatGeo(num);
       if (!g) return [];
-      if (mode === 'tiles') {
+      if (false) {
         return geo.hexPoints.map(function (p) {
           return [g.hex[0] + p[0], g.hex[1] + p[1]];
         });
@@ -316,7 +210,7 @@ CMP.ui.map = (function () {
 
     function anchorOf(num) {
       var g = seatGeo(num);
-      return mode === 'tiles' ? g.hex : g.centroid;
+      return g.centroid;
     }
 
     /* ------------------------------------------------------ building */
@@ -360,7 +254,7 @@ CMP.ui.map = (function () {
       Object.keys(geo.districts).forEach(function (name) {
         var d = geo.districts[name];
         var reg = regionOfDistrictName(name);
-        (mode === 'tiles' ? d.hexBorder : d.border).forEach(function (line) {
+        d.border.forEach(function (line) {
           var node = svgEl('path', { class: 'map-district-line', d: pathOf(line, false) });
           borderLayer.appendChild(node);
           // Tagged so showing one region can hide the other two outright
@@ -739,18 +633,6 @@ CMP.ui.map = (function () {
       paint();
     }
 
-    function setMode(next) {
-      if (next === mode) return;
-      mode = next;
-      Array.prototype.forEach.call(modeToggle.children, function (b) {
-        b.classList.toggle('is-selected', b.dataset.mode === mode);
-      });
-      build();
-      // The region survives a change of view: somebody working Majha in the
-      // map view wants Majha in the tiles view, not all of Punjab back.
-      setRegion(region, false);
-      paintRegions();
-    }
 
     /* -------------------------------------------------------- camera */
 
@@ -764,7 +646,7 @@ CMP.ui.map = (function () {
       // it.
       var k = BASE.w / cam.w;
       labelLayer.setAttribute('style', '--map-k:' + k);
-      labelLayer.classList.toggle('show-nums', mode === 'tiles' || k >= 2.4);
+      labelLayer.classList.toggle('show-nums', k >= 2.4);
     }
 
     /**

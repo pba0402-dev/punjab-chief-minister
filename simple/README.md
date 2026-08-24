@@ -384,6 +384,40 @@ can weigh rounds, districts, alliances, campaign performance or anything else
 by asking for more context rather than by reaching into the game — and the
 screens that display it do not have to be rebuilt.
 
+## One Punjab
+
+There is one map and nothing to choose between. There were three geographic
+levels above the board and a Map/Tiles toggle beside it — four controls asking
+which representation of the same state the player would like, before they had
+done anything with any of it. The map is the game; a game that opens by asking
+how you would like to look at it is a dashboard.
+
+The hex coordinates stay in the geometry. They are cheap, already generated,
+and throwing data away to remove a control would be removing more than the
+control.
+
+## Districts are the playing areas
+
+A tap on the board opens the **district** it is in. A district is a group of
+constituencies that pays a grant every round to whoever leads all of them,
+which is the decision the board is actually about — so the panel answers what
+follows from that: how much of it each campaign holds, what the grant still
+needs, and what one sum across the whole of it would cost.
+
+Spending goes through the same bulk allocation the areas screen uses, which
+plays each open seat with the game's own dice. **No calculation changed
+because the tap did.**
+
+A seat is one tap further in, from the panel's own list. A district spend
+spreads evenly; taking one particular seat off somebody is a different move,
+and that is the way to it. Only one panel is ever open — a seat replaces the
+district rather than stacking on it.
+
+**The grant condition is leading, not winning.** The panel said "win all 11
+seats" until it was checked against `districtsHeldBy`, which reads the support
+board. That would have had a player chasing a harder condition than the one
+that actually pays. There is a test.
+
 ## The board, and one thing under it
 
 **Map, then who's leading.** That is the whole screen.

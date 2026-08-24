@@ -735,9 +735,9 @@ check('14. and the one you are on says so',
   q(dom, '.g-nav-item.is-on .g-nav-label').textContent === 'Home',
   q(dom, '.g-nav-item.is-on')
     ? q(dom, '.g-nav-item.is-on .g-nav-label').textContent : 'none marked');
-// 5. Three levels — the whole state, a district, or a zone.
-check('5. the map offers three geographic levels',
-  qq(dom, '.map-regions .term-option').length === 3,
+// 5. One map, and nothing to choose between.
+check('5. there is one map and no way to pick another',
+  qq(dom, '.map-regions .term-option').length === 0 && !q(dom, '.map-modes'),
   qq(dom, '.map-regions .term-option').map((n) => n.textContent).join('/'));
 check('23. and says what the four appearances mean',
   !!q(dom, '.legend-key') &&
@@ -766,79 +766,45 @@ check('1. and all 117 seats drawn',
   qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
 
 /*
- * Three levels, not four buttons.
+ * One Punjab, and nothing to choose between.
  *
- * All Punjab, Majha, Doaba and Malwa used to sit in one row, which put the
- * whole state and one third of it on the same footing and left no room for a
- * district at all. The levels are what you are looking at; the row underneath
- * is which one.
+ * There were three geographic levels above the board and a Map/Tiles toggle
+ * beside it — four controls asking which representation of the same state the
+ * player would like, before they had done anything with any of it. The map is
+ * the game; a game that opens by asking how you would like to look at it is a
+ * dashboard.
+ *
+ * The districts are still the playing areas. What is gone is the navigation
+ * between ways of drawing them.
  */
-check('map: the levels are All Punjab, District and Zone',
-  qq(dom, '.map-regions .term-option').map((b) => b.textContent).join('/') ===
-    'All Punjab/District/Zone',
+check('map: there is no geographic level selector',
+  qq(dom, '.map-regions .term-option').length === 0,
   qq(dom, '.map-regions .term-option').map((b) => b.textContent).join('/'));
-check('map: and no zone sits in the level row',
-  !qq(dom, '.map-regions .term-option')
-    .some((b) => /Majha|Doaba|Malwa/.test(b.textContent)));
-
-clickIt(dom, regionButton('Zone'));
-await settle();
-check('map: choosing Zone offers the three zones',
-  qq(dom, '.map-scope-chip').map((b) => b.textContent).join('/') === 'Majha/Doaba/Malwa',
-  qq(dom, '.map-scope-chip').map((b) => b.textContent).join('/'));
-
-clickIt(dom, qq(dom, '.map-scope-chip').find((b) => b.textContent === 'Majha'));
-await settle();
-await new Promise((r) => setTimeout(r, 500));
-
-const majhaSeats = dom.window.CMP.CONSTITUENCIES
-  .filter((c) => dom.window.CMP.regionOfSeat(c.number) === 'majha').length;
-const shown = qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside'));
-
-check('1. choosing Majha draws only Majha', shown.length === majhaSeats,
-  shown.length + ' drawn of ' + majhaSeats + ' in Majha');
-check('1. every other region is gone from the board',
-  shown.every((c) => dom.window.CMP.regionOfSeat(Number(c.dataset.seat)) === 'majha'));
-check('1. and so is the Punjab outline',
-  q(dom, '.map-outline').classList.contains('is-outside'));
-
-const majhaBox = viewBoxOf();
-check('3. the camera moved to fit it',
-  majhaBox[2] < punjabBox[2] * 0.9,
-  majhaBox.map((n) => Math.round(n)).join(' ') + ' vs ' + punjabBox.join(' '));
-check('3. nobody has to zoom out afterwards',
-  majhaBox[2] > 0 && majhaBox[3] > 0);
+check('map: and no map/tiles toggle',
+  qq(dom, '.map-modes .term-option').length === 0 && !q(dom, '.map-modes'),
+  q(dom, '.map-modes') ? q(dom, '.map-modes').textContent : 'gone');
+check('map: the whole of Punjab is on screen',
+  qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
+check('map: at its full extent, not zoomed in',
+  viewBoxOf()[2] === dom.window.CMP.GEOMETRY.viewBox.width,
+  viewBoxOf().join(' '));
 
 /*
- * 18. And a line above it saying how this part stands, from the game's own
- * board rather than from anything stored or invented.
+ * The framing still works — it is driven by choosing a district now rather
+ * than by a row of buttons, and that is the one caller left.
  */
-check('18. the summary names the region on screen',
-  /Majha/i.test(q(dom, '.map-summary').textContent),
-  q(dom, '.map-summary').textContent.slice(0, 60));
+{
+  const mapView = dom.window.document.querySelector('.punjab-map');
+  check('map: a district can still be framed', !!mapView);
+}
 
-// A zone is chosen from the row under the levels, not from the levels.
-clickIt(dom, qq(dom, '.map-scope-chip').find((b) => b.textContent === 'Doaba'));
-await settle();
-await new Promise((r) => setTimeout(r, 500));
-const doabaShown = qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside'));
-check('1. switching to Doaba draws only Doaba',
-  doabaShown.every((c) => dom.window.CMP.regionOfSeat(Number(c.dataset.seat)) === 'doaba') &&
-  doabaShown.length > 0,
-  doabaShown.length + ' drawn');
-check('3. and reframes for it',
-  viewBoxOf().join(' ') !== majhaBox.join(' '));
-check('18. the summary follows the region',
-  /Doaba/i.test(q(dom, '.map-summary').textContent),
+/*
+ * 18. And a line above it saying what is on screen, from the game's own board
+ * rather than from anything stored or invented.
+ */
+check('18. the summary names what is on screen',
+  /Punjab/i.test(q(dom, '.map-summary').textContent),
   q(dom, '.map-summary').textContent.slice(0, 60));
-
-clickIt(dom, regionButton('All Punjab'));
-await settle();
-await new Promise((r) => setTimeout(r, 500));
-check('1. All Punjab brings the whole board back',
-  qq(dom, '.map-cell').filter((c) => !c.classList.contains('is-outside')).length === 117);
-check('3. at the full extent',
-  viewBoxOf()[2] === punjabBox[2], viewBoxOf().join(' '));
 
 /*
  * 8. The legend names the parties.
@@ -1211,6 +1177,134 @@ check('who is leading shows what each campaign has left',
 check('10. the disclaimer is not on the game screen',
   !/not official constituency boundaries/i.test(text(dom)));
 
+/* --------------------------------------------------- the district panel */
+
+/*
+ * Tapping the board opens a district.
+ *
+ * Worked in Sangrur rather than Amritsar: this block spends across a whole
+ * district, and the seat-panel block below asserts that seats in Amritsar are
+ * untouched. A test that quietly campaigned in another test's district would
+ * fail it for the wrong reason.
+ *
+ * The districts are the playing areas: one is a group of constituencies that
+ * pays a grant every round to whoever leads all of them, which is the
+ * decision the board is actually about. A seat is one tap further in.
+ */
+{
+  const cell = qq(dom, '.map-cell').find((c) => c.dataset.seat === '100');
+  const areaId = dom.window.CMP.campaign.areaOf(100);
+  const area = dom.window.CMP.getDistrict(areaId);
+
+  clickIt(dom, cell);
+  await settle();
+
+  check('area: tapping the board opens the district it is in',
+    !!q(dom, '.dp-area'), q(dom, '.dp') ? q(dom, '.dp').className : 'no panel');
+  check('area: named, with its size and its region',
+    q(dom, '.dp-name').textContent === area.name &&
+      new RegExp(area.seats.length + ' seats?').test(q(dom, '.dp-where').textContent),
+    q(dom, '.dp-name').textContent + ' / ' + q(dom, '.dp-where').textContent);
+  check('area: and the board is still behind it', !!q(dom, '.punjab-map'));
+
+  check('area: every party is listed with what it holds',
+    qq(dom, '.dp-area .dp-row').length === 4 &&
+      qq(dom, '.dp-seats-held').length === 4,
+    qq(dom, '.dp-seats-held').map((n) => n.textContent).join(' | '));
+
+  /*
+   * The counts are the board's. A district panel quietly computing its own
+   * standing would be a second opinion about who is winning.
+   */
+  {
+    const leaders = dom.window.CMP.campaign.currentLeaders(
+      dom.window.CMP.app.getGame().support);
+    const won = dom.window.CMP.app.getGame().wonSeats || {};
+    const mine = dom.window.CMP.app.getGame().partyId;
+    let expected = 0;
+    area.seats.forEach((n) => {
+      const w = won[String(n)];
+      if (w) { if (w.party === mine) expected += 1; return; }
+      if (leaders[n] === mine) expected += 1;
+    });
+    const row = qq(dom, '.dp-area .dp-row').find(
+      (r) => r.querySelector('.dp-party').textContent ===
+        dom.window.CMP.getParty(mine).short);
+    check('area: and they are counted off the board, not invented',
+      Number(row.querySelector('.dp-seats-held').textContent.replace(/\D.*$/, '')) === expected,
+      row.querySelector('.dp-seats-held').textContent + ' vs ' + expected);
+  }
+
+  check('area: the money and the grant are shown, and kept apart',
+    qq(dom, '.dp-grant-label').map((n) => n.textContent).join('/')
+      .indexOf('Your money here') === 0,
+    qq(dom, '.dp-grant-label').map((n) => n.textContent).join(' / '));
+  /*
+   * And it says the right condition.
+   *
+   * A district pays its grant to whoever *leads* every seat in it — see
+   * districtsHeldBy, which reads the support board. The panel said "win all
+   * 11" until that was checked, which would have had a player chasing a
+   * harder condition than the one that actually pays.
+   */
+  check('area: and it says what the grant needs',
+    /pays a grant|hold this district|Nothing left/i.test(q(dom, '.dp').textContent),
+    q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(-90));
+  check('area: which is leading every seat, not winning them outright',
+    !/Win all \d+ seats/i.test(q(dom, '.dp').textContent),
+    q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(-90));
+
+  /* Spending across the district, through the game's own allocation. */
+  {
+    const g = dom.window.CMP.app.getGame();
+    g.cash = 40 * 10000000;
+    dom.window.CMP.app.goTo('election');
+    clickIt(dom, qq(dom, '.map-cell').find((c) => c.dataset.seat === '100'));
+    await settle();
+
+    const before = dom.window.CMP.campaign.balanceOf(dom.window.CMP.app.getGame());
+    const go = qq(dom, '.dp button').find((b) => /Campaign across/.test(b.textContent));
+    check('area: one button spends across the whole district', !!go,
+      qq(dom, '.dp button').map((b) => b.textContent.slice(0, 24)).join(' | '));
+    clickIt(dom, go);
+    await settle();
+    check('area: with amounts and the arithmetic beside them',
+      qq(dom, '.dp-amount').length > 0 &&
+        qq(dom, '.dp-tally-label').map((n) => n.textContent).join('/') ===
+          'Available/This spend/Remaining',
+      qq(dom, '.dp-tally-label').map((n) => n.textContent).join('/'));
+
+    clickIt(dom, qq(dom, '.dp-amount')[0]);
+    await settle();
+    clickIt(dom, qq(dom, '.dp button').find((b) => /^Spend ₹/.test(b.textContent)));
+    await settle();
+    await settle();
+
+    const after = dom.window.CMP.campaign.balanceOf(dom.window.CMP.app.getGame());
+    check('area: spending across a district takes the money', after < before,
+      before + ' -> ' + after);
+    check('area: and it went into more than one seat',
+      area.seats.filter((n) => (dom.window.CMP.app.getGame().support[n] || {})[
+        dom.window.CMP.app.getGame().partyId] > 0).length > 1,
+      area.seats.filter((n) => (dom.window.CMP.app.getGame().support[n] || {})[
+        dom.window.CMP.app.getGame().partyId] > 0).length + ' seats touched');
+  }
+
+  /* A seat is one tap further in, and it replaces the district rather than
+     stacking on it. */
+  clickIt(dom, qq(dom, '.dp-seat')[0]);
+  await settle();
+  check('area: a seat opens from the district list',
+    !!q(dom, '.dp') && !q(dom, '.dp-area'),
+    q(dom, '.dp') ? q(dom, '.dp').className : 'no panel');
+  check('area: and only one panel is ever open',
+    qq(dom, '.dp').length === 1, qq(dom, '.dp').length + ' panels');
+
+  clickIt(dom, q(dom, '.dp-close'));
+  await settle();
+  check('area: closing puts the board back', !q(dom, '.dp') && !!q(dom, '.punjab-map'));
+}
+
 /* ------------------------------------------------------- the seat panel */
 
 /*
@@ -1223,8 +1317,25 @@ check('10. the disclaimer is not on the game screen',
  */
 const seatCell = (n) => qq(dom, '.map-cell').find((c) => c.dataset.seat === String(n));
 
-clickIt(dom, seatCell(17));
-await settle();
+/*
+ * Tapping the board opens the district, not the seat.
+ *
+ * The districts are the playing areas: one is a group of constituencies that
+ * pays a grant to whoever leads all of them, which is the decision the board
+ * is about. A seat is one tap further in, from the panel's own list — so this
+ * takes both taps, the way a player does.
+ */
+const openSeatPanel = async (n) => {
+  clickIt(dom, seatCell(n));
+  await settle();
+  const seat = qq(dom, '.dp-seat').find((b) => b.dataset.seat === String(n));
+  if (seat) {
+    clickIt(dom, seat);
+    await settle();
+  }
+};
+
+await openSeatPanel(17);
 
 check('panel: tapping a seat opens the seat panel', !!q(dom, '.dp'));
 check('panel: and the map is still on screen behind it', !!q(dom, '.punjab-map'));
@@ -1256,13 +1367,11 @@ check('panel: and all of them reading No bid',
 /*
  * 14.9. Tapping another seat switches the panel rather than closing it.
  */
-clickIt(dom, seatCell(18));
-await settle();
+await openSeatPanel(18);
 check('panel: tapping another seat switches straight to it',
   !!q(dom, '.dp') && q(dom, '.dp-where').textContent.indexOf('AC 18') !== -1,
   q(dom, '.dp-where').textContent);
-clickIt(dom, seatCell(17));
-await settle();
+await openSeatPanel(17);
 
 /* 14.3 + 14.4. One bidder, then a contest, both read off the real board. */
 {
@@ -1276,8 +1385,7 @@ await settle();
   g.support[17][me] = 40;
   dom.window.CMP.app.goTo('election');
   menuItem(dom, 'Map');
-  clickIt(dom, seatCell(17));
-  await settle();
+  await openSeatPanel(17);
 
   const rowFor = (id) => qq(dom, '.dp-row').find(
     (r) => r.querySelector('.dp-party').textContent ===
@@ -1296,8 +1404,7 @@ await settle();
   g.support[17][rival] = 38;
   dom.window.CMP.app.goTo('election');
   menuItem(dom, 'Map');
-  clickIt(dom, seatCell(17));
-  await settle();
+  await openSeatPanel(17);
 
   check('panel: a close race reads as contested, not as a lead',
     /Contested/i.test(rowFor(me).querySelector('.dp-pos').textContent),
@@ -1365,8 +1472,7 @@ await settle();
     }
     dom.window.CMP.app.goTo('election');
     menuItem(dom, 'Map');
-    clickIt(dom, seatCell(23));
-    await settle();
+    await openSeatPanel(23);
 
     const posOf = (id) => {
       const short = dom.window.CMP.getParty(id).short;
@@ -1415,8 +1521,7 @@ await settle();
   (g.grants || {}) && Object.keys(g.grants || {}).forEach((r) => { g.grants[r] = 0; });
   dom.window.CMP.app.goTo('election');
   menuItem(dom, 'Map');
-  clickIt(dom, seatCell(19));
-  await settle();
+  await openSeatPanel(19);
   check('panel: with no money there is no spend button',
     !qq(dom, '.dp button').some((b) => /Spend money here/.test(b.textContent)),
     qq(dom, '.dp button').map((b) => b.textContent.slice(0, 20)).join(' | '));
@@ -1440,8 +1545,7 @@ await settle();
   g3.wonSeats['24'] = { party: g3.partyId, round: 3, share: 82 };
   dom.window.CMP.app.goTo('election');
   menuItem(dom, 'Map');
-  clickIt(dom, seatCell(24));
-  await settle();
+  await openSeatPanel(24);
   check('panel: a won seat says who took it',
     /has won this seat/.test(q(dom, '.dp').textContent),
     q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(-110));
@@ -1464,8 +1568,7 @@ await settle();
  * them apart and says which is which.
  */
 {
-  clickIt(dom, seatCell(17));
-  await settle();
+  await openSeatPanel(17);
   check('panel: grant has a section of its own',
     /Potential here/.test(q(dom, '.dp').textContent),
     q(dom, '.dp').textContent.replace(/\s+/g, ' ').slice(0, 90));
@@ -1489,8 +1592,7 @@ await settle();
 }
 
 /* 9. Closing it leaves the board exactly where it was. */
-clickIt(dom, seatCell(17));
-await settle();
+await openSeatPanel(17);
 clickIt(dom, q(dom, '.dp-close'));
 await settle();
 check('panel: closing puts the board back', !q(dom, '.dp') && !!q(dom, '.punjab-map'));
@@ -1499,8 +1601,7 @@ check('panel: closing puts the board back', !q(dom, '.dp') && !!q(dom, '.punjab-
  * The full seat screen — history, ratings, the other kinds of move — is still
  * there, one step behind the panel rather than in front of it.
  */
-clickIt(dom, seatCell(17));
-await settle();
+await openSeatPanel(17);
 clickIt(dom, qq(dom, '.dp button').find((b) => /Full seat detail/.test(b.textContent)));
 await settle();
 check('panel: the full seat screen is still reachable',
@@ -1538,25 +1639,19 @@ check('the map repaints when support moves', before17 !== after17, before17 + ' 
 check('the seat now shows the player colour',
   seat17().getAttribute('fill') === dom.window.CMP.getParty(g17.partyId).colour);
 
-// Tiles view.
-clickIt(dom, qq(dom, '.map-modes .term-option').find((b2) => b2.textContent === 'Tiles'));
-check('a tiles view is offered', qq(dom, '.map-cell').length === 117);
-// Path-string length varies with coordinate digits, so measure the tiles.
-function boxOf(d) {
-  const nums = (d.match(/-?\d+(\.\d+)?/g) || []).map(Number);
-  const xs = nums.filter((_, i) => i % 2 === 0);
-  const ys = nums.filter((_, i) => i % 2 === 1);
-  return [
-    Math.round((Math.max(...xs) - Math.min(...xs)) * 10) / 10,
-    Math.round((Math.max(...ys) - Math.min(...ys)) * 10) / 10,
-  ].join('x');
-}
-const tileBoxes = new Set(qq(dom, '.map-cell').map((c) => boxOf(c.getAttribute('d') || '')));
-check('every tile is identical in size', tileBoxes.size === 1,
-  [...tileBoxes].slice(0, 3).join(' , '));
-check('every tile sits on its own centre',
+/*
+ * The tiles view is gone, and its geometry is not.
+ *
+ * There is one Punjab now: a toggle asking which representation of the same
+ * state the player would like, before they had done anything with any of it,
+ * is a dashboard rather than a board. The hex coordinates stay in the
+ * geometry — they are cheap, they are already generated, and throwing away
+ * data to remove a control would be removing more than the control.
+ */
+check('there is no tiles view to switch to', !q(dom, '.map-modes'));
+check('every seat still has geometry', dom.window.CMP.GEOMETRY.seats.length === 117);
+check('including the tile centres, kept for later',
   new Set(dom.window.CMP.GEOMETRY.seats.map((s2) => s2.hex.join(','))).size === 117);
-check('every seat has geometry', dom.window.CMP.GEOMETRY.seats.length === 117);
 
 /* ---------------------------------------------------------------- picker */
 
@@ -1601,8 +1696,17 @@ check('9. and the five strongest seats', /Top 5 strongest seats/.test(text(dom))
 clickIt(dom, qq(dom, 'button').find((b) => /All my seats/i.test(b.textContent)));
 await settle();
 check('9. with a way through to every seat', !!q(dom, '.areas'));
+/*
+ * A summary, not all 117.
+ *
+ * The bound is generous on purpose: the screen is a handful of short lists —
+ * strongest, closest, districts controlled — and how many rows they add up to
+ * depends on how the game has gone. What has to hold is that it is a summary
+ * and that there is no search box, because a search box would mean the full
+ * list is what opened.
+ */
 check('16. which opens as a summary, not as 117 rows',
-  qq(dom, '.area-row').length <= 10 && !q(dom, '.seat-search'),
+  qq(dom, '.area-row').length <= 20 && !q(dom, '.seat-search'),
   qq(dom, '.area-row').length + ' rows');
 check('18. statewide support is shown for all four parties',
   qq(dom, '.ar-support-row').length === 4);

@@ -156,6 +156,7 @@ CMP.ui.election = (function () {
   function create(opts) {
     var game = null;
     var selected = null;      // the seat a campaign action would target
+    var openArea = null;      // the district whose panel is open over the board
     var openSeat = null;      // the seat whose panel is open over the board
     var fullSeat = null;      // the seat whose full screen replaced the body
     var openParty = null;     // the candidate whose areas are open
@@ -415,6 +416,7 @@ CMP.ui.election = (function () {
       if (CMP.audio) CMP.audio.play('tap');
       section = next;
       openSeat = null;
+      openArea = null;
       fullSeat = null;
       paintPanel();
       rememberSection(next);
@@ -496,6 +498,62 @@ CMP.ui.election = (function () {
       },
     });
 
+    /**
+     * The district panel, made once and pointed at whichever one is open.
+     *
+     * The map's playing areas are districts, so a tap on the board opens one
+     * of these. A district is a group of constituencies that pays a grant to
+     * whoever leads all of them, so the panel answers what follows from that:
+     * who is ahead across the whole of it, and what it would cost to change
+     * that. The seats are listed underneath for when the district is not the
+     * right unit — taking one particular seat off somebody is a different
+     * move from spreading money over all of them.
+     */
+    var areaView = CMP.ui.district.createArea({
+      players: function () {
+        return roster();
+      },
+      canSpend: function () {
+        return !isCounting() && CMP.campaign.roundIsLive(game);
+      },
+      /*
+       * One sum across the district, through the game's own allocation —
+       * each seat played with the same dice as playing it by hand. Nothing
+       * about the arithmetic changes because the tap did.
+       */
+      allocate: function (seats, amount) {
+        return Promise.resolve(allocate('invest', seats, amount)).then(function (res) {
+          if (res && res.ok) {
+            notice = null;
+            render(game);
+          }
+          return res;
+        });
+      },
+      onSeat: function (number) {
+        closeAreaPanel();
+        openSeatDetail(number);
+      },
+      onClose: function () {
+        closeAreaPanel();
+      },
+    });
+
+    function closeAreaPanel() {
+      openArea = null;
+      paintPanel();
+    }
+
+    /** Open a district. The board stays where it is. */
+    function openAreaPanel(id) {
+      if (!id) return;
+      openArea = id;
+      openSeat = null;
+      fullSeat = null;
+      if (mapView) mapView.highlightDistrict(id);
+      paintPanel();
+    }
+
     function closeSeatPanel() {
       openSeat = null;
       if (mapView) mapView.select(null);
@@ -521,12 +579,23 @@ CMP.ui.election = (function () {
     }
 
     function paintPanel() {
-      if (openSeat === null) {
+      if (openSeat === null && openArea === null) {
         mount(panelNode, []);
         panelNode.classList.remove('is-open');
         return;
       }
-      districtView.show(game, openSeat);
+
+      // A seat panel opened from a district replaces it rather than stacking
+      // on it: two panels over one board is one too many.
+      var view;
+      if (openSeat !== null) {
+        districtView.show(game, openSeat);
+        view = districtView.root;
+      } else {
+        areaView.show(game, openArea);
+        view = areaView.root;
+      }
+
       mount(panelNode, [
         /*
          * The scrim is what makes the panel a panel rather than a card that
@@ -536,10 +605,11 @@ CMP.ui.election = (function () {
         el('div', {
           class: 'g-panel-scrim',
           onclick: function () {
-            closeSeatPanel();
+            if (openSeat !== null) closeSeatPanel();
+            else closeAreaPanel();
           },
         }),
-        districtView.root,
+        view,
       ]);
       panelNode.classList.add('is-open');
     }
@@ -2603,8 +2673,16 @@ CMP.ui.election = (function () {
            * what it would leave them. The panel is that missing step; the
            * spend is one button inside it.
            */
-          onSelect: function (num) {
-            openSeatDetail(num);
+          /*
+           * A tap on the board opens the district it is in.
+           *
+           * The districts are the playing areas: one is a group of seats that
+           * pays a grant to whoever leads all of them, which is the decision
+           * the board is actually about. The seat underneath is still one tap
+           * further in, from the panel.
+           */
+          onSelect: function (num, area) {
+            openAreaPanel(area || CMP.campaign.areaOf(num));
           },
           /*
            * The standing under the board follows the board.
@@ -2888,6 +2966,7 @@ CMP.ui.election = (function () {
       // The panel is a layer over the board, so a board that moved - a rival
       // spending, a round settling - has to reach it too.
       if (openSeat !== null) districtView.update(game);
+      if (openArea !== null) areaView.update(game);
       roundView.render(game, secondsFromServer);
       mount(roundNode, [roundView.root]);
       paintPlayer();

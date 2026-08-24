@@ -570,3 +570,88 @@
 .dp-grant-value.is-high { color: var(--warn-good); }
 .dp-grant-value.is-medium { color: var(--gold); }
 .dp-grant-value.is-low { color: var(--navy-3); }
+
+/* ------------------------------------------------------------------
+   The district panel.
+
+   The same panel as a seat, answering the district's own questions: how much
+   of it each campaign holds, what the grant needs, and what one sum across
+   the whole of it would cost.
+   ------------------------------------------------------------------ */
+
+.dp-area .dp-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+}
+
+/* Seats held, and how many of those are settled for good. */
+.dp-seats-held {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * The seats themselves, when the district is not the right unit.
+ *
+ * A district spend spreads evenly; taking one particular seat off somebody is
+ * a different move, and this is the way to it.
+ */
+.dp-seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dp-seat {
+  appearance: none;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.dp-seat:hover { border-color: var(--gold); }
+.dp-seat:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* The same four states the board uses, in the same colours. */
+.dp-seat.is-leading,
+.dp-seat.is-contested { box-shadow: inset 3px 0 0 var(--party); }
+.dp-seat.is-won {
+  box-shadow: inset 3px 0 0 var(--party);
+  background: var(--paper);
+}
+.dp-seat.is-open { opacity: 0.78; }
+
+.dp-seat-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.dp-seat-who {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy-3);
+}
+.dp-seat.is-leading .dp-seat-who,
+.dp-seat.is-contested .dp-seat-who,
+.dp-seat.is-won .dp-seat-who { color: var(--party); }
+
+@media (max-width: 359px) {
+  .dp-seats { grid-template-columns: minmax(0, 1fr); }
+}

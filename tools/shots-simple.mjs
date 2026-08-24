@@ -150,27 +150,18 @@ const SCENES = {
     "CMP.app.goTo('setup');setTimeout(function(){CMP.app.goTo('home');},40);",
 
   /*
-   * One region on the board, which is what the map is for.
+   * The board, framed on a district.
    *
-   * Rendered so the audit can see that Majha genuinely replaces the frame
-   * rather than Punjab being cropped to it — no Malwa in the corners, and the
-   * region fitted without anybody zooming out.
+   * The two region scenes and the level selector that drove them are gone:
+   * there is one Punjab now, and the framing that remains is what choosing a
+   * district does.
    */
-  'map-majha':
+  'map-framed':
     startGame() +
     "setTimeout(function(){" +
-    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
-    "    .filter(function(x){return x.textContent==='Majha';})[0];" +
-    "  if(b)b.click();" +
-    "},120);",
-
-  'map-doaba':
-    startGame() +
-    "setTimeout(function(){" +
-    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
-    "    .filter(function(x){return x.textContent==='Doaba';})[0];" +
-    "  if(b)b.click();" +
-    "},120);",
+    "  var c=document.querySelector('.map-cell[data-seat=\"17\"]');" +
+    "  if(c)c.dispatchEvent(new MouseEvent('click',{bubbles:true}));" +
+    "},220);",
 
   /*
    * The campaign panel in seat mode, over the map.
@@ -329,20 +320,6 @@ const SCENES = {
   'leading':
     "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:''});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
     "setTimeout(function(){window.scrollTo(0,900);},600);",
-
-  /* The district level, and the standing scoped to the chosen district. */
-  'map-district-level':
-    "var g=CMP.state.startElection({partyName:'Unity Punjab Front',  partyShort:'UPF',candidateName:'Gurpreet Singh',slogan:''});for(var r=0;r<12;r++){  for(var m=0;m<6;m++){    CMP.campaign.play(g,'invest',((r*13+m*7)%117)+1,      {outcome:0.35,consequence:0.99,consequencePick:0.5});  }  CMP.campaign.endRound(g);  CMP.campaign.startNextRound(g);}g.lastResult=null;CMP.app.setGame(g);CMP.app.goTo('election');" +
-    "setTimeout(function(){" +
-    "  var b=[].slice.call(document.querySelectorAll('.map-regions .term-option'))" +
-    "    .filter(function(x){return /District/.test(x.textContent);})[0];" +
-    "  if(b)b.click();" +
-    "  setTimeout(function(){" +
-    "    var c=document.querySelector('.map-scope-chip');" +
-    "    if(c)c.click();" +
-    "    setTimeout(function(){window.scrollTo(0,900);},300);" +
-    "  },260);" +
-    "},600);",
 
   /* The round overview: where every campaign stands, before the regions. */
   'results-overview':

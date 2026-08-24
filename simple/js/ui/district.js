@@ -548,5 +548,495 @@ CMP.ui.district = (function () {
     };
   }
 
-  return { create: create, POSITION: POSITION };
+  /* ==================================================================
+     A district, over the board.
+
+     The map's playing areas are districts: tap one and this opens on top of
+     it. What a district actually is, in this game, is a group of
+     constituencies that pays a grant every round to whoever leads all of
+     them — so the panel answers the two questions that follow from that: who
+     is ahead across the whole of it, and what would it cost to change that.
+
+     Spending here goes through the same bulk allocation the areas screen
+     uses, which plays each seat in the district with the game's own dice. No
+     calculation is done in this file; it asks and repaints.
+     ================================================================== */
+
+  function createArea(opts) {
+    opts = opts || {};
+    var root = el('div', { class: 'dp dp-area' });
+    var game = null;
+    var districtId = null;
+    var spendOpen = false;
+    var amount = 0;
+    var busy = false;
+    var note = null;
+
+    function def() {
+      return CMP.getDistrict ? CMP.getDistrict(districtId) : null;
+    }
+
+    function close() {
+      if (opts.onClose) opts.onClose();
+    }
+
+    /**
+     * How the district stands, counted from the board.
+     *
+     * A district is not a seat, so it has no single leader — it has whoever
+     * leads the most of it. Won seats and led seats are counted apart,
+     * because one is finished and the other is today's picture.
+     */
+    function standing() {
+      var d = def();
+      if (!d) return null;
+      var won = game.wonSeats || {};
+      var rows = {};
+
+      function row(id) {
+        if (!rows[id]) rows[id] = { partyId: id, won: 0, leading: 0, spent: 0, known: true };
+        return rows[id];
+      }
+
+      d.seats.forEach(function (n) {
+        var w = won[String(n)];
+        if (w) {
+          row(w.party).won += 1;
+          return;
+        }
+        var lead = CMP.ui.constituency.leaderOf(game.support[n] || {});
+        if (lead) row(lead.partyId).leading += 1;
+      });
+
+      // What each campaign has put into this district this round, where this
+      // client is entitled to know — see seatBids.
+      d.seats.forEach(function (n) {
+        CMP.campaign.seatBids(game, n).forEach(function (b) {
+          var r = row(b.partyId);
+          if (!b.spendKnown) r.known = false;
+          else r.spent += b.spent || 0;
+        });
+      });
+
+      var list = CMP.getParties().map(function (party) {
+        var r = rows[party.id] || { partyId: party.id, won: 0, leading: 0, spent: 0, known: true };
+        r.total = r.won + r.leading;
+        return r;
+      }).sort(function (a, b) {
+        return b.total - a.total || b.won - a.won;
+      });
+
+      var top = list[0] && list[0].total > 0 ? list[0] : null;
+      var settled = list.reduce(function (n, r) { return n + r.won; }, 0);
+
+      return {
+        district: d,
+        rows: list,
+        top: top,
+        settled: settled,
+        seats: d.seats.length,
+        /*
+         * A district pays its grant to whoever leads every seat in it.
+         *
+         * Leading, not winning outright — see districtsHeldBy in the engine,
+         * which reads the support board. The panel said "win all 11" until
+         * this was checked against the rule, which would have had a player
+         * chasing a harder condition than the one that actually pays.
+         */
+        held: top && top.total >= d.seats.length ? top.partyId : null,
+      };
+    }
+
+    /** The seats in this district anybody may still campaign in. */
+    function openSeats() {
+      var d = def();
+      if (!d) return [];
+      return d.seats.filter(function (n) {
+        return !CMP.campaign.isWon(game, n);
+      });
+    }
+
+    /**
+     * What can go in, bounded by what the engine will accept.
+     *
+     * A district spend is one sum spread across its open seats, so the floor
+     * is the minimum move times the number of seats it would be spread over —
+     * anything less would be refused seat by seat.
+     */
+    function amountsFor() {
+      var cfg = (CMP.CAMPAIGN || {}).spending || {};
+      var seats = openSeats();
+      var pot = seats.length
+        ? CMP.campaign.spendableOn(game, seats[0])
+        : { total: 0, grant: 0, cash: 0, region: null };
+      var min = (cfg.minAmount || 0) * Math.max(1, seats.length);
+      var max = pot.total;
+
+      var steps = [];
+      for (var i = 1; i <= 4; i++) {
+        var n = min * i;
+        if (n <= max) steps.push(n);
+      }
+      if (max >= min && steps.indexOf(max) === -1) steps.push(max);
+
+      return {
+        pot: pot,
+        seats: seats,
+        min: min,
+        max: max,
+        quick: steps,
+        canAfford: max >= min && seats.length > 0,
+      };
+    }
+
+    function head(st) {
+      var d = st.district;
+      var party = st.top ? CMP.getParty(st.top.partyId) : null;
+      var word = st.held ? 'Held' : st.top ? 'Leading' : 'Open';
+
+      return el('header', { class: 'dp-head' }, [
+        el('div', { class: 'dp-titles' }, [
+          el('h2', { class: 'dp-name', text: d.name }),
+          el('p', {
+            class: 'dp-where',
+            text: st.seats + (st.seats === 1 ? ' seat' : ' seats') + ' · ' +
+              ((CMP.getRegion && CMP.getRegion(d.region) || {}).name || d.region),
+          }),
+        ]),
+        el('button', {
+          class: 'dp-close',
+          type: 'button',
+          'aria-label': 'Close',
+          text: '✕',
+          onclick: close,
+        }),
+        el('div', { class: 'dp-state dp-state-' + word.toLowerCase() }, [
+          el('span', { class: 'dp-state-word', text: word }),
+          party
+            ? el('span', {
+                class: 'dp-state-who',
+                style: { '--party': party.colour },
+              }, [
+                el('span', { class: 'dp-state-dot', 'aria-hidden': 'true' }),
+                party.short + ' · ' + st.top.total + ' of ' + st.seats,
+              ])
+            : el('span', { class: 'dp-state-who is-quiet', text: 'Nobody has campaigned here' }),
+        ]),
+      ]);
+    }
+
+    function field(st, players) {
+      var anyHidden = false;
+      var list = el('div', { class: 'dp-field' }, st.rows.map(function (r) {
+        var party = CMP.getParty(r.partyId);
+        var isYou = r.partyId === game.partyId;
+        if (!r.known) anyHidden = true;
+
+        var pos = r.total <= 0 ? POSITION.none
+          : r.won >= st.seats ? POSITION.won
+          : st.top && st.top.partyId === r.partyId ? POSITION.leading
+          : POSITION.trailing;
+
+        return el('div', {
+          class: 'dp-row ' + pos.cls + (isYou ? ' is-you' : ''),
+          style: { '--party': party.colour },
+        }, [
+          el('span', {
+            class: 'dp-mark',
+            'aria-hidden': 'true',
+            text: r.total > 0 ? '✓' : '○',
+          }),
+          el('span', { class: 'dp-who' }, [
+            el('strong', { class: 'dp-party', text: party.short }),
+            el('span', {
+              class: 'dp-name-small',
+              text: isYou ? 'You' : (candidateFor(r.partyId, players) || {}).candidateName ||
+                party.name,
+            }),
+          ]),
+          el('span', {
+            class: 'dp-seats-held',
+            text: r.total + (r.won ? ' (✓' + r.won + ')' : ''),
+          }),
+          el('span', { class: 'dp-pos', text: pos.label }),
+        ]);
+      }));
+
+      return el('section', { class: 'dp-block' }, [
+        el('div', { class: 'dp-block-head' }, [
+          el('h3', { class: 'dp-block-title', text: 'Across the district' }),
+          el('span', { class: 'dp-block-note', text: 'Seats held' }),
+        ]),
+        list,
+        anyHidden
+          ? el('p', {
+              class: 'dp-note',
+              text: 'What the other campaigns have spent here is their own.',
+            })
+          : null,
+      ]);
+    }
+
+    /**
+     * The grant, and the money — kept apart, and both said plainly.
+     *
+     * A district pays its grant only to a campaign that leads every seat in
+     * it, which is the fact that makes a district worth taking rather than a
+     * seat. The purse beside it is what is actually available to spend here.
+     */
+    function moneyBlock(st, a) {
+      var region = st.district.region;
+      var name = (CMP.getRegion && CMP.getRegion(region) || {}).name || region;
+      var held = CMP.campaign.grantIn ? CMP.campaign.grantIn(game, region) : 0;
+      var mine = st.rows.filter(function (r) {
+        return r.partyId === game.partyId;
+      })[0] || { won: 0, total: 0 };
+      var toTake = Math.max(0, st.seats - mine.total);
+
+      return el('section', { class: 'dp-block' }, [
+        el('div', { class: 'dp-grant' }, [
+          el('div', { class: 'dp-grant-fig' }, [
+            el('span', { class: 'dp-grant-label', text: 'Your money here' }),
+            el('strong', {
+              class: 'dp-grant-value',
+              text: money.words(a.pot.total) || '₹0',
+            }),
+          ]),
+          el('div', { class: 'dp-grant-fig' }, [
+            el('span', { class: 'dp-grant-label', text: name + ' grant' }),
+            el('strong', {
+              class: 'dp-grant-value is-medium',
+              text: held > 0 ? money.words(held) : '₹0',
+            }),
+          ]),
+        ]),
+        el('p', {
+          class: 'dp-note',
+          text: st.held === game.partyId
+            ? 'You hold this district outright, so it pays you every round.'
+            : toTake === 0
+              ? 'Nothing left to take here.'
+              : 'Lead all ' + st.seats + ' seats and this district pays a grant ' +
+                'every round. ' + toTake + (toTake === 1 ? ' to go.' : ' to go.'),
+        }),
+      ]);
+    }
+
+    function spendPanel(a) {
+      var after = Math.max(0, a.pot.total - amount);
+      return el('div', { class: 'dp-actions' }, [
+        el('div', { class: 'dp-amounts' }, a.quick.map(function (n) {
+          return el('button', {
+            class: 'dp-amount' + (n === amount ? ' is-on' : ''),
+            type: 'button',
+            disabled: busy,
+            onclick: function () {
+              amount = n;
+              if (CMP.audio) CMP.audio.play('tap');
+              paint();
+            },
+          }, [money.words(n)]);
+        })),
+        el('div', { class: 'dp-tally' }, [
+          tallyFig('Available', money.words(a.pot.total) || '₹0'),
+          tallyFig('This spend', money.words(amount) || '₹0', 'is-spend'),
+          tallyFig('Remaining', money.words(after) || '₹0', 'is-after'),
+        ]),
+        el('button', {
+          class: 'btn btn-quiet btn-wide',
+          type: 'button',
+          text: 'Not now',
+          onclick: function () {
+            spendOpen = false;
+            paint();
+          },
+        }),
+        el('button', {
+          class: 'btn btn-primary btn-wide dp-go',
+          type: 'button',
+          disabled: busy || amount < a.min || amount > a.max,
+          text: busy ? 'Spending…' : 'Spend ' + (money.words(amount) || '₹0'),
+          onclick: function () {
+            spend(a);
+          },
+        }),
+      ]);
+    }
+
+    function tallyFig(label, value, cls) {
+      return el('div', { class: 'dp-tally-fig ' + (cls || '') }, [
+        el('span', { class: 'dp-tally-label', text: label }),
+        el('strong', { class: 'dp-tally-value', text: value }),
+      ]);
+    }
+
+    /**
+     * Spend it across the district, through the game's own allocation.
+     *
+     * One sum spread over the seats that are still open, played with the same
+     * dice as playing each of them by hand. Nothing is decided here.
+     */
+    function spend(a) {
+      if (busy || !opts.allocate) return;
+      if (amount < a.min || amount > a.max) return;
+
+      busy = true;
+      note = null;
+      paint();
+
+      Promise.resolve(opts.allocate(a.seats, amount)).then(function (res) {
+        busy = false;
+        if (!res || !res.ok) {
+          note = { tone: 'bad', text: (res && res.reason) || 'That could not be played.' };
+        } else {
+          note = {
+            tone: 'good',
+            text: money.words(res.spent || amount) + ' across ' +
+              (res.seats || a.seats.length) + ' seats.',
+          };
+          spendOpen = false;
+          amount = 0;
+          if (CMP.audio) CMP.audio.play('spend');
+        }
+        paint();
+      }).catch(function () {
+        busy = false;
+        note = { tone: 'bad', text: 'That could not be played.' };
+        paint();
+      });
+    }
+
+    function actions(st, a) {
+      if (!opts.canSpend || !opts.canSpend()) {
+        return el('div', { class: 'dp-actions' }, [
+          el('p', { class: 'dp-note', text: 'The round is closed. Wait for the next one.' }),
+        ]);
+      }
+      if (!a.seats.length) {
+        return el('div', { class: 'dp-actions' }, [
+          el('p', { class: 'dp-note', text: 'Every seat here is settled.' }),
+        ]);
+      }
+      if (!a.canAfford) {
+        return el('div', { class: 'dp-actions' }, [
+          el('p', {
+            class: 'dp-note is-bad',
+            text: 'Campaigning across ' + a.seats.length + ' seats needs at least ' +
+              money.words(a.min) + ', and you have ' + (money.words(a.pot.total) || '₹0') + '.',
+          }),
+        ]);
+      }
+      if (spendOpen) return spendPanel(a);
+
+      return el('div', { class: 'dp-actions' }, [
+        el('div', { class: 'dp-purse' }, [
+          el('div', { class: 'dp-purse-fig' }, [
+            el('span', { class: 'dp-purse-label', text: 'Available here' }),
+            el('strong', {
+              class: 'dp-purse-value',
+              text: money.words(a.pot.total) || '₹0',
+            }),
+          ]),
+        ]),
+        el('button', {
+          class: 'btn btn-primary btn-wide',
+          type: 'button',
+          text: 'Campaign across ' + a.seats.length +
+            (a.seats.length === 1 ? ' seat' : ' seats'),
+          onclick: function () {
+            spendOpen = true;
+            if (!amount) amount = a.quick[0] || a.min;
+            if (CMP.audio) CMP.audio.play('tap');
+            paint();
+          },
+        }),
+      ]);
+    }
+
+    /**
+     * The seats themselves, for when the district is not the right unit.
+     *
+     * A district spend spreads evenly; taking one particular seat off
+     * somebody is a different move, and this is the way to it.
+     */
+    function seatList(st) {
+      if (!opts.onSeat) return null;
+      return el('section', { class: 'dp-block' }, [
+        el('h3', { class: 'dp-block-title', text: 'Seats' }),
+        el('div', { class: 'dp-seats' }, st.district.seats.map(function (n) {
+          var status = CMP.campaign.seatStatus(game, n);
+          var party = status.partyId ? CMP.getParty(status.partyId) : null;
+          var seat = seatDef(n);
+          return el('button', {
+            class: 'dp-seat is-' + status.state,
+            type: 'button',
+            dataset: { seat: String(n) },
+            style: party ? { '--party': party.colour } : null,
+            onclick: function () {
+              opts.onSeat(n);
+            },
+          }, [
+            el('span', { class: 'dp-seat-name', text: seat ? seat.name : 'AC ' + n }),
+            el('span', {
+              class: 'dp-seat-who',
+              text: party ? party.short : 'open',
+            }),
+          ]);
+        })),
+      ]);
+    }
+
+    function paint() {
+      if (!game || !districtId) {
+        mount(root, []);
+        return;
+      }
+      var st = standing();
+      if (!st) {
+        mount(root, [el('p', { class: 'dp-note', text: 'Unknown district.' })]);
+        return;
+      }
+      var a = amountsFor();
+
+      mount(root, [
+        head(st),
+        el('div', { class: 'dp-body' }, [
+          field(st, opts.players ? opts.players() : []),
+          moneyBlock(st, a),
+          note ? el('p', { class: 'dp-flash is-' + note.tone, text: note.text }) : null,
+          seatList(st),
+        ]),
+        actions(st, a),
+      ]);
+    }
+
+    function show(nextGame, id) {
+      var changed = id !== districtId;
+      game = nextGame;
+      districtId = id;
+      if (changed) {
+        spendOpen = false;
+        amount = 0;
+        note = null;
+      }
+      paint();
+    }
+
+    function update(nextGame) {
+      if (!districtId) return;
+      game = nextGame;
+      paint();
+    }
+
+    return {
+      root: root,
+      show: show,
+      update: update,
+      district: function () {
+        return districtId;
+      },
+    };
+  }
+
+  return { create: create, createArea: createArea, POSITION: POSITION };
 })();
